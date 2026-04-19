@@ -1,0 +1,18 @@
+{
+  "_comment": "Display recipe: background_visual. prominence=standard, sizing=cover, autoplay=muted, loop=true. Used for video-as-background-of-audio (Spotify Canvas style).",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 5,
+  "slug": "background-visual",
+  "name": "Background Visual Conformance Fixture",
+  "items": [
+    {
+      "item_id": 501,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Background Visual Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["background_visual"]
+    }
+  ]
+}

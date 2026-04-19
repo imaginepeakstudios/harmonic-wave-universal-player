@@ -1,0 +1,32 @@
+{
+  "_comment": "image_sequence sets sequence_dwell_seconds:5 (already default but recipe-stamped), content_advance:auto, transition:crossfade.",
+  "experience": {
+    "id": 9,
+    "slug": "image-sequence"
+  },
+  "hwes_extensions_honored": ["display_recipes_v1"],
+  "items": [
+    {
+      "item_id": 901,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "crossfade",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

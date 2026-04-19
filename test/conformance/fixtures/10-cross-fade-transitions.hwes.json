@@ -1,0 +1,18 @@
+{
+  "_comment": "Display recipe: cross_fade_transitions. transition=crossfade. Smooth cross-fade between items.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 10,
+  "slug": "cross-fade-transitions",
+  "name": "Cross-Fade Transitions Conformance Fixture",
+  "items": [
+    {
+      "item_id": 1001,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Cross-Fade Transitions Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["cross_fade_transitions"]
+    }
+  ]
+}

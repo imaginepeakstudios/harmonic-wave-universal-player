@@ -1,5 +1,9 @@
 import { describe, test, expect } from 'vitest';
-import { selectLayers, pickContentRenderer } from '../../src/composition/layer-selector.js';
+import {
+  selectLayers,
+  pickContentRenderer,
+  LAYER_RULES,
+} from '../../src/composition/layer-selector.js';
 import { defaultBehavior, mergeBehavior } from '../../src/engine/behavior-config.js';
 
 describe('composition/layer-selector — pickContentRenderer', () => {
@@ -76,5 +80,52 @@ describe('composition/layer-selector — selectLayers', () => {
     const layers = selectLayers({ content_type_slug: 'song' }, defaultBehavior());
     const order = layers.map((l) => l.layer);
     expect(order.indexOf('content')).toBeLessThan(order.indexOf('chrome'));
+  });
+});
+
+describe('composition/layer-selector — LAYER_RULES registry', () => {
+  test('registry has one entry per layer in z-order', () => {
+    // Lock the contract: every layer kind in the order it should mount.
+    // Adding a new layer means adding an entry; reordering means a real
+    // visual change that needs a deliberate edit.
+    const order = LAYER_RULES.map((r) => r.layer);
+    expect(order).toEqual(['scene', 'content', 'overlay', 'chrome', 'narration']);
+  });
+
+  test('every rule has the expected shape (layer + renderer + when)', () => {
+    for (const rule of LAYER_RULES) {
+      expect(rule).toHaveProperty('layer');
+      expect(rule).toHaveProperty('renderer');
+      expect(rule).toHaveProperty('when');
+      expect(typeof rule.when).toBe('function');
+    }
+  });
+
+  test('Step 7/8/11 rules currently return false (renderers not shipped yet)', () => {
+    // Sanity check that activation predicates default to off until the
+    // renderer ships. When Step 7 lands the visualizer, this test
+    // intentionally fails for the scene rule — that's the signal the
+    // implementer needs to update the predicate.
+    const item = { content_type_slug: 'song', content_metadata: {} };
+    const behavior = defaultBehavior();
+    const sceneRule = LAYER_RULES.find((r) => r.layer === 'scene');
+    const overlayRule = LAYER_RULES.find((r) => r.layer === 'overlay');
+    const narrationRule = LAYER_RULES.find((r) => r.layer === 'narration');
+    expect(sceneRule.when(item, behavior)).toBe(false);
+    expect(overlayRule.when(item, behavior)).toBe(false);
+    expect(narrationRule.when(item, behavior)).toBe(false);
+  });
+
+  test('content rule always activates regardless of behavior', () => {
+    const contentRule = LAYER_RULES.find((r) => r.layer === 'content');
+    expect(contentRule.when({}, defaultBehavior())).toBe(true);
+    expect(contentRule.when({ content_type_slug: 'unknown' }, defaultBehavior())).toBe(true);
+  });
+
+  test('chrome rule activates only when behavior.chrome !== "none"', () => {
+    const chromeRule = LAYER_RULES.find((r) => r.layer === 'chrome');
+    expect(chromeRule.when({}, defaultBehavior())).toBe(true); // chrome=full default
+    expect(chromeRule.when({}, mergeBehavior(defaultBehavior(), { chrome: 'minimal' }))).toBe(true);
+    expect(chromeRule.when({}, mergeBehavior(defaultBehavior(), { chrome: 'none' }))).toBe(false);
   });
 });

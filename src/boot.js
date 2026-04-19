@@ -75,6 +75,30 @@ if (!app) {
 const params = new URLSearchParams(globalThis.location?.search || '');
 const fixtureName = params.get('fixture');
 
+/**
+ * Top-level dispose chain. Boot's module-scope captures the active
+ * renderer + shell so SPA-style unmounts (or programmatic teardown via
+ * __hwes.dispose) release Audio elements, AudioContext nodes (Step 9),
+ * visualizer rAF (Step 7), and DOM listeners cleanly.
+ *
+ * Per IMPLEMENTATION-GUIDE.md "Memory leak when player is unmounted"
+ * bug pattern: in the POC, the engine assumed page-reload would clean
+ * up everything, so embedding it inside an SPA leaked Audio elements +
+ * AudioContext on every navigation. The new player exposes a single
+ * dispose() entry point so any host environment can call it on unmount.
+ *
+ * The IIFE below assigns its activeRenderer/activeShell teardown
+ * functions to these module-scope hooks. dispose() is also wired to
+ * pagehide (more reliable than beforeunload on mobile + bfcache) so a
+ * normal navigation away releases resources without host code.
+ */
+let teardownActive = () => {};
+function dispose() {
+  teardownActive();
+  teardownActive = () => {}; // idempotent — second dispose() is a no-op
+}
+globalThis.addEventListener?.('pagehide', dispose);
+
 // Run the pipeline. Wrapped in an async IIFE so top-level await isn't
 // required and the surrounding script keeps its synchronous side effects
 // (registry counts, debug global) ordered before the awaits.
@@ -97,6 +121,15 @@ const fixtureName = params.get('fixture');
     let activeIndex = 0;
     let activeRenderer = null;
     let activeShell = null;
+
+    // Wire the module-scope dispose hook so __hwes.dispose() / pagehide
+    // tears down the active item cleanly.
+    teardownActive = () => {
+      activeRenderer?.teardown();
+      activeShell?.teardown();
+      activeRenderer = null;
+      activeShell = null;
+    };
 
     function mountItem(index) {
       activeRenderer?.teardown();
@@ -322,6 +355,7 @@ if (isLocalDev) {
     engine: { resolveBehavior, defaultBehavior },
     composition: { composeItem },
     theme: { injectTheme },
+    dispose,
     registry: {
       version: RECIPES_VERSION,
       delivery: BUILTIN_DELIVERY_RECIPES,

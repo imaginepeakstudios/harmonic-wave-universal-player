@@ -1,0 +1,9 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`snapshot — audio renderer > default behavior — bare card with cover + title + hidden audio 1`] = `"<article class="hwes-audio hwes-audio--standard hwes-audio--contain"><img class="hwes-audio__cover" crossorigin="anonymous" src="https://example.com/holding-on.jpg" alt="Holding On — cover art"><div class="hwes-audio__meta"><h2 class="hwes-audio__title">Holding On</h2></div><audio class="hwes-audio__element" preload="metadata" src="https://example.com/holding-on.mp3"></audio></article>"`;
+
+exports[`snapshot — audio renderer > hero + fullscreen sizing — cinematic display path 1`] = `"<article class="hwes-audio hwes-audio--hero hwes-audio--fullscreen"><img class="hwes-audio__cover" crossorigin="anonymous" src="https://example.com/test.jpg" alt="Cinematic Test — cover art"><div class="hwes-audio__meta"><h2 class="hwes-audio__title">Cinematic Test</h2></div><audio class="hwes-audio__element" preload="metadata" muted="" src="https://example.com/test.mp3"></audio></article>"`;
+
+exports[`snapshot — audio renderer > loop=true — element carries the loop attribute 1`] = `"<article class="hwes-audio hwes-audio--standard hwes-audio--contain"><div class="hwes-audio__meta"><h2 class="hwes-audio__title">Looped</h2></div><audio class="hwes-audio__element" preload="metadata" loop="" src="https://example.com/loop.mp3"></audio></article>"`;
+
+exports[`snapshot — audio renderer > no cover — title-only card 1`] = `"<article class="hwes-audio hwes-audio--standard hwes-audio--contain"><div class="hwes-audio__meta"><h2 class="hwes-audio__title">No Cover Track</h2></div><audio class="hwes-audio__element" preload="metadata" src="https://example.com/nocover.mp3"></audio></article>"`;

@@ -1,0 +1,18 @@
+{
+  "_comment": "Display recipe: letterbox_21_9. sizing=contain, chrome=minimal. Used for cinematic video content. No precondition on content type today (any content can use it; the recipe just hints renderer-side at letterbox bars).",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 6,
+  "slug": "letterbox-21-9",
+  "name": "Letterbox 21:9 Conformance Fixture",
+  "items": [
+    {
+      "item_id": 601,
+      "content_id": 100,
+      "content_type_slug": "movie",
+      "content_title": "Letterbox 21:9 Test",
+      "media_play_url": "/media/play/test.mp4",
+      "display_directives": ["letterbox_21_9"]
+    }
+  ]
+}

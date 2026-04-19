@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`snapshot — chrome controls > after setNowPlaying + setPlayingState(true) — Pause button + label 1`] = `"<div class="hwes-controls"><div class="hwes-controls__now-playing">Track 3 of 12 — Holding On</div><div class="hwes-controls__buttons"><button type="button" class="hwes-controls__btn hwes-controls__btn--primary" aria-label="Pause">Pause</button><button type="button" class="hwes-controls__btn" aria-label="Skip to next item">Skip</button></div></div>"`;
+
+exports[`snapshot — chrome controls > initial state — Play button + empty now-playing 1`] = `"<div class="hwes-controls"><div class="hwes-controls__now-playing">—</div><div class="hwes-controls__buttons"><button type="button" class="hwes-controls__btn hwes-controls__btn--primary" aria-label="Play">Play</button><button type="button" class="hwes-controls__btn" aria-label="Skip to next item">Skip</button></div></div>"`;

@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`snapshot — chrome shell > chrome=full with actor byline 1`] = `"<div class="hwes-shell hwes-shell--full"><header class="hwes-shell__header"><h1 class="hwes-shell__title">Test Experience</h1><p class="hwes-shell__byline">with DJ Layla</p></header><main class="hwes-shell__content"></main><footer class="hwes-shell__controls"><div class="hwes-controls"><div class="hwes-controls__now-playing">—</div><div class="hwes-controls__buttons"><button type="button" class="hwes-controls__btn hwes-controls__btn--primary" aria-label="Play">Play</button><button type="button" class="hwes-controls__btn" aria-label="Skip to next item">Skip</button></div></div></footer></div>"`;
+
+exports[`snapshot — chrome shell > chrome=minimal — no header, controls present 1`] = `"<div class="hwes-shell hwes-shell--minimal"><main class="hwes-shell__content"></main><footer class="hwes-shell__controls"><div class="hwes-controls"><div class="hwes-controls__now-playing">—</div><div class="hwes-controls__buttons"><button type="button" class="hwes-controls__btn hwes-controls__btn--primary" aria-label="Play">Play</button><button type="button" class="hwes-controls__btn" aria-label="Skip to next item">Skip</button></div></div></footer></div>"`;
+
+exports[`snapshot — chrome shell > chrome=none — bare mount, no controls slot 1`] = `"<div class="hwes-shell hwes-shell--none"><div class="hwes-shell__content"></div></div>"`;

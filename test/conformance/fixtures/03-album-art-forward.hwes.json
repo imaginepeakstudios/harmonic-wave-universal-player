@@ -1,0 +1,18 @@
+{
+  "_comment": "Display recipe: album_art_forward. prominence=hero, sizing=contain, chrome=minimal. Expected layers: content + chrome (chrome != 'none').",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 3,
+  "slug": "album-art-forward",
+  "name": "Album Art Forward Conformance Fixture",
+  "items": [
+    {
+      "item_id": 301,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Album Art Forward Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["album_art_forward"]
+    }
+  ]
+}

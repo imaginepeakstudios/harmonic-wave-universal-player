@@ -1,0 +1,18 @@
+{
+  "_comment": "Display recipe: performance_mode. prominence=hero, sizing=fullscreen, chrome=none, content_advance=manual. Layers: content only (chrome=none drops the chrome layer).",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 4,
+  "slug": "performance-mode",
+  "name": "Performance Mode Conformance Fixture",
+  "items": [
+    {
+      "item_id": 401,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Performance Mode Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["performance_mode"]
+    }
+  ]
+}

@@ -7,15 +7,35 @@
  * Ordering is z-index back-to-front:
  *   scene → content → overlay → chrome → narration
  *
- * Step 5 ships content + chrome only. The other layer rules are stubbed
- * out below to make the activation criteria explicit — when Step 6/7/11
- * adds the renderer, the rule already says when to fire it.
+ * Architecture: layer rules are a DATA-DRIVEN registry. Each entry
+ * declares (a) which layer it claims, (b) which renderer to mount,
+ * and (c) a `when(item, behavior)` predicate that gates activation.
+ * Adding a new layer / renderer means adding one entry here — no
+ * surgery elsewhere. This pattern lands per FE arch review P1 #5
+ * (was previously commented-out `if (...) layers.push(...)` rules,
+ * which had the failure mode "Step N implementer forgets to uncomment").
+ *
+ * The `when` predicate captures the activation criteria for each layer
+ * BEFORE its renderer ships. Rules whose renderer is a Step-N stub
+ * still appear here with `when: () => false` so the activation rule is
+ * documented and version-controlled. When the renderer ships, flip
+ * the predicate — the rest of the engine doesn't care.
  */
 
 /**
  * @typedef {object} LayerEntry
  * @property {'scene' | 'content' | 'overlay' | 'chrome' | 'narration'} layer
  * @property {string} renderer
+ */
+
+/**
+ * @typedef {object} LayerRule
+ * @property {LayerEntry['layer']} layer
+ * @property {string | ((item: import('../schema/interpreter.js').ItemView) => string)} renderer
+ *   String for fixed renderer names, function for content-type-dispatched
+ *   selection (e.g. content layer dispatches by content_type_slug).
+ * @property {(item: import('../schema/interpreter.js').ItemView, behavior: import('../engine/behavior-config.js').BehaviorConfig) => boolean} when
+ *   Activation predicate. Return true to include this layer in the plan.
  */
 
 /**
@@ -52,45 +72,68 @@ export function pickContentRenderer(item) {
 }
 
 /**
+ * The layer-rules registry. Order is z-index back-to-front; the
+ * selectLayers function preserves it.
+ *
+ * @type {LayerRule[]}
+ */
+export const LAYER_RULES = [
+  // SCENE — Step 7 (visualizer + cinematic backdrops). Activates when
+  // item or experience has visual_scene metadata AND chrome is rendered
+  // (otherwise scene + content stack weirdly under fullscreen).
+  {
+    layer: 'scene',
+    renderer: 'banner-static',
+    when: (_item, _behavior) => false, // TODO(step-7): activate
+  },
+
+  // CONTENT — always present. The single load-bearing layer.
+  {
+    layer: 'content',
+    renderer: (item) => pickContentRenderer(item),
+    when: () => true,
+  },
+
+  // OVERLAY — Step 8. Activates when behavior says lyrics should render
+  // AND content_metadata carries the data the renderer needs. Defense in
+  // depth: the engine's precondition check should already have prevented
+  // lyrics_display!=='none' without lrc_lyrics, but composition guards
+  // again for direct BehaviorConfig manipulation in tests.
+  {
+    layer: 'overlay',
+    renderer: 'lyrics-scrolling',
+    when: (_item, _behavior) => false, // TODO(step-8): activate when behavior.lyrics_display !== 'none' && item.content_metadata?.lrc_lyrics
+  },
+
+  // CHROME — render unless behavior says hide it entirely. 'minimal' and
+  // 'full' both render the chrome layer; the chrome renderer reads
+  // behavior.chrome itself to decide HOW much to show.
+  {
+    layer: 'chrome',
+    renderer: 'shell',
+    when: (_item, behavior) => behavior.chrome !== 'none',
+  },
+
+  // NARRATION — Step 11. Activates when item has a resolved actor AND
+  // narration directives are non-trivial.
+  {
+    layer: 'narration',
+    renderer: 'tts-bridge',
+    when: (_item, _behavior) => false, // TODO(step-11): activate when item.resolved_actor && narration directives are set
+  },
+];
+
+/**
  * @param {import('../schema/interpreter.js').ItemView} item
  * @param {import('../engine/behavior-config.js').BehaviorConfig} behavior
  * @returns {LayerEntry[]}
  */
 export function selectLayers(item, behavior) {
-  /** @type {LayerEntry[]} */
   const layers = [];
-
-  // SCENE — Step 7. Activate when item or experience has visual_scene
-  // configured AND chrome != 'none' (otherwise scene + content stack
-  // weirdly under fullscreen). Stubbed for now; rule shape locked in.
-  // if (item?.content_metadata?.visual_scene && behavior.chrome !== 'none') {
-  //   layers.push({ layer: 'scene', renderer: 'banner-static' });
-  // }
-
-  // CONTENT — always present. The single load-bearing layer.
-  layers.push({ layer: 'content', renderer: pickContentRenderer(item) });
-
-  // OVERLAY — Step 8. Activate when behavior.lyrics_display !== 'none'
-  // AND content_metadata carries lrc_lyrics (precondition the engine
-  // already enforces, but composition guards too — defense in depth
-  // against direct BehaviorConfig manipulation in tests).
-  // if (behavior.lyrics_display === 'scroll_synced' && item?.content_metadata?.lrc_lyrics) {
-  //   layers.push({ layer: 'overlay', renderer: 'lyrics-scrolling' });
-  // }
-
-  // CHROME — render unless behavior says hide it entirely. 'minimal' and
-  // 'full' both render the chrome layer; the chrome renderer reads
-  // behavior.chrome itself to decide HOW much to show.
-  if (behavior.chrome !== 'none') {
-    layers.push({ layer: 'chrome', renderer: 'shell' });
+  for (const rule of LAYER_RULES) {
+    if (!rule.when(item, behavior)) continue;
+    const renderer = typeof rule.renderer === 'function' ? rule.renderer(item) : rule.renderer;
+    layers.push({ layer: rule.layer, renderer });
   }
-
-  // NARRATION — Step 11. Activate when item has a resolved actor AND
-  // narration directives are non-trivial (e.g., narration_position is
-  // set, audio_ducking_db is set, etc.).
-  // if (item?.resolved_actor && behavior.narration_position) {
-  //   layers.push({ layer: 'narration', renderer: 'tts-bridge' });
-  // }
-
   return layers;
 }

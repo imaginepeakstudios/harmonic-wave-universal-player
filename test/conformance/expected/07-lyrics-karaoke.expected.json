@@ -1,0 +1,32 @@
+{
+  "_comment": "lyrics_karaoke (precondition met) sets lyrics_display:scroll_synced, expand_button:true.",
+  "experience": {
+    "id": 7,
+    "slug": "lyrics-karaoke"
+  },
+  "hwes_extensions_honored": ["display_recipes_v1"],
+  "items": [
+    {
+      "item_id": 701,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "scroll_synced",
+        "doc_display": "none",
+        "expand_button": true,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

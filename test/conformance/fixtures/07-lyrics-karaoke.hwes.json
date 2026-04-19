@@ -1,0 +1,21 @@
+{
+  "_comment": "Display recipe: lyrics_karaoke. lyrics_display=scroll_synced, expand_button=true. Precondition: requires content_metadata.lrc_lyrics. This fixture supplies the LRC string so the precondition passes.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 7,
+  "slug": "lyrics-karaoke",
+  "name": "Lyrics Karaoke Conformance Fixture",
+  "items": [
+    {
+      "item_id": 701,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Lyrics Karaoke Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["lyrics_karaoke"],
+      "content_metadata": {
+        "lrc_lyrics": "[00:00.00]Line one of the lyrics\n[00:02.00]Line two\n"
+      }
+    }
+  ]
+}

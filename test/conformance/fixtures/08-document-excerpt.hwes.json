@@ -1,0 +1,18 @@
+{
+  "_comment": "Display recipe: document_excerpt. doc_display=excerpt, expand_button=true. Precondition: applicable_content_types=[document]. Item is content_type_slug=document.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 8,
+  "slug": "document-excerpt",
+  "name": "Document Excerpt Conformance Fixture",
+  "items": [
+    {
+      "item_id": 801,
+      "content_id": 100,
+      "content_type_slug": "document",
+      "content_title": "Document Excerpt Test",
+      "media_play_url": "/media/play/test.pdf",
+      "display_directives": ["document_excerpt"]
+    }
+  ]
+}

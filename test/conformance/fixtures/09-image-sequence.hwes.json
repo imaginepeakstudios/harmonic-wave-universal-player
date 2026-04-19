@@ -1,0 +1,18 @@
+{
+  "_comment": "Display recipe: image_sequence. sequence_dwell_seconds=5, content_advance=auto, transition=crossfade. Precondition: applicable_content_types=[photo, image]. Item is content_type_slug=photo.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 9,
+  "slug": "image-sequence",
+  "name": "Image Sequence Conformance Fixture",
+  "items": [
+    {
+      "item_id": 901,
+      "content_id": 100,
+      "content_type_slug": "photo",
+      "content_title": "Image Sequence Test",
+      "media_play_url": "/media/play/test.jpg",
+      "display_directives": ["image_sequence"]
+    }
+  ]
+}

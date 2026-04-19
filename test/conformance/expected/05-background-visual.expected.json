@@ -1,0 +1,32 @@
+{
+  "_comment": "background_visual sets prominence:standard, sizing:cover, autoplay:muted, loop:true. chrome stays at default (full).",
+  "experience": {
+    "id": 5,
+    "slug": "background-visual"
+  },
+  "hwes_extensions_honored": ["display_recipes_v1"],
+  "items": [
+    {
+      "item_id": 501,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "cover",
+        "chrome": "full",
+        "autoplay": "muted",
+        "loop": true,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

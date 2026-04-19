@@ -1,0 +1,33 @@
+{
+  "_comment": "album_art_forward sets prominence:hero, sizing:contain, chrome:minimal. Other primitives at default. Layers: content + chrome.",
+  "experience": {
+    "id": 3,
+    "slug": "album-art-forward"
+  },
+  "hwes_extensions_honored": ["display_recipes_v1"],
+  "hwes_extensions_ignored": [],
+  "items": [
+    {
+      "item_id": 301,
+      "resolved_behavior": {
+        "prominence": "hero",
+        "sizing": "contain",
+        "chrome": "minimal",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}
