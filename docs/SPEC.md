@@ -622,10 +622,12 @@ The modular structure allows incremental shipping. Each step produces a working 
 - `interactions/gestures.js`
 - `interactions/single-audio-guard.js`
 
-### Step 11: TTS bridge
-- `renderers/narration/tts-bridge.js`
-- `composition/narration-pipeline.js`
-- (Depends on Voice-as-Actor / TTS service being functional platform-side)
+### Step 11: TTS bridge ✅
+- `renderers/narration/tts-bridge.js` — uniform `{ on, speak, pause, resume, cancel, teardown }` interface over 3 providers (decision #33): platform-audio (pre-rendered MP3/WAV), browser-tts (Web Speech API + `SpeechSynthesisUtterance` + per-word `boundary` events, the permanent default), silent (synthetic timing fallback so the rest of the pipeline still fires). Voice mapping from `actor.voice_name` → browser voice via substring match.
+- `composition/narration-pipeline.js` — orchestrates narration around content per the `narration_position` primitive: mounts a transient narration overlay (`.hwes-narration` — upper-third text with per-word highlight), ducks the music bed via Step 9's `audioPipeline.duckMusicBed()`, drives the TTS bridge, honors `pause_after_narration_seconds`, subscribes to state-machine `narration:skip` (keyboard 'N' from Step 10).
+- `boot.js` — narration pipeline created at boot scope (survives across mountItem). `item:started` subscriber speaks the intro narration BEFORE mounting content when `narration_position === 'before_content'` (the default) or `'between_items'`. `?narrate=auto` URL override enables the "Up next: <title>" fallback for items without authored intro_hint.
+- `narration_text` resolution: `item.intro_hint` → `item.content_metadata.intro_hint` → `item.tts_intro_text` → (with allowDefault) `"Up next: <title>"`.
+- `narration_audio_url` resolution: `item.tts_intro_audio_url` → `item.content_metadata.tts_intro_audio_url` → `item.tts_intro_url` (production wire).
 
 ### Step 12: End-of-experience
 - `end-of-experience/completion-card.js`

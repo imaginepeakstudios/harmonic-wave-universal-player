@@ -1,0 +1,34 @@
+{
+  "_comment": "Browser-demo fixture for Step 11 — TTS-bridge narration intros before each item. Two audio items, each with an intro_hint that DJ Layla speaks before the song plays. Load with ?fixture=13-narration-intro&debug to see the narration overlay (text in upper-third) + per-word highlight as the browser TTS speaks. The pipeline routes through the silent fallback in headless / no-SpeechSynthesis envs and through the real Web Speech API in the browser. Music bed isn't started in this fixture (chrome-none cinematic) so ducking isn't visible — see fixture 12 for the music-bed demo. Add &narrate=auto to enable the 'Up next: <title>' default for items WITHOUT intro_hint.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1", "actor_visual_identity_v1"],
+  "id": 1013,
+  "slug": "demo-narration-intro",
+  "name": "Demo \u2014 Narration Intro",
+  "description": "Two audio items with DJ-host intros before each.",
+  "actor_name": "DJ Layla",
+  "actor_voice_name": "Samantha",
+  "actor_narrative_voice": "warm",
+  "items": [
+    {
+      "item_id": 1,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Holding On",
+      "intro_hint": "Welcome. This first one is a song about love and loss \u2014 about holding on when everything else slips away.",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen", "cross_fade_transitions"]
+    },
+    {
+      "item_id": 2,
+      "content_id": 101,
+      "content_type_slug": "song",
+      "content_title": "Without You",
+      "intro_hint": "Up next \u2014 a quieter piece. Sometimes the absence of a thing tells you more than its presence ever could.",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/without-you-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen", "cross_fade_transitions"]
+    }
+  ]
+}

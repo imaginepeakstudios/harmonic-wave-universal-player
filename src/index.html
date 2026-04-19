@@ -546,6 +546,56 @@
         }
       }
 
+      /* NARRATION OVERLAY — Step 11. Transient text overlay shown
+         while the AI host speaks (TTS bridge per #33). Per-word
+         highlight via __word--active class fired by the bridge's
+         boundary events. Positioned in the upper third of the screen
+         so it doesn't cover the visualizer / cover / video. */
+      .hwes-narration {
+        position: fixed;
+        top: 18%;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: min(80vw, 920px);
+        z-index: 60; /* above content + chrome, below network bumper */
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 380ms ease-in-out;
+        text-align: center;
+      }
+      .hwes-narration--visible {
+        opacity: 1;
+      }
+      .hwes-narration__text {
+        font-family: var(--player-font-display);
+        font-size: clamp(1.4rem, 3.2vw, 2.4rem);
+        font-weight: 600;
+        line-height: 1.35;
+        letter-spacing: 0.02em;
+        color: var(--player-text);
+        text-shadow:
+          0 2px 8px rgba(0, 0, 0, 0.95),
+          0 6px 24px rgba(0, 0, 0, 0.8),
+          0 0 56px var(--player-primary);
+      }
+      .hwes-narration__word {
+        display: inline-block;
+        opacity: 0.55;
+        transition: opacity 120ms ease-out, color 120ms ease-out;
+      }
+      .hwes-narration__word--active {
+        opacity: 1;
+        color: var(--player-primary);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .hwes-narration {
+          transition: none;
+        }
+        .hwes-narration__word {
+          transition: none;
+        }
+      }
+
       /* NETWORK STATION ID BUMPER — Step 10. Plays before any
          experience. The HW wordmark + a synthesized digital-wave SFX
          (network-bumper-sfx.js). Reinforces the broadcast-TV-program
@@ -589,8 +639,7 @@
         position: relative;
         z-index: 2;
         /* Logo is intentionally small — the wave bars are wider than
-           the logo on both sides so they frame it. Per user direction:
-           "logo should be small so you can see the wave bars." */
+           the logo on both sides so they frame it. */
         width: clamp(140px, 22vw, 260px);
         height: auto;
         user-select: none;
@@ -600,7 +649,15 @@
            crescendos. The "network ident emerging" motion. */
         transform: scale(0.5);
         animation: hwes-bumper-logo 9000ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-        filter: drop-shadow(0 0 32px rgba(109, 211, 255, 0.18));
+        /* Massive 5-stack drop shadow from the POC — cyan glow plus
+           multiple black halos that create depth + vignette the logo
+           against the black background so it feels lit-from-within. */
+        filter:
+          drop-shadow(0 0 40px rgba(0, 210, 235, 0.35))
+          drop-shadow(0 0 40px rgba(0, 0, 0, 1))
+          drop-shadow(0 0 80px rgba(0, 0, 0, 1))
+          drop-shadow(0 0 140px rgba(0, 0, 0, 0.8))
+          drop-shadow(0 0 200px rgba(0, 0, 0, 0.6));
       }
       @keyframes hwes-bumper-logo {
         /* Sync points (matches network-bumper-sfx.js timeline):

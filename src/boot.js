@@ -71,6 +71,7 @@ import { createKeyboardInteractions } from './interactions/keyboard.js';
 import { createGestureInteractions } from './interactions/gestures.js';
 import { createSingleAudioGuard } from './interactions/single-audio-guard.js';
 import { createNetworkBumper } from './intro/network-bumper.js';
+import { createNarrationPipeline } from './composition/narration-pipeline.js';
 
 const config = readConfig();
 const mcp = createMcpClient(config);
@@ -273,6 +274,16 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     let activeSet = null;
     let activeIndex = 0;
 
+    // Step 11 narration pipeline. Subscribes to state-machine
+    // narration:skip + drives TTS bridge (platform-audio / browser-tts /
+    // silent per #33). The pipeline mounts a transient narration
+    // overlay, ducks the music bed, speaks, then resolves so content
+    // can start. `?narrate=auto` URL override turns on the default
+    // "Up next: <title>" fallback for items without authored intro_hint
+    // — useful for demos. Without the flag, only items with
+    // intro_hint / tts_intro_text get narration.
+    const narrateAuto = params.get('narrate') === 'auto';
+
     // Module-scope playing flag — kept in lockstep with whatever the
     // currently-mounted controls show. Read by the keyboard space-bar
     // toggle, the single-audio-guard's "another tab took over" handler,
@@ -343,6 +354,7 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       keyboard.teardown();
       gestures.teardown();
       audioGuard.teardown();
+      narration?.teardown();
       // dispose() (full-unmount) closes the AudioContext irreversibly;
       // teardown() keeps it alive for a re-mount. Boot's teardownActive
       // is the SPA-unmount entry, so dispose is correct here.
@@ -618,8 +630,17 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     // what's already mounted, we just trigger playback on the existing
     // renderer instead of tearing it down + rebuilding (which would
     // leak the bootstrap audio element + race renderer.done).
+    // Narration pipeline (Step 11) — mounted at boot scope so it
+    // survives across mountItem. Subscribes to narration:skip itself.
+    const narration = createNarrationPipeline({
+      audioPipeline,
+      stateMachine,
+      mount: app,
+      allowDefaultNarration: narrateAuto,
+    });
+
     let lastMountedIndex = -1;
-    stateMachine.on('item:started', ({ index }) => {
+    stateMachine.on('item:started', async ({ index, item }) => {
       activeIndex = index;
       if (index === lastMountedIndex && activeSet) {
         // Bootstrap-then-unlock path: the visible card is already the
@@ -628,6 +649,21 @@ globalThis.addEventListener?.('pagehide', onPageHide);
         return;
       }
       lastMountedIndex = index;
+      // Step 11: speak the intro narration BEFORE mounting content
+      // (default narration_position = 'before_content'). speakForItem
+      // resolves immediately if the item has no authored intro and
+      // `?narrate=auto` is not set, so no narration mounts a no-op.
+      const { behavior: itemBehavior } = resolveBehavior(view, item);
+      const itemActor = view.getItemActor(item);
+      const position = /** @type {string} */ (itemBehavior.narration_position ?? 'before_content');
+      if (position === 'before_content' || position === 'between_items') {
+        await narration.speakForItem({
+          item,
+          behavior: itemBehavior,
+          actor: itemActor ?? undefined,
+          phase: position === 'between_items' ? 'between' : 'intro',
+        });
+      }
       mountItem(index);
     });
     // Music bed is gated on isAudioUnlocked + desktop. The bootstrap
@@ -677,7 +713,7 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     // see…" expectation.
     // eslint-disable-next-line no-console
     console.info(
-      '[Harmonic Wave Universal Player] Steps 1-9 mounted.\n' +
+      '[Harmonic Wave Universal Player] Steps 1-11 mounted.\n' +
         `  Audio:      ${audioPipeline.kind} pipeline${stateMachine.isAudioUnlocked() ? ' (unlocked)' : ' (locked — first Play unlocks)'}\n` +
         `  Source:     ${describeSource({ fixtureName })}\n` +
         `  Experience: ${view.experience?.name ?? '(unnamed)'} (${view.items.length} item${view.items.length === 1 ? '' : 's'})\n` +
