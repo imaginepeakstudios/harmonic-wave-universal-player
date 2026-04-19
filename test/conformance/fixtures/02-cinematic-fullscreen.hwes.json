@@ -1,0 +1,23 @@
+{
+  "_comment": "Conformance fixture 02 — cinematic_fullscreen display recipe applied at the experience root. Tests that the engine resolves player_directives from the recipe registry into a BehaviorConfig with prominence=hero, sizing=fullscreen, chrome=none, autoplay=muted; layers include scene + content + chrome; chrome layer's chrome=none means no controls render.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 2,
+  "slug": "cinematic-fullscreen",
+  "name": "Cinematic Fullscreen Conformance Fixture",
+  "display_directives": ["cinematic_fullscreen"],
+  "items": [
+    {
+      "item_id": 201,
+      "content_id": 2001,
+      "content_type_slug": "song",
+      "content_type_name": "Song",
+      "content_title": "Cinematic Track",
+      "content_slug": "cinematic-track",
+      "content_status": "published",
+      "content_rating": "clean",
+      "media_play_url": "/media/play/2001",
+      "display_directives": ["cinematic_fullscreen"]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "_comment": "Expected resolved shape for fixture 02. Schema layer surfaces display_recipes_v1 as honored; engine layer derives BehaviorConfig from cinematic_fullscreen's player_directives in the registry: prominence=hero, sizing=fullscreen, chrome=none, autoplay=muted. Engine-layer assertions skip until Step 4.",
+  "experience": {
+    "id": 2,
+    "slug": "cinematic-fullscreen",
+    "name": "Cinematic Fullscreen Conformance Fixture",
+    "display_directives": ["cinematic_fullscreen"]
+  },
+  "hwes_extensions_honored": ["display_recipes_v1"],
+  "hwes_extensions_ignored": [],
+  "items": [
+    {
+      "item_id": 201,
+      "resolved_behavior": {
+        "prominence": "hero",
+        "sizing": "fullscreen",
+        "chrome": "none",
+        "autoplay": "muted",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content"]
+    }
+  ]
+}

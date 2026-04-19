@@ -1,1 +1,104 @@
-{"version":"1","generated_at":"2026-04-19T13:43:13.897Z","primitives":{"prominence":{"type":"enum","values":["standard","hero"],"default":"standard","description":"How prominent the content layer is in the rendered area. \"hero\" promotes it to a featured treatment (fullscreen cover, oversized type)."},"sizing":{"type":"enum","values":["contain","cover","fullscreen"],"default":"contain","description":"How the content sizes within its rendered area. contain = letterboxed, cover = crops to fill, fullscreen = scales to viewport."},"chrome":{"type":"enum","values":["full","minimal","none"],"default":"full","description":"How much surrounding UI chrome (controls, header, nav) renders. \"none\" gives a fully immersive treatment."},"autoplay":{"type":"enum","values":["off","on","muted"],"default":"off","description":"Autoplay behavior for media-bearing content. Players that cannot honor a value SHOULD degrade gracefully (e.g. autoplay:on for audio without user interaction → effectively off on mobile browsers)."},"loop":{"type":"boolean","default":false,"description":"Loop the active item until the listener advances."},"transition":{"type":"enum","values":["cut","crossfade","fade_through_black","slide"],"default":"cut","description":"Transition style between items."},"lyrics_display":{"type":"enum","values":["none","scroll_synced","spotlight_line","typewriter"],"default":"none","description":"How lyrics render on top of audio/video content. scroll_synced requires LRC-format timed lyrics in content metadata."},"doc_display":{"type":"enum","values":["none","excerpt","fullscreen_reader"],"default":"none","description":"How document-type content presents. \"excerpt\" shows first ~200 words inline; \"fullscreen_reader\" takes over the viewport with reading flow."},"expand_button":{"type":"boolean","default":false,"description":"Show an \"expand for more info\" affordance (full lyrics, full story, etc.)."},"sequence_dwell_seconds":{"type":"number","min":0,"max":600,"default":5,"description":"Seconds the engine dwells on a non-time-based item (image, document) before auto-advancing. 0 disables auto-advance."},"pause_between_items_seconds":{"type":"number","min":0,"max":30,"default":0,"description":"Seconds of silence inserted between items."},"content_advance":{"type":"enum","values":["auto","manual"],"default":"auto","description":"How the next item is triggered. \"manual\" requires listener input to advance."},"narration_position":{"type":"enum","values":["before_content","during_content","after_content","between_items"],"default":"before_content","description":"When narration plays relative to its associated content."},"pause_after_narration_seconds":{"type":"number","min":0,"max":30,"default":0,"description":"Seconds of silence after narration ends, before content begins."},"audio_ducking_db":{"type":"number","min":-24,"max":0,"default":-6,"description":"Decibel reduction applied to background audio (music bed, content audio) while narration is speaking."},"narration_music_bed":{"type":"enum","values":["none","auto"],"default":"none","description":"Music bed under narration. \"auto\" lets the engine pick a low-volume track from the experience. Desktop multi-channel only — mobile pipeline ignores this directive."}}}
+{
+  "version": "1",
+  "generated_at": "2026-04-19T13:43:13.897Z",
+  "primitives": {
+    "prominence": {
+      "type": "enum",
+      "values": ["standard", "hero"],
+      "default": "standard",
+      "description": "How prominent the content layer is in the rendered area. \"hero\" promotes it to a featured treatment (fullscreen cover, oversized type)."
+    },
+    "sizing": {
+      "type": "enum",
+      "values": ["contain", "cover", "fullscreen"],
+      "default": "contain",
+      "description": "How the content sizes within its rendered area. contain = letterboxed, cover = crops to fill, fullscreen = scales to viewport."
+    },
+    "chrome": {
+      "type": "enum",
+      "values": ["full", "minimal", "none"],
+      "default": "full",
+      "description": "How much surrounding UI chrome (controls, header, nav) renders. \"none\" gives a fully immersive treatment."
+    },
+    "autoplay": {
+      "type": "enum",
+      "values": ["off", "on", "muted"],
+      "default": "off",
+      "description": "Autoplay behavior for media-bearing content. Players that cannot honor a value SHOULD degrade gracefully (e.g. autoplay:on for audio without user interaction → effectively off on mobile browsers)."
+    },
+    "loop": {
+      "type": "boolean",
+      "default": false,
+      "description": "Loop the active item until the listener advances."
+    },
+    "transition": {
+      "type": "enum",
+      "values": ["cut", "crossfade", "fade_through_black", "slide"],
+      "default": "cut",
+      "description": "Transition style between items."
+    },
+    "lyrics_display": {
+      "type": "enum",
+      "values": ["none", "scroll_synced", "spotlight_line", "typewriter"],
+      "default": "none",
+      "description": "How lyrics render on top of audio/video content. scroll_synced requires LRC-format timed lyrics in content metadata."
+    },
+    "doc_display": {
+      "type": "enum",
+      "values": ["none", "excerpt", "fullscreen_reader"],
+      "default": "none",
+      "description": "How document-type content presents. \"excerpt\" shows first ~200 words inline; \"fullscreen_reader\" takes over the viewport with reading flow."
+    },
+    "expand_button": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show an \"expand for more info\" affordance (full lyrics, full story, etc.)."
+    },
+    "sequence_dwell_seconds": {
+      "type": "number",
+      "min": 0,
+      "max": 600,
+      "default": 5,
+      "description": "Seconds the engine dwells on a non-time-based item (image, document) before auto-advancing. 0 disables auto-advance."
+    },
+    "pause_between_items_seconds": {
+      "type": "number",
+      "min": 0,
+      "max": 30,
+      "default": 0,
+      "description": "Seconds of silence inserted between items."
+    },
+    "content_advance": {
+      "type": "enum",
+      "values": ["auto", "manual"],
+      "default": "auto",
+      "description": "How the next item is triggered. \"manual\" requires listener input to advance."
+    },
+    "narration_position": {
+      "type": "enum",
+      "values": ["before_content", "during_content", "after_content", "between_items"],
+      "default": "before_content",
+      "description": "When narration plays relative to its associated content."
+    },
+    "pause_after_narration_seconds": {
+      "type": "number",
+      "min": 0,
+      "max": 30,
+      "default": 0,
+      "description": "Seconds of silence after narration ends, before content begins."
+    },
+    "audio_ducking_db": {
+      "type": "number",
+      "min": -24,
+      "max": 0,
+      "default": -6,
+      "description": "Decibel reduction applied to background audio (music bed, content audio) while narration is speaking."
+    },
+    "narration_music_bed": {
+      "type": "enum",
+      "values": ["none", "auto"],
+      "default": "none",
+      "description": "Music bed under narration. \"auto\" lets the engine pick a low-volume track from the experience. Desktop multi-channel only — mobile pipeline ignores this directive."
+    }
+  }
+}

@@ -8,15 +8,15 @@ Thanks for your interest. This document covers how to contribute, what we accept
 
 ## Current state
 
-| Path | Status |
-|---|---|
-| Issues for bugs, edge cases, design questions | ✅ Welcome |
-| Discussion of HWES v1 conformance | ✅ Welcome |
-| PRs for documentation improvements | ✅ Welcome |
-| PRs for engine modules during initial build | ⚠️ Coordinate with maintainers first |
-| PRs for new built-in display recipes | ⚠️ Requires design discussion (see below) |
-| PRs that edit recipe definitions | ❌ Not accepted without versioning plan |
-| Forks for white-label / native / AI-generated variants | ✅ Encouraged |
+| Path                                                   | Status                                    |
+| ------------------------------------------------------ | ----------------------------------------- |
+| Issues for bugs, edge cases, design questions          | ✅ Welcome                                |
+| Discussion of HWES v1 conformance                      | ✅ Welcome                                |
+| PRs for documentation improvements                     | ✅ Welcome                                |
+| PRs for engine modules during initial build            | ⚠️ Coordinate with maintainers first      |
+| PRs for new built-in display recipes                   | ⚠️ Requires design discussion (see below) |
+| PRs that edit recipe definitions                       | ❌ Not accepted without versioning plan   |
+| Forks for white-label / native / AI-generated variants | ✅ Encouraged                             |
 
 ---
 
@@ -97,7 +97,7 @@ If you're building a white-label, native, or AI-generated variant:
 
 ## Code style
 
-> *Detailed style guide will land alongside the first engine code.*
+> _Detailed style guide will land alongside the first engine code._
 
 Initial conventions:
 

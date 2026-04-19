@@ -256,6 +256,15 @@ export function createVisualizer(opts: {
  * attribute on the <img>; falls back to an explicit "scene" palette if
  * extraction fails.
  *
+ * CORS verification (2026-04-19): Both legacy POC cover URLs (matthewhartdev
+ * .wpenginepowered.com/wp-content/...) AND HWES platform proxied media
+ * (harmonicwave.ai/media/play/r2key/...) return `Access-Control-Allow-Origin: *`
+ * plus `Access-Control-Expose-Headers: Content-Range,Content-Length,
+ * Accept-Ranges,Content-Type`. So `<img crossorigin="anonymous">` will not
+ * taint the canvas, and `getImageData()` will succeed. If a future media
+ * source omits CORS, the catch path returns the fallback palette — visualizer
+ * keeps rendering, palette just doesn't follow cover art.
+ *
  * @param {string} imageUrl
  * @param {{ primary: string; secondary: string; glow: string }} fallback
  * @returns {Promise<{ primary: string; secondary: string; glow: string }>}

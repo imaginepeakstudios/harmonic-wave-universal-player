@@ -1,0 +1,21 @@
+{
+  "_comment": "Conformance fixture 01 — bare audio. Single song item, no recipes, no actor, no theme. Tests the engine's default-behavior path: every BehaviorConfig field falls back to the primitive defaults; renderer plan is just [content+chrome] for a song. This is the floor — every conformant engine must handle this without exception.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 1,
+  "slug": "bare-audio",
+  "name": "Bare Audio Conformance Fixture",
+  "items": [
+    {
+      "item_id": 101,
+      "content_id": 1001,
+      "content_type_slug": "song",
+      "content_type_name": "Song",
+      "content_title": "A Song",
+      "content_slug": "a-song",
+      "content_status": "published",
+      "content_rating": "clean",
+      "media_play_url": "/media/play/1001"
+    }
+  ]
+}

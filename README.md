@@ -56,7 +56,7 @@ HWES v1 schema response → schema-interpreter → recipe-engine → composition
 
 ## Quick start
 
-> *Implementation is in progress — quick start instructions land when the engine is buildable.*
+> _Implementation is in progress — quick start instructions land when the engine is buildable._
 
 When ready, expect something like:
 
@@ -85,44 +85,45 @@ cd harmonic-wave-universal-player && python3 -m http.server 8080
 ```
 harmonic-wave-universal-player/
 ├── docs/                          ← Design + architecture documentation
-│   └── SPEC.md                    ← The full v2 spec (architectural decisions, modules, build sequence)
-├── src/                           ← Engine source (modular ES modules — no build step)
+│   ├── SPEC.md                    ← The full engine spec (decisions, modules, build sequence)
+│   └── IMPLEMENTATION-GUIDE.md    ← POC code-archaeology + module interfaces + extraction recipes
+├── src/                           ← Engine source (vanilla ES modules — no build step)
 │   ├── boot.js                    ← Entry: fetch schema, instantiate engine, mount
+│   ├── index.html                 ← Bootstrap shell with default theme
+│   ├── api/                       ← MCP client + auth + config
 │   ├── schema/                    ← Schema interpreter (typed accessors over HWES response)
-│   ├── recipe-registry/           ← Recipe DEFINITIONS (data files, zero logic)
-│   │   ├── delivery/
-│   │   └── display/
-│   ├── engine/                    ← Rules engine (composes recipes → BehaviorConfig)
-│   ├── composition/               ← Layering (decides which layers to render per item)
-│   ├── renderers/                 ← Presentation (DOM/CSS, per-layer, per-content-type)
-│   │   ├── content/
-│   │   ├── overlay/
-│   │   ├── narration/
-│   │   └── scene/
-│   ├── chrome/                    ← Page shell + controls
-│   ├── theme/                     ← CSS custom properties from player_theme
-│   ├── playback/                  ← State machine + audio pipeline (desktop / mobile)
-│   ├── interactions/              ← Keyboard / gestures / single-audio guard
-│   ├── visualizer/                ← Audio-reactive Canvas + palette extraction
-│   ├── end-of-experience/         ← Completion card + Share / Try Another / What's Next
-│   ├── api/                       ← MCP client (configurable backend)
-│   └── client-runtime/            ← Browser bootstrap
-├── examples/                      ← Reference deployments
-│   ├── minimal/                   ← Tiny example — fetch HWES, render audio
-│   ├── matthew-hartley/           ← Music experience deployment (the v1 POC, expressed as HWES)
-│   └── white-label/               ← Branded variant
+│   ├── registry-snapshot/         ← Build-time snapshot of /hwes/v1/recipes.json + primitives.json
+│   ├── engine/                    ← (Step 4) Rules engine — composes recipes → BehaviorConfig
+│   ├── composition/               ← (Step 4) Layering — decides which layers to render per item
+│   ├── renderers/                 ← (Steps 5-7) Presentation per layer + content type
+│   │   ├── content/               (audio, video, image, document, sound-effect)
+│   │   ├── overlay/               (lyrics-scrolling, lyrics-spotlight, doc-excerpt)
+│   │   ├── scene/                 (banner-static, banner-animated)
+│   │   └── narration/             (tts-bridge, word-sync)
+│   ├── chrome/                    ← (Step 4) Page shell + controls
+│   ├── theme/                     ← (Step 4) CSS custom properties from player_theme
+│   ├── playback/                  ← (Steps 8-9) State machine + audio pipeline (desktop/mobile)
+│   ├── interactions/              ← (Step 10) Keyboard / gestures / single-audio guard
+│   ├── visualizer/                ← (Step 6) Audio-reactive Canvas + palette extraction
+│   ├── end-of-experience/         ← (Step 12) Completion card + Share / Try Another / What's Next
+│   └── client-runtime/            ← (Step 4) Browser bootstrap glue
+├── scripts/
+│   └── sync-registry.sh           ← Pulls live registry from production into src/registry-snapshot/
 ├── test/
-│   ├── fixtures/                  ← Canned HWES schemas + recipe combinations
-│   ├── unit/
-│   ├── snapshot/                  ← Per-renderer DOM + recipe-registry snapshots
-│   └── integration/               ← Headless playback against canned MCP backend
-├── deploy/
-│   └── cloudflare-pages.sh
+│   ├── unit/                      ← Per-module pure logic
+│   ├── snapshot/                  ← (Step 4+) Per-renderer DOM snapshots
+│   ├── conformance/               ← THE SPEC VALIDATOR (HWES v1 fixtures + expected shapes)
+│   └── ci/
+│       └── registry-sync.test.js  ← Drift gate against /hwes/v1/recipes.json + primitives.json
+├── examples/                      ← (Step 13+) Reference deployments
+├── deploy/                        ← (Step 14) cloudflare-pages.sh + self-host docs
 ├── LICENSE                        ← Apache 2.0
+├── README.md
 ├── CONTRIBUTING.md
-├── CODE_OF_CONDUCT.md
-└── CHANGELOG.md
+└── CODE_OF_CONDUCT.md
 ```
+
+Directories marked **(Step N)** are scaffolded today (`.gitkeep` placeholders) and get implemented in the indicated build-sequence step. See [`docs/SPEC.md`](docs/SPEC.md) §9 for the full step list.
 
 See [`docs/SPEC.md`](docs/SPEC.md) for the full architectural rationale + module-by-module responsibilities.
 
@@ -140,11 +141,11 @@ The original POC remains available at [imaginepeakstudios/harmonic-wave-player](
 
 ## How this relates to the platform
 
-| Component | Repo | Purpose |
-|---|---|---|
-| **Harmonic Wave Universal Player** (this repo) | `imaginepeakstudios/harmonic-wave-universal-player` | Open source HWES v1 player engine + reference implementation |
-| **Harmonic Wave API Platform** | `imaginepeakstudios/harmonic-wave-api-platform` | Closed-source platform backend (D1, R2, KV), MCP server, dashboard, creator workflow |
-| **Harmonic Wave Player POC** | `imaginepeakstudios/harmonic-wave-player` | Original single-file proof-of-concept (Matthew Hartley's music experience) — kept as reference example until v2 is at parity |
+| Component                                      | Repo                                                | Purpose                                                                                                                      |
+| ---------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Harmonic Wave Universal Player** (this repo) | `imaginepeakstudios/harmonic-wave-universal-player` | Open source HWES v1 player engine + reference implementation                                                                 |
+| **Harmonic Wave API Platform**                 | `imaginepeakstudios/harmonic-wave-api-platform`     | Closed-source platform backend (D1, R2, KV), MCP server, dashboard, creator workflow                                         |
+| **Harmonic Wave Player POC**                   | `imaginepeakstudios/harmonic-wave-player`           | Original single-file proof-of-concept (Matthew Hartley's music experience) — kept as reference example until v2 is at parity |
 
 The Universal Player consumes the platform via **MCP only** — no privileged backend access; `get_experience` over the public API. The player works against any HWES v1-conformant backend (production, dev, staging, self-hosted, partner). The platform's `/run/:token` route redirects to a hosted instance of the player.
 
@@ -154,12 +155,12 @@ The Universal Player consumes the platform via **MCP only** — no privileged ba
 
 The full test suite ships with the engine — open source under the same Apache 2.0 license as the rest of the player. Three layers:
 
-| Layer | Path | What it covers |
-|---|---|---|
-| **Unit tests** | `test/unit/` | Per-module pure logic — recipe-engine, schema-interpreter, composition, palette-extractor, LRC parser, state-machine. Fast, headless, run on every commit. |
-| **Snapshot tests** | `test/snapshot/` | DOM output per renderer + canned input. Reviewers see exactly what a PR changes; regressions surface as snapshot diffs. |
-| **Conformance tests** ← **the spec validator** | `test/conformance/` | Canned HWES v1 payloads → expected resolved behavior (BehaviorConfig values, layer composition, cascade results, hwes_extensions handling). Any third-party player, fork, or AI-generated variant runs this suite to claim "HWES v1 conformant." |
-| **Registry drift gate** | `test/ci/registry-sync.test.js` | Fails when the local registry snapshot drifts from production `/hwes/v1/recipes.json` + `/primitives.json`. Forces snapshot updates to be intentional. |
+| Layer                                          | Path                            | What it covers                                                                                                                                                                                                                                   |
+| ---------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Unit tests**                                 | `test/unit/`                    | Per-module pure logic — recipe-engine, schema-interpreter, composition, palette-extractor, LRC parser, state-machine. Fast, headless, run on every commit.                                                                                       |
+| **Snapshot tests**                             | `test/snapshot/`                | DOM output per renderer + canned input. Reviewers see exactly what a PR changes; regressions surface as snapshot diffs.                                                                                                                          |
+| **Conformance tests** ← **the spec validator** | `test/conformance/`             | Canned HWES v1 payloads → expected resolved behavior (BehaviorConfig values, layer composition, cascade results, hwes_extensions handling). Any third-party player, fork, or AI-generated variant runs this suite to claim "HWES v1 conformant." |
+| **Registry drift gate**                        | `test/ci/registry-sync.test.js` | Fails when the local registry snapshot drifts from production `/hwes/v1/recipes.json` + `/primitives.json`. Forces snapshot updates to be intentional.                                                                                           |
 
 **Why the conformance suite is the most important part:**
 
@@ -173,7 +174,7 @@ See [`test/conformance/README.md`](test/conformance/README.md) for fixture forma
 
 ## Contributing
 
-> *Contribution guidelines land when the engine reaches a stable shape worth contributing to. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for early guidance.*
+> _Contribution guidelines land when the engine reaches a stable shape worth contributing to. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for early guidance._
 
 We welcome:
 

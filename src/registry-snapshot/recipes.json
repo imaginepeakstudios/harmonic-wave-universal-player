@@ -1,1 +1,251 @@
-{"version":"1","generated_at":"2026-04-19T13:43:13.707Z","recipes":{"delivery":{"story_then_play":{"kind":"delivery","category":"narrative_storytelling","name":"Story Then Play","description":"Narrate the backstory, then begin playback.","instructions_text":"Before playing the item, narrate its backstory using the actor's voice. Set the scene — context, intent, what makes this piece matter. Pause briefly to let the story land, then begin playback. After the item ends, allow a beat of silence before the next narration begins.","player_directives":{"narration_position":"before_content","pause_after_narration_seconds":1,"audio_ducking_db":-6}},"emotional_opening":{"kind":"delivery","category":"narrative_storytelling","name":"Emotional Opening","description":"Lead with the most powerful moment or quote.","instructions_text":"Open with the most emotionally resonant line, quote, or moment from the item. Deliver it with weight and presence — let it land in silence before the actor introduces the piece. Then begin playback.","player_directives":{"narration_position":"before_content","pause_after_narration_seconds":2}},"chapter_sequence":{"kind":"delivery","category":"narrative_storytelling","name":"Chapter Sequence","description":"Deliver section by section, in order.","instructions_text":"Deliver the item in sequential order — one section or chapter at a time. Pause between sections to let each part breathe. Do not skip ahead or shuffle. The order is intentional.","player_directives":{"content_advance":"auto","pause_between_items_seconds":2}},"late_night_reflection":{"kind":"delivery","category":"pacing_flow","name":"Late Night Reflection","description":"Quiet, contemplative pacing for an evening listen.","instructions_text":"Set a quiet, contemplative tone. Speak softly. Slow the pacing. Leave space between thoughts. This is a late-night moment — the listener is winding down, reflective, present.","player_directives":{"pause_between_items_seconds":3,"pause_after_narration_seconds":2,"audio_ducking_db":-9}},"visual_first":{"kind":"delivery","category":"narrative_storytelling","name":"Visual First","description":"Display visual before any audio plays.","instructions_text":"Before playing any audio, display the cover art or associated image. Let the visual set the tone. Pause for a moment, then begin playback.","player_directives":{"prominence":"hero","sequence_dwell_seconds":3,"narration_position":"after_content"}},"quote_then_play":{"kind":"delivery","category":"narrative_storytelling","name":"Quote Then Play","description":"Lead with a striking quote, then play.","instructions_text":"Find the most striking line or lyric from the item and present it first. Let it resonate, then begin playback. The quote is the hook; the content is the payoff.","player_directives":{"narration_position":"before_content","pause_after_narration_seconds":2},"preconditions":{"requires_metadata":["primary_quote"]}},"full_immersion":{"kind":"delivery","category":"pacing_flow","name":"Full Immersion","description":"No interruptions, start to finish.","instructions_text":"Play the item from start to finish with no interruptions. Do not pause, comment, or interject. Let the content speak for itself. This is a full immersion — the creator intended it to be experienced whole.","player_directives":{"chrome":"minimal","narration_position":"before_content","pause_between_items_seconds":0}},"guided_walkthrough":{"kind":"delivery","category":"narrative_storytelling","name":"Guided Walkthrough","description":"Section-by-section guidance with brief commentary.","instructions_text":"Walk the listener through the item section by section. Between each part, provide brief context — what to notice, what the creator intended, how it connects to what came before. Be a guide, not a lecturer. Keep commentary concise and warm.","player_directives":{"narration_position":"between_items","pause_after_narration_seconds":1,"audio_ducking_db":-6}},"compare_and_contrast":{"kind":"delivery","category":"colistening","name":"Compare & Contrast","description":"Highlight differences and connections across items.","instructions_text":"Present the item alongside related content in this experience. Highlight what makes each piece different — tone, style, message, era. Draw connections between them. Help the listener notice what they might miss alone.","player_directives":{"narration_position":"between_items","pause_after_narration_seconds":2}},"loop_ambient":{"kind":"delivery","category":"pacing_flow","name":"Loop Ambient","description":"Loop as background, no narration.","instructions_text":"Loop the item as ambient background. Do not introduce or narrate — just let it play on repeat. This content is meant to create atmosphere, not demand attention.","player_directives":{"loop":true,"chrome":"none","autoplay":"on","narration_position":"before_content"}},"build_anticipation":{"kind":"delivery","category":"narrative_storytelling","name":"Build Anticipation","description":"Tease before revealing.","instructions_text":"Build anticipation before revealing the item. Share pieces of the backstory without giving everything away. Tease with quotes or imagery. Let curiosity build. When the moment is right, begin playback.","player_directives":{"narration_position":"before_content","pause_after_narration_seconds":2,"transition":"fade_through_black"}},"lyrics_along":{"kind":"delivery","category":"colistening","name":"Lyrics Along","description":"Display synced lyrics during playback.","instructions_text":"Display synced lyrics alongside the item as it plays. Use the timed text data when available to keep lyrics in sync with the audio. Let the words and music move together.","player_directives":{"lyrics_display":"scroll_synced","expand_button":true},"preconditions":{"requires_metadata":["lrc_lyrics"],"applicable_content_types":["song","narration"]}}},"display":{"inline_player":{"kind":"display","category":"presentation","name":"Inline Player","description":"Default — items render in-flow as cards.","instructions_text":"Present each item as an in-flow card with full surrounding chrome — controls, progress, item title, optional cover art. The default presentation; use for browsing-style experiences where listeners want context around each item.","player_directives":{"prominence":"standard","sizing":"contain","chrome":"full"}},"album_art_forward":{"kind":"display","category":"presentation","name":"Album Art Forward","description":"Cover art is the hero, controls beneath.","instructions_text":"Present the cover art as the hero element of each item, with playback controls and metadata stacked beneath. Best for music or audio with strong visual identity.","player_directives":{"prominence":"hero","sizing":"contain","chrome":"minimal"}},"performance_mode":{"kind":"display","category":"presentation","name":"Performance Mode","description":"Fullscreen, gesture-only, no chrome.","instructions_text":"Present items fullscreen with no UI chrome at all — no controls, no header, no progress indicator. Listener interacts via gestures (tap to reveal controls briefly, swipe to advance). Best for live-performance or installation contexts.","player_directives":{"prominence":"hero","sizing":"fullscreen","chrome":"none","content_advance":"manual"}},"cinematic_fullscreen":{"kind":"display","category":"immersive","name":"Cinematic Fullscreen","description":"Full-bleed presentation, hide chrome, autoplay muted.","instructions_text":"Present each item full-bleed with no surrounding UI chrome. Where the content type supports it, autoplay muted to avoid surprising the listener. Maintain immersion — no UI distractions during playback.","player_directives":{"prominence":"hero","sizing":"fullscreen","chrome":"none","autoplay":"muted"}},"background_visual":{"kind":"display","category":"immersive","name":"Background Visual","description":"Visual loops behind audio (Spotify Canvas style).","instructions_text":"For audio-primary items with an associated video or image sequence, loop the visual silently as a background while the audio plays. The visual is decoration — the audio is the focus. Listener can tap to mute the audio if desired.","player_directives":{"prominence":"standard","sizing":"cover","autoplay":"muted","loop":true}},"letterbox_21_9":{"kind":"display","category":"immersive","name":"Letterbox 21:9","description":"Cinema aspect in dark backdrop.","instructions_text":"Render video content in 21:9 cinemascope ratio with dark letterbox bars top and bottom. Best for cinematic video content where the creator authored in widescreen aspect.","player_directives":{"sizing":"contain","chrome":"minimal"}},"lyrics_karaoke":{"kind":"display","category":"synced_visuals","name":"Lyrics Karaoke","description":"Scrolling synced lyrics overlay.","instructions_text":"Render synced lyrics as a scrolling karaoke-style overlay on the cover art or video background. The active line is highlighted. Requires LRC-format timed lyrics in content metadata.","player_directives":{"lyrics_display":"scroll_synced","expand_button":true},"preconditions":{"requires_metadata":["lrc_lyrics"]}},"document_excerpt":{"kind":"display","category":"synced_visuals","name":"Document Excerpt","description":"First ~200 words inline with expand affordance.","instructions_text":"For document-type content, render the first ~200 words inline with an \"Read more\" affordance that opens the full reader. Lets listeners get a taste without committing to a full read.","player_directives":{"doc_display":"excerpt","expand_button":true},"preconditions":{"applicable_content_types":["document"]}},"image_sequence":{"kind":"display","category":"sequences_transitions","name":"Image Sequence","description":"Images cycle on a timer.","instructions_text":"For image-type content, dwell on each image for a set number of seconds before auto-advancing. The default dwell is 5 seconds; engines may make this configurable per-item via metadata.","player_directives":{"sequence_dwell_seconds":5,"content_advance":"auto","transition":"crossfade"},"preconditions":{"applicable_content_types":["photo","image"]}},"cross_fade_transitions":{"kind":"display","category":"sequences_transitions","name":"Cross-fade Transitions","description":"Smooth cross-fade between items.","instructions_text":"Cross-fade between items rather than hard-cutting. Audio cross-fades for last 2 seconds; visual cross-fades for full transition duration. Smoother flow at the cost of a beat of overlapping content.","player_directives":{"transition":"crossfade"}}}}}
+{
+  "version": "1",
+  "generated_at": "2026-04-19T13:43:13.707Z",
+  "recipes": {
+    "delivery": {
+      "story_then_play": {
+        "kind": "delivery",
+        "category": "narrative_storytelling",
+        "name": "Story Then Play",
+        "description": "Narrate the backstory, then begin playback.",
+        "instructions_text": "Before playing the item, narrate its backstory using the actor's voice. Set the scene — context, intent, what makes this piece matter. Pause briefly to let the story land, then begin playback. After the item ends, allow a beat of silence before the next narration begins.",
+        "player_directives": {
+          "narration_position": "before_content",
+          "pause_after_narration_seconds": 1,
+          "audio_ducking_db": -6
+        }
+      },
+      "emotional_opening": {
+        "kind": "delivery",
+        "category": "narrative_storytelling",
+        "name": "Emotional Opening",
+        "description": "Lead with the most powerful moment or quote.",
+        "instructions_text": "Open with the most emotionally resonant line, quote, or moment from the item. Deliver it with weight and presence — let it land in silence before the actor introduces the piece. Then begin playback.",
+        "player_directives": {
+          "narration_position": "before_content",
+          "pause_after_narration_seconds": 2
+        }
+      },
+      "chapter_sequence": {
+        "kind": "delivery",
+        "category": "narrative_storytelling",
+        "name": "Chapter Sequence",
+        "description": "Deliver section by section, in order.",
+        "instructions_text": "Deliver the item in sequential order — one section or chapter at a time. Pause between sections to let each part breathe. Do not skip ahead or shuffle. The order is intentional.",
+        "player_directives": { "content_advance": "auto", "pause_between_items_seconds": 2 }
+      },
+      "late_night_reflection": {
+        "kind": "delivery",
+        "category": "pacing_flow",
+        "name": "Late Night Reflection",
+        "description": "Quiet, contemplative pacing for an evening listen.",
+        "instructions_text": "Set a quiet, contemplative tone. Speak softly. Slow the pacing. Leave space between thoughts. This is a late-night moment — the listener is winding down, reflective, present.",
+        "player_directives": {
+          "pause_between_items_seconds": 3,
+          "pause_after_narration_seconds": 2,
+          "audio_ducking_db": -9
+        }
+      },
+      "visual_first": {
+        "kind": "delivery",
+        "category": "narrative_storytelling",
+        "name": "Visual First",
+        "description": "Display visual before any audio plays.",
+        "instructions_text": "Before playing any audio, display the cover art or associated image. Let the visual set the tone. Pause for a moment, then begin playback.",
+        "player_directives": {
+          "prominence": "hero",
+          "sequence_dwell_seconds": 3,
+          "narration_position": "after_content"
+        }
+      },
+      "quote_then_play": {
+        "kind": "delivery",
+        "category": "narrative_storytelling",
+        "name": "Quote Then Play",
+        "description": "Lead with a striking quote, then play.",
+        "instructions_text": "Find the most striking line or lyric from the item and present it first. Let it resonate, then begin playback. The quote is the hook; the content is the payoff.",
+        "player_directives": {
+          "narration_position": "before_content",
+          "pause_after_narration_seconds": 2
+        },
+        "preconditions": { "requires_metadata": ["primary_quote"] }
+      },
+      "full_immersion": {
+        "kind": "delivery",
+        "category": "pacing_flow",
+        "name": "Full Immersion",
+        "description": "No interruptions, start to finish.",
+        "instructions_text": "Play the item from start to finish with no interruptions. Do not pause, comment, or interject. Let the content speak for itself. This is a full immersion — the creator intended it to be experienced whole.",
+        "player_directives": {
+          "chrome": "minimal",
+          "narration_position": "before_content",
+          "pause_between_items_seconds": 0
+        }
+      },
+      "guided_walkthrough": {
+        "kind": "delivery",
+        "category": "narrative_storytelling",
+        "name": "Guided Walkthrough",
+        "description": "Section-by-section guidance with brief commentary.",
+        "instructions_text": "Walk the listener through the item section by section. Between each part, provide brief context — what to notice, what the creator intended, how it connects to what came before. Be a guide, not a lecturer. Keep commentary concise and warm.",
+        "player_directives": {
+          "narration_position": "between_items",
+          "pause_after_narration_seconds": 1,
+          "audio_ducking_db": -6
+        }
+      },
+      "compare_and_contrast": {
+        "kind": "delivery",
+        "category": "colistening",
+        "name": "Compare & Contrast",
+        "description": "Highlight differences and connections across items.",
+        "instructions_text": "Present the item alongside related content in this experience. Highlight what makes each piece different — tone, style, message, era. Draw connections between them. Help the listener notice what they might miss alone.",
+        "player_directives": {
+          "narration_position": "between_items",
+          "pause_after_narration_seconds": 2
+        }
+      },
+      "loop_ambient": {
+        "kind": "delivery",
+        "category": "pacing_flow",
+        "name": "Loop Ambient",
+        "description": "Loop as background, no narration.",
+        "instructions_text": "Loop the item as ambient background. Do not introduce or narrate — just let it play on repeat. This content is meant to create atmosphere, not demand attention.",
+        "player_directives": {
+          "loop": true,
+          "chrome": "none",
+          "autoplay": "on",
+          "narration_position": "before_content"
+        }
+      },
+      "build_anticipation": {
+        "kind": "delivery",
+        "category": "narrative_storytelling",
+        "name": "Build Anticipation",
+        "description": "Tease before revealing.",
+        "instructions_text": "Build anticipation before revealing the item. Share pieces of the backstory without giving everything away. Tease with quotes or imagery. Let curiosity build. When the moment is right, begin playback.",
+        "player_directives": {
+          "narration_position": "before_content",
+          "pause_after_narration_seconds": 2,
+          "transition": "fade_through_black"
+        }
+      },
+      "lyrics_along": {
+        "kind": "delivery",
+        "category": "colistening",
+        "name": "Lyrics Along",
+        "description": "Display synced lyrics during playback.",
+        "instructions_text": "Display synced lyrics alongside the item as it plays. Use the timed text data when available to keep lyrics in sync with the audio. Let the words and music move together.",
+        "player_directives": { "lyrics_display": "scroll_synced", "expand_button": true },
+        "preconditions": {
+          "requires_metadata": ["lrc_lyrics"],
+          "applicable_content_types": ["song", "narration"]
+        }
+      }
+    },
+    "display": {
+      "inline_player": {
+        "kind": "display",
+        "category": "presentation",
+        "name": "Inline Player",
+        "description": "Default — items render in-flow as cards.",
+        "instructions_text": "Present each item as an in-flow card with full surrounding chrome — controls, progress, item title, optional cover art. The default presentation; use for browsing-style experiences where listeners want context around each item.",
+        "player_directives": { "prominence": "standard", "sizing": "contain", "chrome": "full" }
+      },
+      "album_art_forward": {
+        "kind": "display",
+        "category": "presentation",
+        "name": "Album Art Forward",
+        "description": "Cover art is the hero, controls beneath.",
+        "instructions_text": "Present the cover art as the hero element of each item, with playback controls and metadata stacked beneath. Best for music or audio with strong visual identity.",
+        "player_directives": { "prominence": "hero", "sizing": "contain", "chrome": "minimal" }
+      },
+      "performance_mode": {
+        "kind": "display",
+        "category": "presentation",
+        "name": "Performance Mode",
+        "description": "Fullscreen, gesture-only, no chrome.",
+        "instructions_text": "Present items fullscreen with no UI chrome at all — no controls, no header, no progress indicator. Listener interacts via gestures (tap to reveal controls briefly, swipe to advance). Best for live-performance or installation contexts.",
+        "player_directives": {
+          "prominence": "hero",
+          "sizing": "fullscreen",
+          "chrome": "none",
+          "content_advance": "manual"
+        }
+      },
+      "cinematic_fullscreen": {
+        "kind": "display",
+        "category": "immersive",
+        "name": "Cinematic Fullscreen",
+        "description": "Full-bleed presentation, hide chrome, autoplay muted.",
+        "instructions_text": "Present each item full-bleed with no surrounding UI chrome. Where the content type supports it, autoplay muted to avoid surprising the listener. Maintain immersion — no UI distractions during playback.",
+        "player_directives": {
+          "prominence": "hero",
+          "sizing": "fullscreen",
+          "chrome": "none",
+          "autoplay": "muted"
+        }
+      },
+      "background_visual": {
+        "kind": "display",
+        "category": "immersive",
+        "name": "Background Visual",
+        "description": "Visual loops behind audio (Spotify Canvas style).",
+        "instructions_text": "For audio-primary items with an associated video or image sequence, loop the visual silently as a background while the audio plays. The visual is decoration — the audio is the focus. Listener can tap to mute the audio if desired.",
+        "player_directives": {
+          "prominence": "standard",
+          "sizing": "cover",
+          "autoplay": "muted",
+          "loop": true
+        }
+      },
+      "letterbox_21_9": {
+        "kind": "display",
+        "category": "immersive",
+        "name": "Letterbox 21:9",
+        "description": "Cinema aspect in dark backdrop.",
+        "instructions_text": "Render video content in 21:9 cinemascope ratio with dark letterbox bars top and bottom. Best for cinematic video content where the creator authored in widescreen aspect.",
+        "player_directives": { "sizing": "contain", "chrome": "minimal" }
+      },
+      "lyrics_karaoke": {
+        "kind": "display",
+        "category": "synced_visuals",
+        "name": "Lyrics Karaoke",
+        "description": "Scrolling synced lyrics overlay.",
+        "instructions_text": "Render synced lyrics as a scrolling karaoke-style overlay on the cover art or video background. The active line is highlighted. Requires LRC-format timed lyrics in content metadata.",
+        "player_directives": { "lyrics_display": "scroll_synced", "expand_button": true },
+        "preconditions": { "requires_metadata": ["lrc_lyrics"] }
+      },
+      "document_excerpt": {
+        "kind": "display",
+        "category": "synced_visuals",
+        "name": "Document Excerpt",
+        "description": "First ~200 words inline with expand affordance.",
+        "instructions_text": "For document-type content, render the first ~200 words inline with an \"Read more\" affordance that opens the full reader. Lets listeners get a taste without committing to a full read.",
+        "player_directives": { "doc_display": "excerpt", "expand_button": true },
+        "preconditions": { "applicable_content_types": ["document"] }
+      },
+      "image_sequence": {
+        "kind": "display",
+        "category": "sequences_transitions",
+        "name": "Image Sequence",
+        "description": "Images cycle on a timer.",
+        "instructions_text": "For image-type content, dwell on each image for a set number of seconds before auto-advancing. The default dwell is 5 seconds; engines may make this configurable per-item via metadata.",
+        "player_directives": {
+          "sequence_dwell_seconds": 5,
+          "content_advance": "auto",
+          "transition": "crossfade"
+        },
+        "preconditions": { "applicable_content_types": ["photo", "image"] }
+      },
+      "cross_fade_transitions": {
+        "kind": "display",
+        "category": "sequences_transitions",
+        "name": "Cross-fade Transitions",
+        "description": "Smooth cross-fade between items.",
+        "instructions_text": "Cross-fade between items rather than hard-cutting. Audio cross-fades for last 2 seconds; visual cross-fades for full transition duration. Smoother flow at the cost of a beat of overlapping content.",
+        "player_directives": { "transition": "crossfade" }
+      }
+    }
+  }
+}

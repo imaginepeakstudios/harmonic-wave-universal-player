@@ -21,5 +21,5 @@ export const PRIMITIVE_DEFINITIONS = primitives.primitives;
  * from every primitive. Engine starts here for every item; recipes mutate.
  */
 export const DEFAULT_BEHAVIOR = Object.fromEntries(
-  Object.entries(PRIMITIVE_DEFINITIONS).map(([key, def]) => [key, def.default])
+  Object.entries(PRIMITIVE_DEFINITIONS).map(([key, def]) => [key, def.default]),
 );

@@ -1,0 +1,35 @@
+{
+  "_comment": "Expected resolved shape for fixture 01. Schema-layer assertions run today; engine-layer (resolved_behavior + layers) skips until Step 4 wires recipe-engine + composition.",
+  "experience": {
+    "id": 1,
+    "slug": "bare-audio",
+    "name": "Bare Audio Conformance Fixture"
+  },
+  "hwes_extensions_honored": [],
+  "hwes_extensions_ignored": [],
+  "items": [
+    {
+      "item_id": 101,
+      "resolved_actor": null,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

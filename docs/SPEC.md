@@ -182,7 +182,7 @@ The engine is built as ~10-12 small, single-responsibility modules with explicit
 - **Custom recipes are creator-owned, mutable, ephemeral** — the player ignores them entirely. They flow through to AI-agent listeners via resolved `delivery_instructions` text.
 
 CI safeguards:
-- Snapshot test: `test/snapshot/registry-mirror.test.js` — fails if the embedded snapshot of the recipe registry diverges from the published platform manifest
+- CI test: `test/ci/registry-sync.test.js` — fails if `src/registry-snapshot/` diverges from production `/hwes/v1/recipes.json` + `/hwes/v1/primitives.json`. Re-run `scripts/sync-registry.sh` to refresh.
 - Engine implementation test: every primitive directive declared in the published primitives schema has a corresponding renderer implementation; CI fails if not
 
 ---
@@ -297,24 +297,35 @@ harmonic-wave-universal-player/
 │   └── white-label/                      Branded variant
 │
 ├── test/
-│   ├── fixtures/
-│   │   ├── hwes-canned-schemas/          Sample HWES responses for each scenario
-│   │   └── recipes/                      Recipe combinations to snapshot-test
-│   ├── unit/
-│   │   ├── recipe-engine.test.js
+│   ├── unit/                             Per-module pure logic (api/*, schema/*,
+│   │   │                                 registry-snapshot, engine/*, composition/*,
+│   │   │                                 state-machine, theme-injector, …)
+│   │   ├── api-config.test.js
+│   │   ├── api-auth.test.js
+│   │   ├── api-mcp-client.test.js
+│   │   ├── schema-conformance.test.js
 │   │   ├── schema-interpreter.test.js
-│   │   ├── composition.test.js
-│   │   ├── theme-injector.test.js
-│   │   └── state-machine.test.js
-│   ├── snapshot/
-│   │   ├── registry-mirror.test.js       (catches drift from platform manifest)
-│   │   ├── primitives-mirror.test.js
-│   │   ├── renderers/                    (per-renderer DOM snapshots)
-│   │   └── end-of-experience.test.js
-│   └── integration/
-│       └── full-playback.test.js         Headless playwright against canned MCP backend
+│   │   ├── registry-snapshot.test.js
+│   │   ├── recipe-engine.test.js         (Step 4)
+│   │   ├── composition.test.js           (Step 4)
+│   │   ├── theme-injector.test.js        (Step 4)
+│   │   └── state-machine.test.js         (Step 8)
+│   ├── snapshot/                         Per-renderer DOM snapshots (Step 4+)
+│   ├── conformance/                      THE SPEC VALIDATOR
+│   │   ├── README.md                     Why-it-exists + format docs
+│   │   ├── conformance.test.js           Harness (~100 lines, portable)
+│   │   ├── fixtures/                     HWES v1 input payloads (NN-name.hwes.json;
+│   │   │                                 -desktop / -mobile suffix when behavior
+│   │   │                                 diverges per platform)
+│   │   └── expected/                     Resolved-shape expectations per fixture
+│   ├── ci/
+│   │   └── registry-sync.test.js         Fails when src/registry-snapshot/ drifts
+│   │                                     from production /hwes/v1/recipes.json
+│   │                                     + /hwes/v1/primitives.json
+│   └── integration/                      Headless playwright (Step 8+)
+│       └── full-playback.test.js
 │
-├── deploy/
+├── deploy/                               (Step 14 — cutover deliverable)
 │   ├── cloudflare-pages.sh
 │   └── self-host.md                      Run-anywhere docs
 │
@@ -329,8 +340,8 @@ harmonic-wave-universal-player/
 #### `boot.js` — Entry orchestrator
 Fetch HWES schema via MCP client → instantiate engine with theme injection → mount initial DOM → wire interaction handlers → hand off to playback controller.
 
-#### `schema/interpreter.js` — Schema accessor
-Takes HWES v1 response, returns typed accessors. Validates conformance (logs warnings for unknown extensions; doesn't crash). Provides `getItems()`, `getResolvedActor(item)`, `getDisplayRecipes(item)`, `getPlayerTheme()`, etc.
+#### `schema/interpreter.js` — Schema accessor (PURE PROJECTION)
+Takes HWES v1 response, returns typed accessors. Validates conformance (logs warnings for unknown extensions; doesn't crash). Provides `experience.*` projection, `actor`, `items`, `getItemActor(item)`, `getItemDisplayDirectives(item)`, `getItemDeliveryInstructions(item)`. **Never makes cascade decisions** — the platform has already walked the cascade server-side; the interpreter just types and surfaces. Cascade-aware resolution + override semantics + recipe stacking live in `engine/recipe-engine.js`. See Decision #28 in §13.
 
 #### `registry-snapshot/` — HWES v1 vocabulary mirror
 Build-time snapshot of the platform's published recipe registry + primitives schema. Synced via `scripts/sync-registry.sh`. CI test asserts the snapshot matches the platform manifest. **Player does not author the registry; it consumes it.**
@@ -631,7 +642,7 @@ Each step is a deployable increment. v2 doesn't ship in one big-bang.
 
 **Snapshot tests:**
 - `registry-mirror.test.js` — catches drift from platform manifest
-- `primitives-mirror.test.js` — primitives schema matches platform
+- `test/ci/registry-sync.test.js` covers BOTH recipes + primitives drift in one run
 - `renderers/*.test.js` — DOM snapshot per renderer + canned input
 
 **Integration tests** (Playwright):
@@ -730,6 +741,10 @@ For traceability, every architectural decision made in the spec discussion:
 23. **Registry lives on the platform** — player consumes via build-time snapshot
 24. **Display vocabulary is closed** — no custom display recipes
 25. **Matthew Hartley's POC is the parity benchmark and first reference deployment**
+26. **Schema interpreter is pure projection; engine owns cascade resolution** — `schema/interpreter.js` provides typed accessors over the platform's already-resolved fields (`item.resolved_actor`, `item.display_directives`, etc.) and DOES NOT make cascade decisions. Override semantics (`override_enabled`), collection-level cascade walks beyond what the platform pre-resolves, recipe stacking, and BehaviorConfig derivation all live in `engine/recipe-engine.js`. This split keeps each layer substitutable: a fork can swap the engine without touching the schema layer (good for native ports), or swap the schema layer without touching the engine (good for alternative backend shapes). Naming convention enforces it: schema accessors are `getItem*` (narrow scope); engine functions are `resolve*` (cascade-aware).
+27. **API key never travels via URL** — `readConfig()` reads endpoint + share_token from URL params but `apiKey` ONLY from explicit opts. Bearer tokens leak through browser history, server logs, and referer headers. The MCP client also `console.warn`s when an API key is configured in a browser context (any other JS on the page can read it). API keys are for server-side / agent-embedded paths; browser listeners use share_token URL paths or HttpOnly session cookies.
+28. **`__hwes` global is local-dev-only** — gated behind `localhost`/`127.0.0.1`/`file://`/`?debug` checks in `boot.js`. Never present on production builds. Lock-in via runtime gate (no build step to enforce it via flag).
+29. **Conformance fixtures use `-desktop` / `-mobile` suffix when behavior diverges per audio platform** — `09-music-bed-narration-desktop.hwes.json` + `09-music-bed-narration-mobile.hwes.json` share an HWES input but expect different resolved BehaviorConfig + layer plan. Fixtures with no suffix are platform-agnostic. Per IMPLEMENTATION-GUIDE.md §3.3, mobile drops music bed entirely (iOS Safari can't coexist standalone Audio with MediaElementSource bed) and DJ playback is sequential, not concurrent.
 
 ---
 
