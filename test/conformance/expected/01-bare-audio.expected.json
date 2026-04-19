@@ -1,5 +1,5 @@
 {
-  "_comment": "Expected resolved shape for fixture 01. Schema-layer assertions run today; engine-layer (resolved_behavior + layers) skips until Step 4 wires recipe-engine + composition.",
+  "_comment": "Expected resolved shape for fixture 01. Schema-layer + engine-layer (resolved_behavior) assertions both run today (Step 4 wired the engine). The `layers` assertion still skips until Step 5 wires composition.",
   "experience": {
     "id": 1,
     "slug": "bare-audio",

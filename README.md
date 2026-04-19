@@ -4,7 +4,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-> **Status:** Pre-1.0 / engine implementation in progress (Steps 1-3 of 15 complete: registry snapshot, schema interpreter, MCP client, conformance harness scaffolded; the engine boots and reaches the platform but doesn't render content yet — that lands in Step 4). **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.74, 2026-04-19) — the data contract this engine builds against is now stable, and the MCP endpoint is reachable cross-origin from any host. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
+> **Status:** Pre-1.0 / engine implementation in progress (Steps 1-4 of 15 complete: registry snapshot, schema interpreter, MCP client, recipe engine + BehaviorConfig + precondition checker, conformance harness with full schema-AND-engine-layer assertions firing. The engine boots, reaches the platform, and resolves a per-item BehaviorConfig from any HWES response — but doesn't render content yet; that lands in Step 5). **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.74, 2026-04-19) — the data contract this engine builds against is now stable, and the MCP endpoint is reachable cross-origin from any host. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
 
 ### Foundational positioning
 
@@ -56,17 +56,17 @@ HWES v1 schema response → schema-interpreter → recipe-engine → composition
 
 ## Quick start
 
-The engine ships as vanilla ES modules — no bundler required. What works today (Step 3): the boot path loads the registry snapshot, resolves runtime config, instantiates the MCP client + schema interpreter, and prints a status line to the browser console. The actual content renderer lands in Step 4.
+The engine ships as vanilla ES modules — no bundler required. What works today (Steps 1-4): registry snapshot, MCP client, schema interpreter, recipe engine + BehaviorConfig + precondition checker. The boot path loads the snapshot, resolves runtime config, instantiates the MCP client + schema interpreter + recipe engine, and prints a status line to the browser console. Content renders in Step 5.
 
 ```bash
 git clone https://github.com/imaginepeakstudios/harmonic-wave-universal-player.git
 cd harmonic-wave-universal-player
 bun install         # installs vitest + prettier + typescript (devDeps only — engine has zero runtime deps)
-bun run test        # 92 tests + 2 skipped — should be green
+bun run test        # 123 tests — should be green
 bun run typecheck   # tsc --checkJs --noEmit on src/
 bun run dev         # python3 -m http.server 8080 --directory src
 # Open http://localhost:8080/?backend=https://harmonicwave.ai&debug=1
-# Console will print: "Step 3 scaffolding loaded — 12 delivery + 10 display recipes, ..."
+# Console will print: "Step 4 scaffolding loaded — 12 delivery + 10 display recipes, ..."
 ```
 
 The `?debug=1` flag exposes `globalThis.__hwes` so you can poke at the MCP client interactively from devtools (`await __hwes.mcp.verifyAccess({ email: "..." })`). The flag is gated to localhost / file:// / explicit `?debug` — production hosts won't expose the global even if listed.
@@ -97,8 +97,8 @@ harmonic-wave-universal-player/
 │   ├── api/                       ← MCP client + auth + config
 │   ├── schema/                    ← Schema interpreter (typed accessors over HWES response)
 │   ├── registry-snapshot/         ← Build-time snapshot of /hwes/v1/recipes.json + primitives.json
-│   ├── engine/                    ← (Step 4) Rules engine — composes recipes → BehaviorConfig
-│   ├── composition/               ← (Step 4) Layering — decides which layers to render per item
+│   ├── engine/                    ← Recipe engine — display + delivery recipes → BehaviorConfig
+│   ├── composition/               ← (Step 5) Layering — decides which layers to render per item
 │   ├── renderers/                 ← (Steps 5-7) Presentation per layer + content type
 │   │   ├── content/               (audio, video, image, document, sound-effect)
 │   │   ├── overlay/               (lyrics-scrolling, lyrics-spotlight, doc-excerpt)

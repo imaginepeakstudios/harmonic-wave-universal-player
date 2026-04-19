@@ -171,39 +171,34 @@ describe('HWES v1 Conformance Suite', () => {
       }
     });
 
-    // Engine-layer slice: resolved BehaviorConfig + layer plan per item.
-    // Skipped until Step 4 wires recipe-engine + composition.
-    test.skipIf(!engineReady)(
-      `${baseName} — engine layer (BehaviorConfig + layers) conforms`,
-      () => {
-        const fixture = loadJson(fixturePath);
-        const expected = loadJson(expectedPath);
-        const view = interpret(fixture, { warn: false });
-        const resolved = {
-          items: view.items.map((item) => ({
-            item_id: item.item_id,
-            resolved_behavior: resolveBehavior(view.getItemDisplayDirectives(item), item),
-            layers: composeItem(
-              item,
-              resolveBehavior(view.getItemDisplayDirectives(item), item),
-            ).map((l) => l.layer),
-          })),
-        };
-        if (Array.isArray(expected.items)) {
-          expected.items.forEach((expItem, i) => {
-            if (expItem.resolved_behavior !== undefined) {
-              assertConforms(
-                resolved.items[i].resolved_behavior,
-                expItem.resolved_behavior,
-                `$.items[${i}].resolved_behavior`,
-              );
-            }
-            if (Array.isArray(expItem.layers)) {
-              assertConforms(resolved.items[i].layers, expItem.layers, `$.items[${i}].layers`);
-            }
-          });
-        }
-      },
-    );
+    // Engine-layer slice: resolved BehaviorConfig per item. Step 4 wires
+    // resolveBehavior; Step 5 wires composition. The behavior assertion
+    // runs as soon as the engine is loadable; the layer assertion stays
+    // skipped until composition lands.
+    const engineLoadable = typeof resolveBehavior === 'function';
+    test.skipIf(!engineLoadable)(`${baseName} — engine layer (BehaviorConfig) conforms`, () => {
+      const fixture = loadJson(fixturePath);
+      const expected = loadJson(expectedPath);
+      const view = interpret(fixture, { warn: false });
+      const compositionReady = typeof composeItem === 'function';
+      if (Array.isArray(expected.items)) {
+        expected.items.forEach((expItem, i) => {
+          const item = view.items[i];
+          if (expItem.resolved_behavior !== undefined) {
+            const resolved = resolveBehavior(view, item);
+            assertConforms(
+              resolved.behavior,
+              expItem.resolved_behavior,
+              `$.items[${i}].resolved_behavior`,
+            );
+          }
+          if (Array.isArray(expItem.layers) && compositionReady) {
+            const resolved = resolveBehavior(view, item);
+            const layers = composeItem(item, resolved.behavior).map((l) => l.layer);
+            assertConforms(layers, expItem.layers, `$.items[${i}].layers`);
+          }
+        });
+      }
+    });
   }
 });

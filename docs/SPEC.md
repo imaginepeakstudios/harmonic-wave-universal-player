@@ -559,11 +559,11 @@ The modular structure allows incremental shipping. Each step produces a working 
 - `schema/interpreter.js`, `schema/conformance.js`
 - Test against canned schemas
 
-### Step 4: Recipe engine + behavior config
-- `engine/recipe-engine.js`
-- `engine/behavior-config.js` (mirrors primitives.json)
-- `engine/precondition-checker.js`
-- Snapshot tests
+### Step 4: Recipe engine + behavior config ✅
+- `engine/recipe-engine.js` — `resolveBehavior(view, item)` returns `{ behavior, applied, skipped }`
+- `engine/behavior-config.js` — `defaultBehavior()`, `mergeBehavior(base, overrides)`, re-exports `DEFAULT_BEHAVIOR` from registry-snapshot
+- `engine/precondition-checker.js` — `checkPreconditions(recipe, item)` for `requires_metadata` + `applicable_content_types`
+- 29 unit tests + conformance harness engine-layer assertions activated for both fixtures (123/123 tests, 0 skipped)
 
 ### Step 5: Composition + first content renderer (audio)
 - `composition/index.js` + selector helpers
@@ -745,6 +745,8 @@ For traceability, every architectural decision made in the spec discussion:
 27. **API key never travels via URL** — `readConfig()` reads endpoint + share_token from URL params but `apiKey` ONLY from explicit opts. Bearer tokens leak through browser history, server logs, and referer headers. The MCP client also `console.warn`s when an API key is configured in a browser context (any other JS on the page can read it). API keys are for server-side / agent-embedded paths; browser listeners use share_token URL paths or HttpOnly session cookies.
 28. **`__hwes` global is local-dev-only** — gated behind `localhost`/`127.0.0.1`/`file://`/`?debug` checks in `boot.js`. Never present on production builds. Lock-in via runtime gate (no build step to enforce it via flag).
 29. **Conformance fixtures use `-desktop` / `-mobile` suffix when behavior diverges per audio platform** — `09-music-bed-narration-desktop.hwes.json` + `09-music-bed-narration-mobile.hwes.json` share an HWES input but expect different resolved BehaviorConfig + layer plan. Fixtures with no suffix are platform-agnostic. Per IMPLEMENTATION-GUIDE.md §3.3, mobile drops music bed entirely (iOS Safari can't coexist standalone Audio with MediaElementSource bed) and DJ playback is sequential, not concurrent.
+30. **Recipe cascade order: defaults → display → delivery (last wins)** — `engine/recipe-engine.js::resolveBehavior` starts from `DEFAULT_BEHAVIOR`, applies display-recipe `player_directives` in array order, then delivery-recipe `player_directives` in array order. Within each array, later entries override earlier ones. Delivery wins ties because delivery recipes encode pacing/narration intent that's typically more item-specific than the broad visual defaults a display recipe sets. Mirrors CSS specificity: cascade order = priority order. The choice is visible in unit tests at `test/unit/engine-recipe-engine.test.js` ("delivery overrides display when both set the same primitive") and locked into the conformance fixtures' expected `resolved_behavior`.
+31. **Hosted Universal Player ships into the platform as a copied tagged-release** — At v1 release time (Step 15), tag the player repo and copy `harmonic-wave-universal-player/src/` into `harmonic-wave-api-platform/public/player/` as a static-asset deploy artifact. The platform's `/run/:token` route returns HTML that loads the player from same-origin AND inlines the resolved HWES JSON via `<script type="application/json" id="hwes-data">{...}</script>`. The player reads from that DOM tag — no MCP browser fetch, no API key, no service account, no CORS. Forks pick whichever pattern fits their infra: most third-party hosts will follow the same bundled pattern against their own backend; embedded/agent flows can use the MCP browser path (which Step 3 wired and the platform's CORS fix in v0.9.74 unblocked). Continuous sync between repos is NOT done — the platform's `public/player/` is a snapshot of the player at release time, intentionally pinned so the platform doesn't break on a player main-branch experiment.
 
 ---
 

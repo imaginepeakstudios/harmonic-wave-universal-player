@@ -1,5 +1,5 @@
 {
-  "_comment": "Expected resolved shape for fixture 02. Schema layer surfaces display_recipes_v1 as honored; engine layer derives BehaviorConfig from cinematic_fullscreen's player_directives in the registry: prominence=hero, sizing=fullscreen, chrome=none, autoplay=muted. Engine-layer assertions skip until Step 4.",
+  "_comment": "Expected resolved shape for fixture 02. Schema layer surfaces display_recipes_v1 as honored; engine layer derives BehaviorConfig from cinematic_fullscreen's player_directives in the registry: prominence=hero, sizing=fullscreen, chrome=none, autoplay=muted. Engine-layer (resolved_behavior) assertion runs today; `layers` skips until Step 5.",
   "experience": {
     "id": 2,
     "slug": "cinematic-fullscreen",

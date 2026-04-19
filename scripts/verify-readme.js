@@ -115,14 +115,19 @@ if (scriptFailures === 0 && referencedScripts.size > 0) {
 // Run the suite and compare counts to the claim in README.
 // Format expected: "N tests + M skipped" anywhere in README.
 console.log('\n\x1b[1mTest-count claim vs actual\x1b[0m');
-const TEST_CLAIM_RE = /(\d+)\s+tests?\s*\+\s*(\d+)\s+skipped/;
+// Match either "N tests + M skipped" OR a bare "N tests" claim.
+// "N tests" alone implies M=0 (which the suite enforces).
+const TEST_CLAIM_FULL_RE = /(\d+)\s+tests?\s*\+\s*(\d+)\s+skipped/;
+const TEST_CLAIM_BARE_RE = /\b(\d+)\s+tests?\b\s*(?:—|--|should be green)/;
 const readmeText = readFileSync(README_PATH, 'utf8');
-const claim = readmeText.match(TEST_CLAIM_RE);
+const fullClaim = readmeText.match(TEST_CLAIM_FULL_RE);
+const bareClaim = !fullClaim && readmeText.match(TEST_CLAIM_BARE_RE);
+const claim = fullClaim || bareClaim;
 if (!claim) {
-  skip('test-count', 'README has no "N tests + M skipped" claim');
+  skip('test-count', 'README has no "N tests" or "N tests + M skipped" claim');
 } else {
   const claimedPassed = parseInt(claim[1], 10);
-  const claimedSkipped = parseInt(claim[2], 10);
+  const claimedSkipped = fullClaim ? parseInt(claim[2], 10) : 0;
   // Run vitest run --reporter=json. We use the JSON reporter so we can
   // parse counts deterministically without screen-scraping the human
   // reporter (which Vitest reformats between minor releases).
