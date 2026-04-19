@@ -1,0 +1,26 @@
+{
+  "_comment": "Browser-demo fixture for Step 6 image renderer + image_sequence display recipe. Uses POC's WP-served images (CORS *). Two photos with sequence_dwell_seconds via the recipe — auto-advance from one to the next after 5s.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 1003,
+  "slug": "demo-image-sequence",
+  "name": "Demo — Image Sequence",
+  "description": "Two photos cycling on a 5s timer.",
+  "display_directives": ["image_sequence"],
+  "items": [
+    {
+      "item_id": 1,
+      "content_id": 100,
+      "content_type_slug": "photo",
+      "content_title": "Holding On (cover)",
+      "media_play_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg"
+    },
+    {
+      "item_id": 2,
+      "content_id": 101,
+      "content_type_slug": "photo",
+      "content_title": "Without You (cover)",
+      "media_play_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/without-you-cover-scaled.jpg"
+    }
+  ]
+}

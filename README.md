@@ -4,7 +4,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-> **Status:** Pre-1.0 / engine implementation in progress (Steps 1-5 of 15 complete: registry snapshot, schema interpreter, MCP client, recipe engine + BehaviorConfig, composition + audio renderer + chrome shell + theme injector + boot orchestrator. The engine boots, fetches an HWES response from one of three sources — server-injected `<script id="hwes-data">`, `?fixture=…` fixture file, or live MCP — resolves per-item BehaviorConfig, picks layers, mounts the audio renderer + chrome controls, and plays. Steps 6-12 add the remaining content types, visualizer, overlays, state machine + audio pipeline, narration, and end-of-experience). **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.74, 2026-04-19) — the data contract this engine builds against is now stable, and the MCP endpoint is reachable cross-origin from any host. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
+> **Status:** Pre-1.0 / engine implementation in progress (Steps 1-6 of 15 complete: registry snapshot, schema interpreter, MCP client, recipe engine + BehaviorConfig, composition + audio renderer + chrome shell + theme injector + boot orchestrator + the remaining four content renderers (video, image, document, sound-effect) with auto-advance via a uniform `done` Promise contract. The engine boots, fetches an HWES response from one of three sources — server-injected `<script id="hwes-data">`, `?fixture=…` fixture file, or live MCP — resolves per-item BehaviorConfig, picks layers, mounts the right renderer per content type, and plays/auto-advances through a multi-item experience. Steps 7-12 add the visualizer, overlays, state machine + audio pipeline, narration, and end-of-experience). **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.74, 2026-04-19) — the data contract this engine builds against is now stable, and the MCP endpoint is reachable cross-origin from any host. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
 
 ### Foundational positioning
 
@@ -62,7 +62,7 @@ The engine ships as vanilla ES modules — no bundler required. What works today
 git clone https://github.com/imaginepeakstudios/harmonic-wave-universal-player.git
 cd harmonic-wave-universal-player
 bun install         # installs vitest + happy-dom + prettier + typescript (devDeps only — engine has zero runtime deps)
-bun run test        # 196 tests — should be green
+bun run test        # 234 tests — should be green
 bun run typecheck   # tsc --checkJs --noEmit on src/
 bun run dev         # python3 -m http.server 8080 --directory src
 # Open http://localhost:8080/?fixture=01-bare-audio&debug=1
@@ -101,7 +101,7 @@ harmonic-wave-universal-player/
 │   ├── engine/                    ← Recipe engine — display + delivery recipes → BehaviorConfig
 │   ├── composition/               ← Layering — decides which layers to render per item
 │   ├── renderers/                 ← Presentation per layer + content type
-│   │   ├── content/               (audio — Step 5; video/image/document/sound-effect land in Step 6)
+│   │   ├── content/               (audio, video, image, document, sound-effect — all 5 shipping)
 │   │   ├── overlay/               ← (Step 8) lyrics-scrolling, lyrics-spotlight, doc-excerpt
 │   │   ├── scene/                 ← (Step 8) banner-static, banner-animated
 │   │   └── narration/             ← (Step 11) tts-bridge, word-sync

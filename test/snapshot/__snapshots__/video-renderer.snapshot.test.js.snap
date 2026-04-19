@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`snapshot — video renderer > cinematic_fullscreen behavior — chrome=none, autoplay=muted 1`] = `"<article class="hwes-video hwes-video--hero hwes-video--fullscreen"><video class="hwes-video__element" preload="metadata" muted="" src="https://example.com/test.mp4"></video><div class="hwes-video__meta"><h2 class="hwes-video__title">Fullscreen Test</h2></div></article>"`;
+
+exports[`snapshot — video renderer > default behavior with poster 1`] = `"<article class="hwes-video hwes-video--standard hwes-video--contain"><video class="hwes-video__element" preload="metadata" poster="https://example.com/poster.jpg" src="https://example.com/test.mp4"></video><div class="hwes-video__meta"><h2 class="hwes-video__title">Cinematic Test</h2></div></article>"`;

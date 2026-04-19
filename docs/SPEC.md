@@ -576,11 +576,16 @@ The modular structure allows incremental shipping. Each step produces a working 
 - 159 tests pass (was 123; +36 for layer-selector, theme injector, shell, controls, audio renderer)
 - End-to-end browser smoke: `localhost:8080/?fixture=01-bare-audio&debug=1` mounts shell + audio card + controls; Play button drives audio start/pause
 
-### Step 6: Remaining content renderers
-- `renderers/content/video.js`
-- `renderers/content/image.js`
-- `renderers/content/document.js`
-- `renderers/content/sound-effect.js`
+### Step 6: Remaining content renderers ✅
+- `renderers/content/video.js` — `<video>` with `playsinline` (iOS), `crossOrigin` deferred to Step 9, `done` resolves on `ended`
+- `renderers/content/image.js` — `<img>` + dwell timer; `sequence_dwell_seconds=0` means manual-advance only; pause/resume halts/continues from elapsed
+- `renderers/content/document.js` — text rendering with `doc_display: 'excerpt'` (200-word truncation + optional `expand_button`) vs `'fullscreen_reader'` (full body inline); inline body via `content_metadata.body` or fetched via `media_play_url`
+- `renderers/content/sound-effect.js` — compact card, always-autoplay (gesture rejection silently advances), `done` on `ended` or `error`
+- All renderers expose a uniform `done` Promise contract — boot.js subscribes to drive auto-advance per `behavior.content_advance === 'auto'`. Step 9's state machine inherits the same contract
+- Audio renderer retrofitted with the same `done` contract (Step 5 carryover)
+- MediaChannel typedef (`src/playback/types.js`) widened to accept image/document kinds with nullable element
+- 234 tests (was 196), 13 snapshots across all 5 content renderers + chrome shell + controls
+- Browser smoke: `?fixture=05-mixed-content` cycles image → audio → document → sound-effect with auto-advance
 
 ### Step 7: Visualizer (preserves POC)
 - `visualizer/canvas.js`

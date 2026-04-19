@@ -1,0 +1,42 @@
+{
+  "_comment": "Browser-demo fixture for Step 6 — multi-item experience exercising 4 renderers in sequence: image (5s dwell) → audio (T-Rex roar) → document (excerpt) → sound-effect. Validates the auto-advance via renderer.done across all four content types end-to-end.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 1005,
+  "slug": "demo-mixed-content",
+  "name": "Demo — Mixed Content Sequence",
+  "description": "Image → audio → document → sound-effect, auto-advancing.",
+  "items": [
+    {
+      "item_id": 1,
+      "content_id": 100,
+      "content_type_slug": "photo",
+      "content_title": "Cover photo (5s dwell)",
+      "media_play_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg"
+    },
+    {
+      "item_id": 2,
+      "content_id": 101,
+      "content_type_slug": "song",
+      "content_title": "T-Rex Roar",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/without-you-cover-scaled.jpg"
+    },
+    {
+      "item_id": 3,
+      "content_id": 102,
+      "content_type_slug": "document",
+      "content_title": "A short note",
+      "content_metadata": {
+        "body": "This is a short document item — body fits within the excerpt limit, so no Read-more affordance. Default sequence_dwell_seconds=5 means the experience auto-advances after 5 seconds."
+      }
+    },
+    {
+      "item_id": 4,
+      "content_id": 103,
+      "content_type_slug": "sound_effect",
+      "content_title": "T-Rex Roar (as SFX)",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"
+    }
+  ]
+}

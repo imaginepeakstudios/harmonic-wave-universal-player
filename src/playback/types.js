@@ -15,13 +15,21 @@
 
 /**
  * @typedef {object} MediaChannel
- * @property {'audio' | 'video'} kind
- * @property {HTMLMediaElement} element  The renderer-owned media element.
- *   Pipeline routes it via MediaElementSource on desktop; on mobile may
- *   leave it standalone (see audio-pipeline/mobile.js).
+ * @property {'audio' | 'video' | 'image' | 'document'} kind
+ *   What the renderer is producing. Audio/video kinds carry a media
+ *   element the audio pipeline will route. Image/document kinds are
+ *   non-routable (no audio stream); the channel still exists so boot.js
+ *   can hold a uniform reference shape per active renderer, and the
+ *   teardown contract stays consistent across types.
+ * @property {HTMLMediaElement | HTMLImageElement | null} element
+ *   The renderer-owned element (audio/video for media kinds, img for
+ *   image kind, null for document kind). Pipeline routes media kinds
+ *   via MediaElementSource on desktop; on mobile may leave standalone
+ *   (see audio-pipeline/mobile.js).
  * @property {AnalyserNode} [analyser]  Set by the pipeline AFTER routing,
  *   so the visualizer can subscribe to FFT frames. Absent on the mobile
- *   pipeline path that doesn't route through MediaElementSource.
+ *   pipeline path that doesn't route through MediaElementSource AND
+ *   absent for image/document kinds (no audio stream to analyze).
  * @property {() => void} teardown  Renderer-provided. Called on item
  *   transition; should pause the element, remove listeners, and release
  *   any DOM nodes the renderer created.

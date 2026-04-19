@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`snapshot — image renderer > default behavior — standard sizing 1`] = `"<article class="hwes-image hwes-image--standard hwes-image--contain"><img class="hwes-image__element" crossorigin="anonymous" src="https://example.com/photo.jpg" alt="Cover Photo"><div class="hwes-image__meta"><h2 class="hwes-image__title">Cover Photo</h2></div></article>"`;
+
+exports[`snapshot — image renderer > image_sequence recipe — sizing:cover, transition:crossfade 1`] = `"<article class="hwes-image hwes-image--standard hwes-image--cover"><img class="hwes-image__element" crossorigin="anonymous" src="https://example.com/seq.jpg" alt="Sequence Photo"><div class="hwes-image__meta"><h2 class="hwes-image__title">Sequence Photo</h2></div></article>"`;

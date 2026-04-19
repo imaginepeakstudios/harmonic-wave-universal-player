@@ -1,0 +1,5 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`snapshot — sound-effect renderer > default — compact label + hidden audio 1`] = `"<article class="hwes-sfx"><div class="hwes-sfx__label">♪ Door Bell</div><audio class="hwes-sfx__element" preload="auto" src="https://example.com/bell.mp3"></audio></article>"`;
+
+exports[`snapshot — sound-effect renderer > looped ambient bed (loop=true) 1`] = `"<article class="hwes-sfx"><div class="hwes-sfx__label">♪ Drone</div><audio class="hwes-sfx__element" preload="auto" loop="" src="https://example.com/drone.mp3"></audio></article>"`;

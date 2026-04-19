@@ -39,6 +39,13 @@
  * @property {() => void} pause
  * @property {() => void} resume
  * @property {() => void} teardown  Pauses + removes element + clears src.
+ * @property {Promise<void>} done
+ *   Resolves when the content is "complete" — for audio, when the
+ *   `<audio>` element fires `ended`. Boot.js / Step 9 state machine
+ *   subscribes to drive sequential auto-advance (when behavior.content_advance
+ *   === 'auto'). Resolves at most once; never rejects (errors during
+ *   playback also resolve this so the experience advances past failures
+ *   instead of dead-stopping).
  */
 
 /**
@@ -115,9 +122,33 @@ export function createAudioRenderer(opts) {
     },
   };
 
+  // `done` resolves when the track ends OR when teardown fires (so
+  // boot.js / Step 9 state machine can subscribe with a single Promise
+  // and not worry about the renderer being torn down before completion).
+  /** @type {(value: void) => void} */
+  let resolveDone;
+  const done = new Promise((resolve) => {
+    resolveDone = resolve;
+  });
+  audio.addEventListener('ended', () => resolveDone(), { once: true });
+  // Errors during playback (network failure mid-stream, decode error)
+  // also resolve done so the experience advances past the failure
+  // instead of dead-stopping. We don't reject — that would force callers
+  // into try/catch around what's morally a "this finished, in some way".
+  audio.addEventListener(
+    'error',
+    () => {
+      // eslint-disable-next-line no-console
+      console.warn('[hwes/audio] playback error; advancing past failed item');
+      resolveDone();
+    },
+    { once: true },
+  );
+
   return {
     root: card,
     channel,
+    done,
     async start() {
       // autoplay='off' means start() should not auto-fire; the chrome
       // controls' Play button calls it explicitly. autoplay='on' or
@@ -145,6 +176,7 @@ export function createAudioRenderer(opts) {
     teardown() {
       channel.teardown();
       card.remove();
+      resolveDone();
     },
   };
 }

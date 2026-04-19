@@ -1,0 +1,21 @@
+{
+  "_comment": "Browser-demo fixture for Step 6 document renderer + document_excerpt display recipe. Inline body in content_metadata, ~250 words so excerpt mode truncates with Read-more button.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 1004,
+  "slug": "demo-document-excerpt",
+  "name": "Demo — Document Excerpt",
+  "description": "Inline document with excerpt + expand affordance.",
+  "items": [
+    {
+      "item_id": 1,
+      "content_id": 100,
+      "content_type_slug": "document",
+      "content_title": "On Building in Public",
+      "display_directives": ["document_excerpt"],
+      "content_metadata": {
+        "body": "Building in public means letting people watch the failures, not just the wins. The wins look like luck from the outside. The failures look like effort. The two are the same thing — a long sequence of attempts where most don't work and a handful do, and you can't tell in advance which is which. The instinct is to hide the misses. To wait until something is polished, then publish a clean post about how you got there. That's safe. It's also how craft becomes performance, and how the people watching learn nothing transferable. The alternative is harder: be visible while you're still figuring it out. Show the dead-end branches. Explain what you tried, what didn't work, and the specific reason it didn't work. Be wrong on the record. The first time you do this, it feels reckless. The second time, it feels normal. The third time, you realize the people who matter — the ones who would actually use what you're building — were waiting for someone to talk like a peer instead of a brand. They show up. They contribute. They tell you what you got wrong, and you fix it before it ships. The polish-then-publish path optimizes for looking competent. The build-in-public path optimizes for being competent. They produce different careers, in the long run, with different kinds of people."
+      }
+    }
+  ]
+}

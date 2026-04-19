@@ -51,18 +51,33 @@ import { composeItem } from './composition/index.js';
 import { injectTheme } from './theme/injector.js';
 import { createShell } from './chrome/shell.js';
 import { createAudioRenderer } from './renderers/content/audio.js';
+import { createVideoRenderer } from './renderers/content/video.js';
+import { createImageRenderer } from './renderers/content/image.js';
+import { createDocumentRenderer } from './renderers/content/document.js';
+import { createSoundEffectRenderer } from './renderers/content/sound-effect.js';
 
 const config = readConfig();
 const mcp = createMcpClient(config);
 
 /**
  * Renderer factory map. boot.js looks up by `descriptor.renderer` from
- * the composition layer. Step 6 adds video/image/document/sound-effect.
- * The 'unsupported' fallback lets the experience continue past an
- * unknown content type instead of dead-stopping.
+ * the composition layer. The 'unsupported' fallback lets the experience
+ * continue past an unknown content type instead of dead-stopping.
+ *
+ * Renderers all share the same shape:
+ *   { root, channel, start(), pause(), resume(), teardown(), done: Promise }
+ * The `done` Promise resolves when the content is "complete" — for
+ * audio/video on `ended`, for image/document on dwell-timer expiry, for
+ * sound-effect on ended (or autoplay rejection). boot.js subscribes to
+ * activeRenderer.done to auto-advance when behavior.content_advance ===
+ * 'auto'. Step 9's state machine inherits this contract.
  */
 const RENDERERS = {
   audio: createAudioRenderer,
+  video: createVideoRenderer,
+  image: createImageRenderer,
+  document: createDocumentRenderer,
+  'sound-effect': createSoundEffectRenderer,
   unsupported: createUnsupportedRenderer,
 };
 
@@ -205,6 +220,26 @@ globalThis.addEventListener?.('pagehide', onPageHide);
         },
       });
       controls?.setNowPlaying(item?.content_title ?? `Item ${index + 1} of ${view.items.length}`);
+
+      // Auto-advance: when content_advance==='auto' (default) AND there's
+      // a next item, subscribe to the renderer's `done` Promise — when it
+      // resolves (audio ended, image dwell expired, etc.), mount the next
+      // item. Step 9's state machine replaces this with a real sequential
+      // controller; the contract (renderer.done resolves on completion)
+      // stays the same so the upgrade is mechanical.
+      const indexAtMount = index;
+      activeRenderer.done?.then(() => {
+        // Defensive: only advance if we're still the active item AND a
+        // next item exists. Protects against (a) teardown firing done
+        // before transition completes, (b) skip having already advanced.
+        if (activeIndex !== indexAtMount) return;
+        if (behavior.content_advance !== 'auto') return;
+        const next = indexAtMount + 1;
+        if (next < view.items.length) {
+          activeIndex = next;
+          mountItem(next);
+        }
+      });
 
       // Honor autoplay directive — some recipes (cinematic_fullscreen,
       // loop_ambient) set autoplay='on' or 'muted'. Browser gesture
