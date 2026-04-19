@@ -147,21 +147,62 @@ Forks / third-party players: copy this directory into your repo, port `conforman
 
 ## Conformance cases covered
 
-> *Cases land alongside engine modules in subsequent build steps. The list grows as the engine implementation progresses.*
+Two categories: **synthetic** (hand-authored, designed to exercise one
+specific contract per fixture) and **golden** (verbatim production
+responses from `harmonicwave.ai/mcp/v1/message get_experience`,
+captured to lock the wire shape the engine must handle correctly).
 
-Planned for initial coverage (per IMPLEMENTATION-GUIDE.md build sequence):
+### Synthetic — built-in recipes (10/10 covered)
+
+| Fixture | Exercises |
+|---|---|
+| `01-bare-audio` | Single audio item, no recipes, default behavior |
+| `02-cinematic-fullscreen` | `cinematic_fullscreen` display recipe → BehaviorConfig |
+| `03-album-art-forward` | `album_art_forward` display recipe |
+| `04-performance-mode` | `performance_mode` display recipe (chrome=none, manual advance) |
+| `05-background-visual` | `background_visual` display recipe (autoplay muted, loop) |
+| `06-letterbox-21-9` | `letterbox_21_9` display recipe for video content |
+| `07-lyrics-karaoke` | `lyrics_karaoke` + `lrc_lyrics` metadata precondition |
+| `08-document-excerpt` | `document_excerpt` + content_type=document precondition |
+| `09-image-sequence` | `image_sequence` + content_type=photo precondition |
+| `10-cross-fade-transitions` | `cross_fade_transitions` (transition primitive only) |
+
+### Synthetic — cascade interactions
+
+| Fixture | Exercises |
+|---|---|
+| `11-cascade-display-and-delivery` | Display + delivery recipe stack on one item; both arrays walked, both merged in SPEC §13 #30 order |
+| `13-broken-media-mid-sequence` | Working item → broken URL → working item; auto-advance must reach the third item via the renderer's error path |
+
+### Golden — production wire shape
+
+| Fixture | Captured | Exercises |
+|---|---|---|
+| `12-production-holding-on` | 2026-04-19 from `harmonicwave.ai/mcp/v1/message` for slug `my-test` | Stringified-JSON content_metadata + item_display_recipes + content_recipes + recipes; flattened actor_* fields; content_cover_art_url alias; custom recipe slug (skipped silently); `seo_metadata_v1` extension honored |
+
+**`12-production-holding-on` is the floor of production coverage, not the ceiling.** It's a basic 2-item experience (1 song + 1 video, no actor configured, single custom recipe at experience level). It does NOT exercise:
+- A nested `player_theme_v1` extension payload with branding tokens
+- A built-in recipe (`cinematic_fullscreen`, `lyrics_karaoke`, etc.) appearing in production stringified-JSON form
+- A non-null actor with `actor_visual_directives` array
+- Items inside a collection (`collection_id` set + `collection_*` fields populated)
+- `item_override_enabled: 1` cascade behavior
+- `delivery_override_instruction` per-item overrides
+- A populated `visual_scene` (banner1_url, banner2_url)
+- Premium experiences with `access_type: 'premium'`
+- Multi-actor experiences with cascade resolution
+
+**Process for adding new golden fixtures:** Each time a richer experience is published on the platform, capture its `get_experience` response verbatim, sanitize timing/state fields (`stream_count`, `play_count`, `last_played`, `share_token`), drop into `fixtures/`, author the corresponding `expected/` for the engine's projection, run the suite. Production schema drift surfaces immediately.
+
+### Planned (land alongside future build steps)
 
 | Fixture | Exercises | Lands in build step |
 |---|---|---|
-| `01-bare-audio` | Single audio item, no recipes, default behavior | Step 4 (composition + first content renderer) |
-| `02-cinematic-fullscreen` | `cinematic_fullscreen` display recipe → BehaviorConfig (`prominence: 'hero'`, `sizing: 'fullscreen'`, `chrome: 'none'`, `autoplay: 'muted'`) | Step 4 |
-| `03-actor-cascade` | Actor cascade resolves correctly across experience → collection → item levels; `resolved_actor.source` reflects the level | Step 5 |
-| `04-display-cascade-override` | Display cascade: item-level override only fires when `override_enabled=1`; otherwise inherits from parent | Step 5 |
-| `05-lyrics-karaoke` | `lyrics_karaoke` recipe + `lrc_lyrics` metadata → lyrics overlay layer composed; missing metadata → silently degrades | Step 7 |
-| `06-player-theme-pro` | Pro+ owner: `player_theme` in response → CSS custom properties applied; brand assets proxied | Step 4 + Step 5 |
-| `07-player-theme-stripped-free` | Free-tier owner: `player_theme` absent from response → engine falls back to default theme | Step 4 + Step 5 |
-| `08-graceful-unknown-recipe` | Unknown recipe slug in cascade → silently skipped (not crashed); known recipes still applied | Step 4 |
-| `09-music-bed-narration` | `narration_music_bed: 'auto'` directive on desktop → music bed activated; on mobile → no-op | Step 9 + Step 10 |
-| `10-end-of-experience` | After last item, `experience:ended` fires; completion card renders with cover art montage + "What's next" CTAs | Step 12 |
+| `14-actor-cascade` | Actor cascade resolves across experience → collection → item; `resolved_actor.source` reflects the level | Step 5 polish (when actor renderer ships) |
+| `15-display-cascade-override` | Display cascade: item-level override only fires when `override_enabled=1`; otherwise inherits | Step 5 polish |
+| `16-player-theme-pro` | `player_theme_v1` extension → CSS custom properties applied; brand assets proxied | Step 5 polish |
+| `17-music-bed-narration-{desktop,mobile}` | Platform discriminator: desktop activates music bed, mobile no-ops | Step 9 + Step 10 |
+| `18-end-of-experience` | After last item, `experience:ended` fires; completion card renders | Step 12 |
+| `19-collection-cascade` | Items inside a collection inherit `actor_profile_id` + recipes from the collection | Future |
+| `20-premium-access-denied` | `access_type=premium` without verification → 403 path | Future |
 
 Add more as conformance edge cases surface.

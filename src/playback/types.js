@@ -42,7 +42,24 @@
  * @property {Error} [error]     Set when phase === 'error'.
  */
 
-// Re-export as no-op so this file can be `import`ed for side-effect-free
-// type registration. JSDoc consumers don't need a value; runtime consumers
-// don't need anything but the types.
-export {};
+/**
+ * Runtime type guard: is this channel routable through the audio
+ * pipeline (i.e., does it carry a media element with audio output)?
+ *
+ * Step 9's audio pipeline (desktop + mobile) needs to branch on this
+ * BEFORE attempting MediaElementSource wiring — image and document
+ * channels carry HTMLImageElement / null, not HTMLMediaElement, and
+ * `audioContext.createMediaElementSource(channel.element)` would throw
+ * if called blindly.
+ *
+ * @param {MediaChannel} channel
+ * @returns {boolean}
+ */
+export function isMediaChannel(channel) {
+  return (
+    channel != null &&
+    (channel.kind === 'audio' || channel.kind === 'video') &&
+    channel.element != null &&
+    'play' in channel.element // HTMLMediaElement-only method
+  );
+}

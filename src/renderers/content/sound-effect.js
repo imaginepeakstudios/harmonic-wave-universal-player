@@ -7,8 +7,13 @@
  * sound effects are usually atmospheric / transitional, not the focus.
  *
  * Differences from the audio renderer:
- *   - Always autoplay='on' (a sound effect that doesn't fire is broken).
- *     Browser gesture policy may still reject; the catch is silent.
+ *   - Honors `behavior.autoplay` like every other renderer (autoplay='off'
+ *     means the chrome controls' Play button must trigger). Per FE arch
+ *     review of d48d81b: a uniform renderer interface means uniform
+ *     primitive handling — silently ignoring `autoplay='off'` violates
+ *     the contract even if "always autoplay" is the common SFX case.
+ *     A creator who sets autoplay='off' on an SFX gets manual-trigger
+ *     behavior (rare but valid).
  *   - No cover art slot. Sound effects don't carry meaningful visuals.
  *   - Compact card; doesn't take hero space even at prominence='hero'.
  *   - Fires `done` on ended so sequential controller advances immediately.
@@ -92,8 +97,11 @@ export function createSoundEffectRenderer(opts) {
     channel,
     done,
     async start() {
-      // Sound effects always autoplay (autoplay directive ignored —
-      // a sound effect that requires user gesture is broken UX).
+      // Honor autoplay primitive. autoplay='off' means the chrome
+      // controls' Play button (or programmatic resume()) is the trigger.
+      // The common case is autoplay='on' or 'muted' — start fires the
+      // play immediately.
+      if (behavior.autoplay === 'off') return;
       try {
         await audio.play();
       } catch (err) {

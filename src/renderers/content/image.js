@@ -71,6 +71,18 @@ export function createImageRenderer(opts) {
   const done = new Promise((resolve) => {
     resolveDone = resolve;
   });
+  // Advance past failures: if the image fails to load, resolve done so
+  // the experience moves on instead of dwelling silently. Mirrors
+  // audio/video's `error` handling (FE arch review d48d81b P1 #4).
+  img.addEventListener(
+    'error',
+    () => {
+      // eslint-disable-next-line no-console
+      console.warn('[hwes/image] load error; advancing past failed item');
+      resolveDone();
+    },
+    { once: true },
+  );
 
   // Dwell-timer plumbing. start() arms the timer; pause() halts; resume()
   // resumes from elapsed; teardown() cancels. dwell=0 means manual-advance
@@ -86,6 +98,13 @@ export function createImageRenderer(opts) {
 
   function armTimer(remainingMs) {
     if (totalMs <= 0) return; // manual-advance: never auto-fire
+    // Self-clearing: if a previous timer is still pending (e.g., a
+    // misbehaving controller calls resume() twice), drop it before
+    // arming a new one. Without this guard, the orphaned setTimeout
+    // would leak and fire resolveDone() on an already-resolved Promise
+    // (harmless but pollutes the timer set + delays GC). Per FE arch
+    // review of d48d81b (P1 #3).
+    if (timer != null) clearTimer();
     timerStartTs = Date.now();
     timer = setTimeout(() => {
       timer = null;

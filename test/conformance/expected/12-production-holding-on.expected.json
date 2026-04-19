@@ -1,0 +1,60 @@
+{
+  "_comment": "Expected projection of the production Holding On response. The single experience-level recipe `custom_make_it_a_playlist` is a CUSTOM (creator-defined) slug — the `custom_` prefix is the platform's convention. The engine's recipe-engine SKIPS unknown slugs silently per SPEC §5.4 (custom recipes are AI-only per decision #12), so resolved_behavior is DEFAULT_BEHAVIOR for both items. layers = [content, chrome] (chrome=full default keeps the chrome layer). hwes_extensions_honored captures only seo_metadata_v1 (the one extension production declares). The schema parser MUST handle the production wire shape correctly: stringified-JSON content_metadata, item_display_recipes, content_recipes, recipes; flattened actor_* (all null here so actor is null); content_cover_art_url aliased to cover_art_url at the item level.",
+  "experience": {
+    "id": 6,
+    "slug": "my-test",
+    "name": "Holding On",
+    "starter_prompts_resolved": ["Turn this into a simple playlist of Matthew Hartley's music."],
+    "delivery_instructions": ["custom_make_it_a_playlist"]
+  },
+  "hwes_extensions_honored": ["seo_metadata_v1"],
+  "hwes_extensions_ignored": [],
+  "items": [
+    {
+      "item_id": 4,
+      "resolved_actor": null,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    },
+    {
+      "item_id": 5,
+      "resolved_actor": null,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

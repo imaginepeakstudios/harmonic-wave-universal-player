@@ -1,0 +1,76 @@
+{
+  "_comment": "All three items resolve to DEFAULT_BEHAVIOR (no recipes). The 'broken middle' aspect is a runtime behavior — the engine layer doesn't see media URLs as anything special. Renderer-level tests prove the error-path resolves done; this fixture exists so the conformance suite has the canonical 3-item shape for any third-party implementer to validate auto-advance composition.",
+  "experience": {
+    "id": 13,
+    "slug": "broken-media-mid-sequence"
+  },
+  "hwes_extensions_honored": [],
+  "items": [
+    {
+      "item_id": 1,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    },
+    {
+      "item_id": 2,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    },
+    {
+      "item_id": 3,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

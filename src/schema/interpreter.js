@@ -13,22 +13,42 @@
  * the engine layer without touching the schema layer, and vice versa.
  *
  * The interpreter's job:
- *   1. Validate the response is HWES v1 (refuse v2+; that needs a different
- *      player build because v2 is reserved for actually-breaking changes)
+ *   1. Validate the response is HWES v1 (refuse v2+)
  *   2. Categorize hwes_extensions into known + unknown; warn on unknown
- *      (additive-within-v1: snapshot may be stale)
- *   3. Surface typed accessors over the resolved fields:
+ *   3. Normalize the production wire shape into the HwesView surface:
+ *      - parse stringified-JSON fields (content_metadata, recipes,
+ *        item_display_recipes, content_recipes, starter_prompts, etc.)
+ *      - alias production field names to the HwesView vocabulary
+ *        (item_display_recipes → display directives, content_recipes →
+ *        delivery instructions, recipes → experience-level delivery,
+ *        content_cover_art_url → cover_art_url on items)
+ *      - synthesize ActorView from flattened actor_* fields on the
+ *        experience (production sends actor as flat fields, not nested)
+ *   4. Surface typed accessors over the resolved fields:
  *        - getItemActor(item)               — item.resolved_actor || exp.actor
- *        - getItemDisplayDirectives(item)   — item.display_directives || exp.display_directives
- *        - getItemDeliveryInstructions(item) — item.delivery_instructions || exp.delivery_instructions
+ *        - getItemDisplayDirectives(item)   — slug array (engine-bound)
+ *        - getItemDeliveryInstructions(item) — slug array (engine-bound)
+ *
+ * **Engine vs AI consumer fields** (lock-in 2026-04-19, golden fixture
+ * 12-production-holding-on): production sends TWO different shapes for
+ * recipe references:
+ *   - `recipes` (experience-level), `content_recipes` (item-level),
+ *     `item_display_recipes` (item-level): SLUG arrays, stringified JSON.
+ *     The engine reads these to look up registry entries.
+ *   - `delivery_instructions` (top-level array): RESOLVED HUMAN-READABLE
+ *     TEXT for AI agents. The engine MUST NOT read this — it's not
+ *     slugs and would all be classified "unknown" if it did.
+ *   The interpreter's `getItemDeliveryInstructions` returns slugs; the
+ *   resolved text is preserved on `view.raw.delivery_instructions` for
+ *   any AI-bridge consumer that needs it.
  *
  * Naming convention: `getItem*` makes the narrow scope explicit. These
  * are NOT the cascade-resolution entry points — those live in
  * `engine/recipe-engine.js::resolveBehavior()` which builds a full
  * BehaviorConfig from the resolved directives + the registry primitives.
  *
- * The raw response is preserved on `.raw` for renderers that need fields
- * not surfaced through the typed wrapper.
+ * The raw response is preserved on `.raw` for renderers / AI bridges
+ * that need fields not surfaced through the typed wrapper.
  *
  * Per the SPEC's graceful-degradation rule: missing fields are tolerated;
  * never throws on optional-field absence. Throws ONLY on:
@@ -37,6 +57,93 @@
  */
 
 import { categorizeExtensions } from './conformance.js';
+
+/**
+ * Parse a field that may be a JSON string OR an already-parsed value.
+ * Production sends stringified-JSON for arrays/objects in many places
+ * (recipes, content_metadata, starter_prompts, etc.); test fixtures
+ * often pass the parsed shape directly. Accept both — broken JSON
+ * (creator-corrupted metadata) returns the fallback.
+ *
+ * @template T
+ * @param {unknown} value
+ * @param {T} fallback
+ * @returns {T | unknown}
+ */
+function parseJsonField(value, fallback) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== 'string') return value; // already parsed
+  if (value === '') return fallback;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Synthesize an ActorView from the experience-level flattened actor_*
+ * fields. Production sends actor data as `actor_name`, `actor_voice_id`,
+ * etc. directly on the experience root, not nested under `actor`. If
+ * `actor_name` is null/missing, returns null (no actor configured at
+ * the experience level).
+ *
+ * @param {Record<string, unknown>} raw
+ * @returns {ActorView | null}
+ */
+function synthesizeActorFromFlat(raw) {
+  // The presence of actor_name OR actor_slug OR actor_voice_id is the
+  // signal that an actor is configured. All-null means no actor.
+  const hasActor = raw.actor_name != null || raw.actor_slug != null || raw.actor_voice_id != null;
+  if (!hasActor) return null;
+  return {
+    name: /** @type {string | undefined} */ (raw.actor_name ?? undefined),
+    slug: /** @type {string | undefined} */ (raw.actor_slug ?? undefined),
+    voice_id: /** @type {string | undefined} */ (raw.actor_voice_id ?? undefined),
+    voice_name: /** @type {string | undefined} */ (raw.actor_voice_name ?? undefined),
+    narrative_voice: /** @type {string | undefined} */ (raw.actor_narrative_voice ?? undefined),
+    actor_type: /** @type {string | undefined} */ (raw.actor_actor_type ?? undefined),
+    visual_style: /** @type {string | null | undefined} */ (raw.actor_visual_style ?? undefined),
+    visual_directives: /** @type {string[] | undefined} */ (
+      parseJsonField(raw.actor_visual_directives, undefined)
+    ),
+  };
+}
+
+/**
+ * Normalize an item from the production wire shape into the HwesView
+ * shape. Aliases production field names + parses stringified JSON in
+ * place. Returns a NEW object (doesn't mutate the original).
+ *
+ * @param {Record<string, unknown>} rawItem
+ * @returns {ItemView}
+ */
+function normalizeItem(rawItem) {
+  if (!rawItem || typeof rawItem !== 'object') return /** @type {any} */ (rawItem);
+  const normalized = { ...rawItem };
+  // Stringified JSON fields → parsed.
+  normalized.content_metadata = parseJsonField(rawItem.content_metadata, {});
+  // Production sends item-level display recipes as `item_display_recipes`
+  // (stringified slug array). Surface them under the HwesView name
+  // `display_directives` so the engine + accessors find them.
+  if (rawItem.display_directives === undefined && rawItem.item_display_recipes !== undefined) {
+    normalized.display_directives = parseJsonField(rawItem.item_display_recipes, []);
+  }
+  // Same pattern for delivery: `content_recipes` (stringified slug array)
+  // becomes `delivery_instructions` for the engine path. Production's
+  // experience-level `delivery_instructions` is human text for AI agents
+  // — DO NOT confuse the two; the resolved text stays on view.raw.
+  if (rawItem.delivery_instructions === undefined && rawItem.content_recipes !== undefined) {
+    normalized.delivery_instructions = parseJsonField(rawItem.content_recipes, []);
+  }
+  // Cover art alias: production sends `content_cover_art_url` on items;
+  // we surface it as `cover_art_url` so renderers don't have to know
+  // both names. Top-level `cover_art_url` (if explicitly set) wins.
+  if (rawItem.cover_art_url == null && rawItem.content_cover_art_url != null) {
+    normalized.cover_art_url = rawItem.content_cover_art_url;
+  }
+  return /** @type {any} */ (normalized);
+}
 
 /**
  * @typedef {object} HwesView
@@ -82,7 +189,10 @@ import { categorizeExtensions } from './conformance.js';
  * @property {string | undefined} actor_type
  * @property {string | null | undefined} visual_style
  * @property {string[] | undefined} visual_directives
- * @property {string | undefined} source  Only on per-item resolved actors
+ * @property {string} [source]  Only on resolved actors — set by the
+ *   platform per-item ('item' / 'collection' / 'experience') OR
+ *   stamped 'experience' by the interpreter when falling back to the
+ *   experience-level actor for an item with no per-item override.
  */
 
 /**
@@ -145,8 +255,41 @@ export function interpret(rawResponse, opts = {}) {
     }
   }
 
-  const items = Array.isArray(rawResponse.items) ? rawResponse.items : [];
-  const actor = rawResponse.actor ?? null;
+  const rawItems = Array.isArray(rawResponse.items) ? rawResponse.items : [];
+  const items = rawItems.map(normalizeItem);
+
+  // Actor lookup priority:
+  //   1. nested `actor` object (clean test fixtures + future production shape)
+  //   2. flattened actor_* fields on the experience root (current production)
+  //   3. null
+  const actor = rawResponse.actor ?? synthesizeActorFromFlat(/** @type {any} */ (rawResponse));
+
+  // Experience-level recipe slugs. Read order:
+  //   1. `recipes` (production: stringified slug array)
+  //   2. `delivery_instructions` (legacy test convention: parsed slug
+  //      array — this is the field name conformance fixtures 01-13 use,
+  //      and we keep accepting it for backward compat). Production also
+  //      uses `delivery_instructions` but for RESOLVED HUMAN TEXT for AI
+  //      consumers; if `recipes` is present we use that instead, so
+  //      production never hits this fallback. If a future production
+  //      response sends ONLY text in `delivery_instructions` with no
+  //      `recipes`, the engine sees the text strings as unknown slugs
+  //      and skips them silently — acceptable for that malformed shape.
+  //   3. undefined
+  const expDelivery =
+    parseJsonField(rawResponse.recipes, undefined) ??
+    (Array.isArray(rawResponse.delivery_instructions)
+      ? rawResponse.delivery_instructions
+      : undefined);
+  const expDisplay = Array.isArray(rawResponse.display_directives)
+    ? rawResponse.display_directives
+    : parseJsonField(rawResponse.display_recipes, undefined);
+
+  // Starter prompts: prefer the pre-resolved array if present (production
+  // sends `starter_prompts_resolved`); fall back to parsing `starter_prompts`.
+  const starterPrompts = Array.isArray(rawResponse.starter_prompts_resolved)
+    ? rawResponse.starter_prompts_resolved
+    : parseJsonField(rawResponse.starter_prompts, undefined);
 
   /** @type {ExperienceView} */
   const experience = {
@@ -160,11 +303,11 @@ export function interpret(rawResponse, opts = {}) {
     experience_mode: rawResponse.experience_mode,
     arc_summary: rawResponse.arc_summary,
     visual_scene: rawResponse.visual_scene,
-    delivery_instructions: rawResponse.delivery_instructions,
-    display_directives: rawResponse.display_directives,
+    delivery_instructions: /** @type {string[] | undefined} */ (expDelivery),
+    display_directives: /** @type {string[] | undefined} */ (expDisplay),
     player_theme: rawResponse.player_theme,
     seo: rawResponse.seo,
-    starter_prompts_resolved: rawResponse.starter_prompts_resolved,
+    starter_prompts_resolved: /** @type {string[] | undefined} */ (starterPrompts),
   };
 
   /** @type {HwesView} */

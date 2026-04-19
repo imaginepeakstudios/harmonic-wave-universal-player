@@ -1,0 +1,25 @@
+{
+  "_comment": "Synthetic — player_theme_v1 extension declared with branding tokens. The interpreter MUST surface this on view.experience.player_theme; the theme/injector module reads it and writes CSS custom properties at boot. Per the platform CLAUDE.md and SPEC §7.1, the extension is plan-gated server-side (Pro+ creators get it; Free creators see player_theme stripped from the response). This fixture represents the Pro+ case.",
+  "hwes_version": 1,
+  "hwes_extensions": ["player_theme_v1"],
+  "id": 17,
+  "slug": "player-theme-pro",
+  "name": "Player Theme Extension Conformance Fixture",
+  "player_theme": {
+    "primary": "#FF6B6B",
+    "secondary": "#4ECDC4",
+    "background": "#1A1A2E",
+    "text": "#FFFFFF",
+    "text_muted": "#A0A0B0",
+    "font_family": "'Inter', sans-serif",
+    "font_display": "'Bebas Neue', sans-serif"
+  },
+  "items": [
+    {
+      "item_id": 1701,
+      "content_type_slug": "song",
+      "content_title": "Themed item",
+      "media_play_url": "/media/play/500?t=token"
+    }
+  ]
+}

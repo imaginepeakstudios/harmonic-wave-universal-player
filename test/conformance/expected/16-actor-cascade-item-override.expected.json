@@ -1,0 +1,37 @@
+{
+  "_comment": "First item carries its own resolved_actor (Marcus Sterling, source='item' from platform). Second item has no resolved_actor → falls back to experience-level (DJ Layla, source='experience' stamped by interpreter).",
+  "experience": {
+    "id": 16,
+    "slug": "actor-cascade-item-override"
+  },
+  "hwes_extensions_honored": ["actor_visual_identity_v1"],
+  "items": [
+    {
+      "item_id": 1601,
+      "resolved_actor": {
+        "name": "Marcus Sterling",
+        "slug": "marcus-sterling",
+        "voice_id": "voice_marcus_authoritative",
+        "voice_name": "Marcus (Authoritative)",
+        "narrative_voice": "documentary_serious",
+        "actor_type": "narrator",
+        "visual_style": "cinematic",
+        "visual_directives": ["high_contrast"],
+        "source": "item"
+      }
+    },
+    {
+      "item_id": 1602,
+      "resolved_actor": {
+        "name": "DJ Layla",
+        "slug": "dj-layla",
+        "voice_id": "voice_layla_calm",
+        "voice_name": "Layla (Calm)",
+        "narrative_voice": "warm_intimate",
+        "actor_type": "narrator",
+        "visual_style": "minimalist",
+        "source": "experience"
+      }
+    }
+  ]
+}

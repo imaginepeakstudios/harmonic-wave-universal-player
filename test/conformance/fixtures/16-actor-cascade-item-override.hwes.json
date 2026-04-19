@@ -1,0 +1,48 @@
+{
+  "_comment": "Synthetic — experience-level actor (DJ Layla) is overridden by per-item resolved_actor (Marcus Sterling). The interpreter MUST surface the per-item resolved_actor verbatim (no source='experience' stamp; the platform already resolved the cascade), and the experience-level actor for items WITHOUT a resolved_actor. This validates that getItemActor honors per-item overrides correctly.",
+  "hwes_version": 1,
+  "hwes_extensions": ["actor_visual_identity_v1"],
+  "id": 16,
+  "slug": "actor-cascade-item-override",
+  "name": "Actor Cascade — Per-Item Override Conformance Fixture",
+  "actor_profile_id": 42,
+  "actor_name": "DJ Layla",
+  "actor_slug": "dj-layla",
+  "actor_voice_id": "voice_layla_calm",
+  "actor_voice_name": "Layla (Calm)",
+  "actor_narrative_voice": "warm_intimate",
+  "actor_actor_type": "narrator",
+  "actor_visual_style": "minimalist",
+  "actor_visual_directives": null,
+  "items": [
+    {
+      "item_id": 1601,
+      "content_type_slug": "song",
+      "content_title": "Item with per-item actor override",
+      "media_play_url": "/media/play/400?t=token",
+      "item_display_recipes": "[]",
+      "content_recipes": "[]",
+      "content_metadata": "{}",
+      "resolved_actor": {
+        "name": "Marcus Sterling",
+        "slug": "marcus-sterling",
+        "voice_id": "voice_marcus_authoritative",
+        "voice_name": "Marcus (Authoritative)",
+        "narrative_voice": "documentary_serious",
+        "actor_type": "narrator",
+        "visual_style": "cinematic",
+        "visual_directives": ["high_contrast"],
+        "source": "item"
+      }
+    },
+    {
+      "item_id": 1602,
+      "content_type_slug": "song",
+      "content_title": "Item without override → falls back to experience actor",
+      "media_play_url": "/media/play/401?t=token",
+      "item_display_recipes": "[]",
+      "content_recipes": "[]",
+      "content_metadata": "{}"
+    }
+  ]
+}

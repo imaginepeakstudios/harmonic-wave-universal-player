@@ -64,10 +64,11 @@ export function createVideoRenderer(opts) {
   if (behavior.autoplay === 'muted') video.muted = true;
   video.controls = false; // chrome owns controls
   // Cover art doubles as the poster — shown until first frame loads.
-  // Use setAttribute (not the .poster property) so the attribute is
-  // observable via getAttribute('poster') in tests + matches what
-  // declarative HTML <video poster=...> would produce.
-  const posterUrl = item?.cover_art_url ?? item?.content_metadata?.cover_art_url;
+  // Same priority as audio renderer (see audio.js comment for rationale).
+  const posterUrl =
+    item?.cover_art_url ??
+    /** @type {{ content_cover_art_url?: string }} */ (item)?.content_cover_art_url ??
+    item?.content_metadata?.cover_art_url;
   if (posterUrl) video.setAttribute('poster', posterUrl);
   if (item?.media_play_url) video.src = item.media_play_url;
   card.appendChild(video);

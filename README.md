@@ -62,7 +62,7 @@ The engine ships as vanilla ES modules — no bundler required. What works today
 git clone https://github.com/imaginepeakstudios/harmonic-wave-universal-player.git
 cd harmonic-wave-universal-player
 bun install         # installs vitest + happy-dom + prettier + typescript (devDeps only — engine has zero runtime deps)
-bun run test        # 234 tests — should be green
+bun run test        # 264 tests — should be green
 bun run typecheck   # tsc --checkJs --noEmit on src/
 bun run dev         # python3 -m http.server 8080 --directory src
 # Open http://localhost:8080/?fixture=01-bare-audio&debug=1
@@ -142,6 +142,8 @@ The v2 engine must be able to recreate Matthew Hartley's existing music experien
 If it can do that, it can do it for any creator. That's the bar.
 
 The original POC remains available at [imaginepeakstudios/harmonic-wave-player](https://github.com/imaginepeakstudios/harmonic-wave-player) as a reference example of what the engine must reproduce.
+
+**One caveat**: the POC is audio/music-only. Video, sound-effect, document, and image content types — the other four supported by Step 6 — aren't exercised by POC parity. The conformance suite under [`test/conformance/`](test/conformance/) covers them at the schema-and-engine level (one fixture per built-in display recipe + one per content type), and the demo fixtures under [`src/demo-fixtures/`](src/demo-fixtures/) exercise them end-to-end in the browser. **Production-side validation for non-audio types depends on uploaded experiences exercising each content type** — those are creator-side data entry, not engine work. Until such experiences exist on the platform, the non-audio production path is "synthetic-tested + spec-conformant" rather than "production-validated."
 
 ---
 

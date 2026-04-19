@@ -453,7 +453,7 @@ Recipe directives mutate this. Renderers read this. Adding a new behavioral aspe
 | `autoplay: 'muted'` | DEGRADES to 'on' (audio without sound = silence) | Video plays muted | N/A | N/A |
 | `loop: true` | Audio loops | Video loops | N/A | N/A |
 | `lyrics_display: 'scroll_synced'` | If lyrics metadata present, render synced overlay | Same | N/A | N/A |
-| `sequence_dwell_seconds` | N/A | N/A | Image displays for N seconds before advance | N/A |
+| `sequence_dwell_seconds` | N/A | N/A | Image displays for N seconds before advance | Document displays for N seconds before advance (auto-resolves done; 0 = manual-advance only) |
 | `doc_display: 'excerpt'` | N/A | N/A | N/A | Render first ~200 words inline |
 
 Per-directive degradation works independently within a recipe. Missing data → no-op directive; recipe contributes what it can.

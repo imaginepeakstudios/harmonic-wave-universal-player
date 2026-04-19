@@ -67,9 +67,16 @@ export function createAudioRenderer(opts) {
   // tainting the canvas. Per IMPLEMENTATION-GUIDE.md CORS verification
   // (2026-04-19), all relevant media hosts already serve `Access-Control-
   // Allow-Origin: *` for the proxied media path, so this is safe.
-  // Top-level cover_art_url wins (platforms that surface it there save
-  // a metadata lookup); falls back to content_metadata.cover_art_url.
-  const coverUrl = item?.cover_art_url ?? item?.content_metadata?.cover_art_url;
+  // Cover art priority (read all three; first non-null wins):
+  //   1. item.cover_art_url — clean test-fixture shape; also the alias
+  //      the schema interpreter writes from production's `content_cover_art_url`
+  //   2. item.content_cover_art_url — direct production field name (defensive
+  //      fallback if interpreter normalization didn't run for any reason)
+  //   3. item.content_metadata.cover_art_url — older fixtures embedded it here
+  const coverUrl =
+    item?.cover_art_url ??
+    /** @type {{ content_cover_art_url?: string }} */ (item)?.content_cover_art_url ??
+    item?.content_metadata?.cover_art_url;
   if (coverUrl) {
     const cover = document.createElement('img');
     cover.className = 'hwes-audio__cover';

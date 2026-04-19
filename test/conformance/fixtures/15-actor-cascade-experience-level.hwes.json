@@ -1,0 +1,28 @@
+{
+  "_comment": "Synthetic — production wire shape with experience-level actor flat fields populated. No per-item resolved_actor override. The interpreter MUST synthesize an ActorView from the flat actor_* fields and apply it to every item via getItemActor(). Tests that the schema/interpreter actor synthesis works against realistic flat-field shapes.",
+  "hwes_version": 1,
+  "hwes_extensions": ["actor_visual_identity_v1"],
+  "id": 15,
+  "slug": "actor-cascade-experience-level",
+  "name": "Actor Cascade — Experience Level Conformance Fixture",
+  "actor_profile_id": 42,
+  "actor_name": "DJ Layla",
+  "actor_slug": "dj-layla",
+  "actor_voice_id": "voice_layla_calm",
+  "actor_voice_name": "Layla (Calm)",
+  "actor_narrative_voice": "warm_intimate",
+  "actor_actor_type": "narrator",
+  "actor_visual_style": "minimalist",
+  "actor_visual_directives": "[\"soft_focus\", \"warm_palette\"]",
+  "items": [
+    {
+      "item_id": 1501,
+      "content_type_slug": "song",
+      "content_title": "Item with experience-level actor",
+      "media_play_url": "/media/play/300?t=token",
+      "item_display_recipes": "[]",
+      "content_recipes": "[]",
+      "content_metadata": "{}"
+    }
+  ]
+}

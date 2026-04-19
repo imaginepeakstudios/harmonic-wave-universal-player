@@ -1,0 +1,34 @@
+{
+  "_comment": "Synthetic fixture — proves the interpreter parses production-style stringified-JSON wire shape WITH a known built-in recipe (not just custom_ slugs like fixture 12). Same schema fields as 12-production-holding-on (stringified item_display_recipes, stringified content_metadata, flattened actor_*) but the slugs reference cinematic_fullscreen (built-in). The engine MUST resolve this to the same BehaviorConfig as fixture 02-cinematic-fullscreen, proving parsing + cascade behave identically across clean + production wire shapes. This is what we mean by 'don't wait on platform data entry to validate production shape parity'.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 14,
+  "slug": "production-shape-builtin",
+  "name": "Production-Shape Built-in Recipe Conformance Fixture",
+  "description": "Built-in recipe slug carried in the production stringified-JSON wire shape.",
+  "items": [
+    {
+      "item_id": 1401,
+      "sort_order": 0,
+      "content_id": 200,
+      "collection_id": null,
+      "item_display_recipes": "[\"cinematic_fullscreen\"]",
+      "item_override_enabled": 0,
+      "item_metadata": "{}",
+      "content_title": "Production Shape Test",
+      "content_slug": "prod-shape-test",
+      "content_status": "active",
+      "content_metadata": "{\"featured_song\":true,\"version_type\":\"final\"}",
+      "content_rating": "clean",
+      "content_recipes": "[]",
+      "content_tts_fields": "[]",
+      "content_cover_art_url": "https://example.com/cover.jpg",
+      "alt_cover_art_1_url": null,
+      "alt_cover_art_2_url": null,
+      "content_type_id": 1,
+      "content_type_name": "Song",
+      "content_type_slug": "song",
+      "media_play_url": "/media/play/200?t=token"
+    }
+  ]
+}

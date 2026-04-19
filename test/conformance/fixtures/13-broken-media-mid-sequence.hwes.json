@@ -1,0 +1,28 @@
+{
+  "_comment": "Bonus fixture per FE arch review of d48d81b — proves the auto-advance composition: a broken media URL in the middle of a sequence MUST resolve renderer.done via the error path so the experience advances instead of dead-stopping. Three items: working audio → broken audio → working audio. Conformance harness only validates the engine layer (resolved_behavior + layers); the runtime advance behavior is exercised at the renderer-level tests (renderers-content-{audio,image}-error tests). The fixture lives here so a third-party engine implementor sees the shape that triggers the rule.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 13,
+  "slug": "broken-media-mid-sequence",
+  "name": "Broken Media Mid-Sequence Conformance Fixture",
+  "items": [
+    {
+      "item_id": 1,
+      "content_type_slug": "song",
+      "content_title": "Working item before",
+      "media_play_url": "/media/play/test.mp3"
+    },
+    {
+      "item_id": 2,
+      "content_type_slug": "song",
+      "content_title": "Broken item — URL returns 404",
+      "media_play_url": "/media/play/this-does-not-exist.mp3"
+    },
+    {
+      "item_id": 3,
+      "content_type_slug": "song",
+      "content_title": "Working item after — must be reached via auto-advance past the broken middle",
+      "media_play_url": "/media/play/test.mp3"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "_comment": "player_theme round-trips intact through the interpreter. Renderer-level theme application (inject CSS custom properties) is exercised in the unit tests for theme/injector.js and the snapshot tests for chrome shell.",
+  "experience": {
+    "id": 17,
+    "slug": "player-theme-pro",
+    "player_theme": {
+      "primary": "#FF6B6B",
+      "secondary": "#4ECDC4",
+      "background": "#1A1A2E",
+      "text": "#FFFFFF",
+      "text_muted": "#A0A0B0",
+      "font_family": "'Inter', sans-serif",
+      "font_display": "'Bebas Neue', sans-serif"
+    }
+  },
+  "hwes_extensions_honored": ["player_theme_v1"],
+  "items": [
+    {
+      "item_id": 1701,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

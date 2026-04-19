@@ -130,6 +130,7 @@ export function createDocumentRenderer(opts) {
 
   function armTimer(remainingMs) {
     if (totalMs <= 0) return; // manual-advance only
+    if (timer != null) clearTimer(); // self-clearing — see image.js comment
     timerStartTs = Date.now();
     timer = setTimeout(() => {
       timer = null;
@@ -147,11 +148,20 @@ export function createDocumentRenderer(opts) {
     }
   }
 
+  // AbortController for the body fetch. teardown() aborts so a Skip
+  // during a slow fetch doesn't run renderBody() against a torn-down
+  // card and doesn't leave the response stream open. Per FE arch
+  // review of d48d81b (P1 #4 — security/correctness).
+  const fetchController = new AbortController();
+
   /** @type {import('../../playback/types.js').MediaChannel} */
   const channel = {
     kind: 'document',
     element: null, // documents have no media element
-    teardown: () => clearTimer(),
+    teardown: () => {
+      clearTimer();
+      fetchController.abort();
+    },
   };
 
   return {
@@ -162,7 +172,7 @@ export function createDocumentRenderer(opts) {
       // If we don't have inline body, fetch from media_play_url.
       if (typeof inlineBody !== 'string' && item?.media_play_url) {
         try {
-          const res = await fetch(item.media_play_url);
+          const res = await fetch(item.media_play_url, { signal: fetchController.signal });
           if (res.ok) {
             const text = await res.text();
             renderBody(text);
@@ -170,6 +180,9 @@ export function createDocumentRenderer(opts) {
             renderBody('(document unavailable: HTTP ' + res.status + ')');
           }
         } catch (err) {
+          // AbortError is the expected outcome of teardown-during-fetch;
+          // don't log it as a failure.
+          if (err instanceof DOMException && err.name === 'AbortError') return;
           const message = err instanceof Error ? err.message : String(err);
           // eslint-disable-next-line no-console
           console.warn('[hwes/document] body fetch failed:', message);

@@ -1,0 +1,43 @@
+{
+  "_comment": "ActorView synthesized from flat actor_* fields. visual_directives parsed from stringified JSON. The item has no resolved_actor of its own, so getItemActor falls back to the experience-level actor and stamps source='experience'.",
+  "experience": {
+    "id": 15,
+    "slug": "actor-cascade-experience-level"
+  },
+  "hwes_extensions_honored": ["actor_visual_identity_v1"],
+  "items": [
+    {
+      "item_id": 1501,
+      "resolved_actor": {
+        "name": "DJ Layla",
+        "slug": "dj-layla",
+        "voice_id": "voice_layla_calm",
+        "voice_name": "Layla (Calm)",
+        "narrative_voice": "warm_intimate",
+        "actor_type": "narrator",
+        "visual_style": "minimalist",
+        "visual_directives": ["soft_focus", "warm_palette"],
+        "source": "experience"
+      },
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full",
+        "autoplay": "off",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 0,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}
