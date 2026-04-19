@@ -565,13 +565,16 @@ The modular structure allows incremental shipping. Each step produces a working 
 - `engine/precondition-checker.js` — `checkPreconditions(recipe, item)` for `requires_metadata` + `applicable_content_types`
 - 29 unit tests + conformance harness engine-layer assertions activated for both fixtures (123/123 tests, 0 skipped)
 
-### Step 5: Composition + first content renderer (audio)
-- `composition/index.js` + selector helpers
-- `renderers/content/audio.js`
-- `chrome/shell.js`
-- `theme/injector.js`, `theme/defaults.js`
-- `boot.js` orchestrator
-- End-to-end: render canned audio-only experience
+### Step 5: Composition + first content renderer (audio) ✅
+- `composition/index.js` + `composition/layer-selector.js` — `composeItem(item, behavior)` returns ordered layer plan; layer rules (scene/content/overlay/chrome/narration) all locked in even though most renderers don't ship until Steps 6-11
+- `renderers/content/audio.js` — `createAudioRenderer({ item, behavior, mount })` returns standalone `<audio>`-backed renderer with MediaChannel exposure for Step 9's audio pipeline
+- `chrome/shell.js` + `chrome/controls.js` — page shell + play/pause/skip controls
+- `theme/injector.js` + `theme/defaults.js` — `injectTheme(player_theme)` → CSS custom properties on `:root`
+- `boot.js` rewrite — orchestrator with three source priorities (inlined `<script id="hwes-data">` → `?fixture=` → MCP `getExperience`)
+- `src/demo-fixtures/{01-bare-audio,02-cinematic-fullscreen}.hwes.json` — browser-demo fixtures with real playable URLs (MDN CC0 audio + POC cover art, both with CORS *)
+- happy-dom added as devDep so renderer/shell/controls have proper DOM tests; vitest.config.js created
+- 159 tests pass (was 123; +36 for layer-selector, theme injector, shell, controls, audio renderer)
+- End-to-end browser smoke: `localhost:8080/?fixture=01-bare-audio&debug=1` mounts shell + audio card + controls; Play button drives audio start/pause
 
 ### Step 6: Remaining content renderers
 - `renderers/content/video.js`

@@ -1,0 +1,22 @@
+{
+  "_comment": "Browser-demo fixture for Step 5. Single audio item, no recipes, no actor — exercises the default-behavior path through the engine + composition + audio renderer + chrome shell. Cover art is a real POC URL with CORS *. Audio is MDN's CC0-licensed T-Rex roar (39KB, public, has CORS) — small + reliable for browser smoke. Replace with a creator's actual song URL via the platform's /media/play/r2key/... proxy in production.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 1001,
+  "slug": "demo-bare-audio",
+  "name": "Demo — Bare Audio",
+  "description": "Step 5 browser demo. One audio item, default behavior, full chrome.",
+  "items": [
+    {
+      "item_id": 1,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "T-Rex Roar (CC0)",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg",
+      "content_metadata": {
+        "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg"
+      }
+    }
+  ]
+}

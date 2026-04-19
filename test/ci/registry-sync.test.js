@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Registry-sync drift gate.
  *
@@ -9,6 +10,12 @@
  * The platform stamps `generated_at` per-request (so cache validation
  * works) — that field MUST be stripped before comparing, otherwise
  * every test run sees a "drift" that isn't a drift.
+ *
+ * Pinned to `node` environment because happy-dom (the project default
+ * after Step 5) enforces browser CORS — and the platform's HWES JSON
+ * endpoints don't send Access-Control-Allow-Origin (they're meant for
+ * server-side / build-time fetch, not browser fetch). Node's native
+ * fetch ignores CORS, which is what we want here.
  *
  * Run with: bun test (or vitest run).
  */

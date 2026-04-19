@@ -1,0 +1,23 @@
+{
+  "_comment": "Browser-demo fixture for the cinematic_fullscreen display recipe. Same audio + cover as 01, but with display_directives applied — exercises the engine cascade end-to-end (default → cinematic_fullscreen overrides chrome=none + autoplay=muted). Note: chrome=none means the chrome shell layer is skipped entirely, so the controls' Play button is unavailable; use this fixture to validate the no-chrome render path.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 1002,
+  "slug": "demo-cinematic",
+  "name": "Demo — Cinematic Fullscreen",
+  "description": "Step 5 browser demo of cinematic_fullscreen recipe.",
+  "items": [
+    {
+      "item_id": 2,
+      "content_id": 200,
+      "content_type_slug": "song",
+      "content_title": "T-Rex Roar (cinematic)",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/without-you-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen"],
+      "content_metadata": {
+        "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/without-you-cover-scaled.jpg"
+      }
+    }
+  ]
+}

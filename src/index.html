@@ -1,55 +1,242 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Harmonic Wave Universal Player</title>
-  <meta name="description" content="Open-source HWES v1 reference implementation. Composes any creator's content into a directed, immersive experience.">
-  <meta name="theme-color" content="#0B0F14">
-  <meta name="robots" content="index, follow">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Harmonic Wave Universal Player</title>
+    <meta
+      name="description"
+      content="Open-source HWES v1 reference implementation. Composes any creator's content into a directed, immersive experience."
+    />
+    <meta name="theme-color" content="#0B0F14" />
+    <meta name="robots" content="index, follow" />
 
-  <!-- Theme injector will replace these defaults at runtime when the
-       experience response carries a player_theme. See src/theme/injector.js. -->
-  <style id="player-theme-defaults">
-    :root {
-      --player-font-family: 'Inter', sans-serif;
-      --player-font-display: 'Orbitron', sans-serif;
-      --player-primary: #6DD3FF;
-      --player-secondary: #a07adc;
-      --player-background: #0B0F14;
-      --player-text: #EAF2F8;
-      --player-text-muted: #9BA6B2;
-      --player-border: rgba(255, 255, 255, 0.08);
-    }
-    html, body { margin: 0; padding: 0; height: 100%; background: var(--player-background); color: var(--player-text); font-family: var(--player-font-family); }
-    #app { min-height: 100%; display: flex; align-items: center; justify-content: center; }
-    .boot-loading { text-align: center; opacity: 0.6; }
-    .boot-loading h1 { font-family: var(--player-font-display); font-size: 1.4rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--player-primary); margin: 0 0 12px; }
-    .boot-loading p { font-size: 0.85rem; letter-spacing: 0.05em; }
-  </style>
-</head>
-<body>
-  <!--
-    Stub bootstrap shell. boot.js will:
-      1. Read backend URL + experience identifier from URL params
-      2. Call mcp-client.getExperience()
-      3. Hand the response to schema/interpreter
-      4. Run recipe-engine + composition
-      5. Mount renderers into #app
-      6. Wire interactions + state machine
+    <!-- Theme injector overrides these at runtime from `player_theme`. -->
+    <style id="player-theme-defaults">
+      :root {
+        --player-font-family: 'Inter', sans-serif;
+        --player-font-display: 'Orbitron', sans-serif;
+        --player-primary: #6dd3ff;
+        --player-secondary: #a07adc;
+        --player-background: #0b0f14;
+        --player-text: #eaf2f8;
+        --player-text-muted: #9ba6b2;
+        --player-border: rgba(255, 255, 255, 0.08);
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        background: var(--player-background);
+        color: var(--player-text);
+        font-family: var(--player-font-family);
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      #app {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
 
-    See SPEC.md §11 build sequence for the full step list, and
-    IMPLEMENTATION-GUIDE.md §4 for Step 2 (current scaffolding) +
-    Step 3 onward.
-  -->
-  <main id="app">
-    <div class="boot-loading">
-      <h1>Harmonic Wave</h1>
-      <p>Universal Player engine — Step 2 scaffolding. boot.js lands in Step 3.</p>
-    </div>
-  </main>
+      /* Boot states */
+      .boot-loading,
+      .boot-error,
+      .boot-empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px;
+        opacity: 0.6;
+      }
+      .boot-loading h1,
+      .boot-error h1,
+      .boot-empty h1 {
+        font-family: var(--player-font-display);
+        font-size: 1.4rem;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        color: var(--player-primary);
+        margin: 0 0 12px;
+      }
+      .boot-loading p,
+      .boot-error p,
+      .boot-empty p {
+        font-size: 0.85rem;
+        letter-spacing: 0.05em;
+        max-width: 60ch;
+      }
+      .boot-error {
+        opacity: 1;
+      }
+      .boot-error h1 {
+        color: #ff6f6f;
+      }
 
-  <!-- ES module entry. Vanilla JS — no build step. -->
-  <script type="module" src="./boot.js"></script>
-</body>
+      /* Shell */
+      .hwes-shell {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        max-width: 920px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 32px 24px 24px;
+      }
+      .hwes-shell--minimal {
+        padding-top: 16px;
+      }
+      .hwes-shell--none {
+        padding: 0;
+        max-width: none;
+      }
+      .hwes-shell__header {
+        margin-bottom: 24px;
+      }
+      .hwes-shell__title {
+        font-family: var(--player-font-display);
+        font-size: 1.6rem;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--player-primary);
+        margin: 0 0 4px;
+      }
+      .hwes-shell__byline {
+        margin: 0;
+        font-size: 0.85rem;
+        color: var(--player-text-muted);
+      }
+      .hwes-shell__content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .hwes-shell__controls {
+        margin-top: 24px;
+      }
+
+      /* Audio renderer */
+      .hwes-audio {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--player-border);
+        border-radius: 16px;
+        padding: 24px;
+        display: flex;
+        gap: 24px;
+        align-items: center;
+      }
+      .hwes-audio--hero {
+        flex-direction: column;
+        text-align: center;
+        padding: 48px 32px;
+      }
+      .hwes-audio--fullscreen {
+        flex: 1;
+        border: none;
+        border-radius: 0;
+        background: transparent;
+      }
+      .hwes-audio__cover {
+        width: 96px;
+        height: 96px;
+        object-fit: cover;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .hwes-audio--hero .hwes-audio__cover {
+        width: 280px;
+        height: 280px;
+      }
+      .hwes-audio__title {
+        font-family: var(--player-font-display);
+        font-size: 1.2rem;
+        margin: 0;
+        letter-spacing: 0.05em;
+      }
+      .hwes-audio__element {
+        display: none;
+      }
+
+      /* Controls */
+      .hwes-controls {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 0;
+        border-top: 1px solid var(--player-border);
+      }
+      .hwes-controls__now-playing {
+        flex: 1;
+        font-size: 0.85rem;
+        color: var(--player-text-muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .hwes-controls__buttons {
+        display: flex;
+        gap: 8px;
+      }
+      .hwes-controls__btn {
+        appearance: none;
+        background: transparent;
+        color: var(--player-text);
+        border: 1px solid var(--player-border);
+        border-radius: 999px;
+        padding: 8px 18px;
+        font-family: var(--player-font-family);
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: background 120ms;
+      }
+      .hwes-controls__btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .hwes-controls__btn--primary {
+        background: var(--player-primary);
+        color: var(--player-background);
+        border-color: var(--player-primary);
+        font-weight: 600;
+      }
+      .hwes-controls__btn--primary:hover {
+        background: var(--player-primary);
+        opacity: 0.9;
+      }
+      .hwes-controls__btn:focus-visible {
+        outline: 2px solid var(--player-primary);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      Bootstrap shell. boot.js orchestrates:
+        1. Read backend URL + experience identifier (or fixture name) from URL params
+        2. Load HWES JSON (fixture / MCP / DOM-injected)
+        3. Hand to schema/interpreter → engine/recipe-engine → composition
+        4. Mount renderers into the chrome shell
+        5. Wire chrome controls to renderer methods (state machine arrives Step 9)
+    -->
+    <main id="app">
+      <div class="boot-loading">
+        <h1>Harmonic Wave</h1>
+        <p>Loading the player engine…</p>
+      </div>
+    </main>
+
+    <!-- Optional server-side schema injection. Platform's /run/:token
+         (Step 14 cutover) inlines the HWES response here so the player
+         doesn't make a round trip from the browser. boot.js reads this
+         tag if present; otherwise falls back to ?fixture=… or MCP. -->
+    <!-- <script type="application/json" id="hwes-data">{...}</script> -->
+
+    <script type="module" src="./boot.js"></script>
+  </body>
 </html>

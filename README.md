@@ -4,7 +4,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-> **Status:** Pre-1.0 / engine implementation in progress (Steps 1-4 of 15 complete: registry snapshot, schema interpreter, MCP client, recipe engine + BehaviorConfig + precondition checker, conformance harness with full schema-AND-engine-layer assertions firing. The engine boots, reaches the platform, and resolves a per-item BehaviorConfig from any HWES response — but doesn't render content yet; that lands in Step 5). **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.74, 2026-04-19) — the data contract this engine builds against is now stable, and the MCP endpoint is reachable cross-origin from any host. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
+> **Status:** Pre-1.0 / engine implementation in progress (Steps 1-5 of 15 complete: registry snapshot, schema interpreter, MCP client, recipe engine + BehaviorConfig, composition + audio renderer + chrome shell + theme injector + boot orchestrator. The engine boots, fetches an HWES response from one of three sources — server-injected `<script id="hwes-data">`, `?fixture=…` fixture file, or live MCP — resolves per-item BehaviorConfig, picks layers, mounts the audio renderer + chrome controls, and plays. Steps 6-12 add the remaining content types, visualizer, overlays, state machine + audio pipeline, narration, and end-of-experience). **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.74, 2026-04-19) — the data contract this engine builds against is now stable, and the MCP endpoint is reachable cross-origin from any host. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
 
 ### Foundational positioning
 
@@ -56,17 +56,18 @@ HWES v1 schema response → schema-interpreter → recipe-engine → composition
 
 ## Quick start
 
-The engine ships as vanilla ES modules — no bundler required. What works today (Steps 1-4): registry snapshot, MCP client, schema interpreter, recipe engine + BehaviorConfig + precondition checker. The boot path loads the snapshot, resolves runtime config, instantiates the MCP client + schema interpreter + recipe engine, and prints a status line to the browser console. Content renders in Step 5.
+The engine ships as vanilla ES modules — no bundler required. What works today (Steps 1-5): registry snapshot, MCP client, schema interpreter, recipe engine + BehaviorConfig, composition layer, audio content renderer, chrome shell + controls, theme injector, boot orchestrator. The boot path can load an experience from three sources (server-injected `<script id="hwes-data">`, a local fixture file, or live MCP) and renders the first item with chrome + Play/Skip controls.
 
 ```bash
 git clone https://github.com/imaginepeakstudios/harmonic-wave-universal-player.git
 cd harmonic-wave-universal-player
-bun install         # installs vitest + prettier + typescript (devDeps only — engine has zero runtime deps)
-bun run test        # 123 tests — should be green
+bun install         # installs vitest + happy-dom + prettier + typescript (devDeps only — engine has zero runtime deps)
+bun run test        # 159 tests — should be green
 bun run typecheck   # tsc --checkJs --noEmit on src/
 bun run dev         # python3 -m http.server 8080 --directory src
-# Open http://localhost:8080/?backend=https://harmonicwave.ai&debug=1
-# Console will print: "Step 4 scaffolding loaded — 12 delivery + 10 display recipes, ..."
+# Open http://localhost:8080/?fixture=01-bare-audio&debug=1
+# A bare audio card with Play/Skip controls should render.
+# Try ?fixture=02-cinematic-fullscreen for the chrome=none, autoplay=muted recipe.
 ```
 
 The `?debug=1` flag exposes `globalThis.__hwes` so you can poke at the MCP client interactively from devtools (`await __hwes.mcp.verifyAccess({ email: "..." })`). The flag is gated to localhost / file:// / explicit `?debug` — production hosts won't expose the global even if listed.
@@ -98,14 +99,15 @@ harmonic-wave-universal-player/
 │   ├── schema/                    ← Schema interpreter (typed accessors over HWES response)
 │   ├── registry-snapshot/         ← Build-time snapshot of /hwes/v1/recipes.json + primitives.json
 │   ├── engine/                    ← Recipe engine — display + delivery recipes → BehaviorConfig
-│   ├── composition/               ← (Step 5) Layering — decides which layers to render per item
-│   ├── renderers/                 ← (Steps 5-7) Presentation per layer + content type
-│   │   ├── content/               (audio, video, image, document, sound-effect)
-│   │   ├── overlay/               (lyrics-scrolling, lyrics-spotlight, doc-excerpt)
-│   │   ├── scene/                 (banner-static, banner-animated)
-│   │   └── narration/             (tts-bridge, word-sync)
-│   ├── chrome/                    ← (Step 4) Page shell + controls
-│   ├── theme/                     ← (Step 4) CSS custom properties from player_theme
+│   ├── composition/               ← Layering — decides which layers to render per item
+│   ├── renderers/                 ← Presentation per layer + content type
+│   │   ├── content/               (audio — Step 5; video/image/document/sound-effect land in Step 6)
+│   │   ├── overlay/               ← (Step 8) lyrics-scrolling, lyrics-spotlight, doc-excerpt
+│   │   ├── scene/                 ← (Step 8) banner-static, banner-animated
+│   │   └── narration/             ← (Step 11) tts-bridge, word-sync
+│   ├── chrome/                    ← Page shell + Play/Skip controls
+│   ├── theme/                     ← CSS custom properties from player_theme
+│   ├── demo-fixtures/             ← Browser-demo fixtures for ?fixture=… dev mode
 │   ├── playback/                  ← (Steps 8-9) State machine + audio pipeline (desktop/mobile)
 │   ├── interactions/              ← (Step 10) Keyboard / gestures / single-audio guard
 │   ├── visualizer/                ← (Step 6) Audio-reactive Canvas + palette extraction
