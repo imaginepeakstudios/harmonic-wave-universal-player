@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * verify-readme.js — mechanical drift gate for README.md + CONTRIBUTING.md.
  *
@@ -19,8 +19,12 @@
  * discipline" section.
  *
  * Usage:
- *   node scripts/verify-readme.js              # all checks
- *   node scripts/verify-readme.js --offline    # skip the platform-version fetch
+ *   bun scripts/verify-readme.js              # all checks
+ *   bun scripts/verify-readme.js --offline    # skip the platform-version fetch
+ *
+ * The `node:fs`/`node:path`/etc. imports are Node's stdlib modules — Bun
+ * implements them natively, so the script runs identically under both
+ * runtimes. Bun is the project default; Node 20+ also works.
  *
  * Exit code: 0 = all checks pass; 1 = drift detected (lists the failures).
  */

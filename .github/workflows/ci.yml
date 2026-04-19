@@ -19,11 +19,6 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Setup Node (for verify-readme.js)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
