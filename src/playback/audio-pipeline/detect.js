@@ -25,17 +25,24 @@ export function isMobile() {
 }
 
 /**
- * Override hook for tests + the dev-only `?mobile=1` URL param so we
- * can exercise the mobile pipeline path in desktop dev. The override
- * is checked once at boot.js read-time; runtime changes don't take
- * effect until the next mountItem.
+ * Override hook for tests + the dev-only `?mobile=1` / `?desktop=1`
+ * URL param so we can exercise either pipeline path regardless of UA.
+ * The override is checked once at boot.js read-time; runtime changes
+ * don't take effect until the next mountItem.
+ *
+ * Symmetric semantics:
+ *   `?mobile=1`  → force mobile (true)
+ *   `?mobile=0`  → force desktop (false)
+ *   `?desktop=1` → force desktop (false)
+ *   `?desktop=0` → force mobile (true)
+ *   neither     → null (defer to UA sniff)
  *
  * @param {URLSearchParams} params
- * @returns {boolean | null}  null = no override; defer to UA sniff
+ * @returns {boolean | null}  true = mobile; false = desktop; null = defer
  */
 export function readMobileOverride(params) {
   if (!params) return null;
   if (params.has('mobile')) return params.get('mobile') !== '0';
-  if (params.has('desktop')) return params.get('desktop') !== '0' ? false : null;
+  if (params.has('desktop')) return params.get('desktop') === '0';
   return null;
 }

@@ -19,14 +19,18 @@
 import { createVisualizer } from '../../visualizer/canvas.js';
 import { createWaveformBars } from '../../visualizer/waveform-bars.js';
 import { extractPalette } from '../../visualizer/palette-extractor.js';
+import { createSilenceProvider } from '../../visualizer/amplitude-provider.js';
 
 /**
  * @typedef {object} VisualizerSceneRenderer
  * @property {HTMLElement} root
- * @property {(provider: import('../../visualizer/amplitude-provider.js').AmplitudeProvider) => void} setAmplitudeProvider
+ * @property {(provider: import('../../visualizer/amplitude-provider.js').AmplitudeProvider | null) => void} setAmplitudeProvider
  *   Hands the provider to BOTH subsystems (canvas + waveform-bars).
  *   Step 9's audio pipeline calls this with createAnalyserAmplitudeProvider(analyser)
- *   when the corresponding audio item is attached.
+ *   when the corresponding audio item is attached. Pass `null` to reset
+ *   to silence (used by layer-set teardown so the rAF loop stops calling
+ *   Web Audio APIs on disconnected analyser nodes — P1 #3 from the FE
+ *   review of 2218bd3).
  * @property {() => void} teardown
  */
 
@@ -61,8 +65,9 @@ export function createVisualizerSceneRenderer({ item, mount }) {
   return {
     root: viz.canvas,
     setAmplitudeProvider(provider) {
-      viz.setAmplitudeProvider(provider);
-      bars.setAmplitudeProvider(provider);
+      const next = provider ?? createSilenceProvider();
+      viz.setAmplitudeProvider(next);
+      bars.setAmplitudeProvider(next);
     },
     teardown() {
       viz.teardown();

@@ -36,6 +36,9 @@
  * @property {(opts?: object) => Promise<void>} startMusicBed
  * @property {() => void} duckMusicBed
  * @property {() => void} killMusicBedInstantly
+ * @property {() => null} getAudioContext
+ *   Mobile shim never creates a context — always null.
+ * @property {() => void} dispose
  * @property {() => void} teardown
  * @property {'mobile'} kind
  */
@@ -59,6 +62,10 @@ export function createMobileAudioPipeline() {
     },
     duckMusicBed() {},
     killMusicBedInstantly() {},
+    getAudioContext() {
+      return null;
+    },
+    dispose() {},
     teardown() {},
   };
 }

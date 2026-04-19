@@ -9,6 +9,16 @@
  *
  * Same lifecycle interface as synthesized-provider so the desktop
  * audio pipeline can swap them without conditional logic in callers.
+ *
+ * Architectural note: this provider creates its OWN <audio> element
+ * + MediaElementSource and routes them straight to the destination —
+ * NOT registered in the desktop pipeline's channel map. This is by
+ * design: the bed is logically a separate channel from content, with
+ * its own gain ramp lifecycle (start → fade-in → duck → teardown).
+ * Mixing it into the channel map would conflate "media element bound
+ * to a content item" with "bed asset". The teardown contract still
+ * works because bed lifecycle is owned by the pipeline's
+ * activeBed reference (desktop.js).
  */
 
 const FADE_IN_S = 1.5;

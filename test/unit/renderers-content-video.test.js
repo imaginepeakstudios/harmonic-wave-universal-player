@@ -28,8 +28,9 @@ describe('renderers/content/video', () => {
     // playsinline is REQUIRED on iOS Safari to keep video in-flow.
     expect(video.playsInline).toBe(true);
     expect(video.hasAttribute('controls')).toBe(false);
-    // crossOrigin deferred to Step 9 (same as audio).
-    expect(video.hasAttribute('crossorigin')).toBe(false);
+    // crossOrigin must be 'anonymous' BEFORE .src so the analyser can
+    // read media samples (P2 #12 from FE review of 2218bd3).
+    expect(video.getAttribute('crossorigin')).toBe('anonymous');
   });
 
   test('autoplay=muted sets the muted attribute', () => {

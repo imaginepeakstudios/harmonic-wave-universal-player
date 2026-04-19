@@ -29,10 +29,12 @@ describe('renderers/content/audio', () => {
     const audio = mount.querySelector('.hwes-audio__element');
     expect(audio).toBeTruthy();
     expect(audio.getAttribute('src')).toBe('https://example.com/holding-on.mp3');
-    // crossOrigin is intentionally NOT set on <audio> until Step 9 (see
-    // comment in audio.js). Standalone <audio> playback works without CORS;
-    // Step 9's MediaElementSource wiring is what needs it.
-    expect(audio.hasAttribute('crossorigin')).toBe(false);
+    // crossOrigin must be 'anonymous' BEFORE .src is assigned so Step 9's
+    // MediaElementSource analyser can read pixels of the audio buffer.
+    // Setting it after the element starts fetching produces silent FFT
+    // data (P2 #12 from FE review of 2218bd3). The platform-proxied
+    // media path serves Access-Control-Allow-Origin: * so this is safe.
+    expect(audio.getAttribute('crossorigin')).toBe('anonymous');
     expect(audio.hasAttribute('controls')).toBe(false); // chrome owns controls
   });
 

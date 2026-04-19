@@ -22,6 +22,11 @@ describe('playback/audio-pipeline/detect', () => {
     expect(readMobileOverride(params)).toBe(false);
   });
 
+  test('readMobileOverride: ?desktop=0 forces mobile (symmetric with ?mobile=0)', () => {
+    const params = new URLSearchParams('desktop=0');
+    expect(readMobileOverride(params)).toBe(true);
+  });
+
   test('readMobileOverride: empty params → null (defer to UA sniff)', () => {
     expect(readMobileOverride(new URLSearchParams(''))).toBe(null);
   });

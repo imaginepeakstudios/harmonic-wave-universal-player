@@ -62,7 +62,10 @@ export function createVideoRenderer(opts) {
   video.className = 'hwes-video__element';
   video.preload = 'metadata';
   video.playsInline = true; // iOS Safari — keep in-flow
-  // crossOrigin deferred to Step 9 (see audio.js comment for rationale).
+  // crossOrigin MUST be set BEFORE .src per the same rationale as
+  // audio.js (otherwise MediaElementSource produces zero analyser data
+  // and the visualizer goes dead).
+  video.crossOrigin = 'anonymous';
   if (behavior.loop) video.loop = true;
   if (behavior.autoplay === 'muted') video.muted = true;
   video.controls = false; // chrome owns controls
@@ -118,13 +121,14 @@ export function createVideoRenderer(opts) {
     channel,
     done,
     async start() {
-      if (behavior.autoplay === 'off') return;
+      // start() unconditionally plays. Autoplay gate is in boot.js
+      // mountItem (mirrors audio.js — see that comment for rationale).
       try {
         await video.play();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         // eslint-disable-next-line no-console
-        console.warn('[hwes/video] autoplay rejected by browser policy:', message);
+        console.warn('[hwes/video] play() rejected:', message);
       }
     },
     pause() {

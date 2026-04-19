@@ -30,6 +30,12 @@ const FADE_IN_S = 1.5;
 const FADE_DUCK_S = 1.5;
 const TARGET_GAIN = 0.03; // POC value (low enough not to compete with voice)
 
+// Brown-noise buffer is expensive to generate (96k Math.random + filter
+// passes for a 2s @48kHz buffer) and identical for the same context.
+// Memoize per AudioContext so item transitions don't regenerate it.
+/** @type {WeakMap<AudioContext, AudioBuffer>} */
+const BROWN_NOISE_CACHE = new WeakMap();
+
 /**
  * @typedef {object} MusicBedProvider
  * @property {(audioContext: AudioContext, destination: AudioNode) => Promise<void>} start
@@ -121,9 +127,14 @@ export function createSynthesizedMusicBedProvider(opts = {}) {
       osc2.connect(osc2Gain).connect(masterGain);
       osc2.start(now);
 
-      // Brown noise → low-pass filter → modulated gain.
+      // Brown noise → low-pass filter → modulated gain. Buffer is
+      // memoized per AudioContext (P2 #13 — same noise data is fine for
+      // every item; regenerating per mountItem was wasteful).
+      const cached = BROWN_NOISE_CACHE.get(ctx);
+      const noiseBuf = cached ?? createBrownNoiseBuffer(ctx);
+      if (!cached) BROWN_NOISE_CACHE.set(ctx, noiseBuf);
       noise = ctx.createBufferSource();
-      noise.buffer = createBrownNoiseBuffer(ctx);
+      noise.buffer = noiseBuf;
       noise.loop = true;
       noiseFilter = ctx.createBiquadFilter();
       noiseFilter.type = 'lowpass';

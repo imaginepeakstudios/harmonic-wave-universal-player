@@ -40,7 +40,16 @@ import { selectMusicBedProvider } from './music-bed/index.js';
  * @property {(opts: object) => Promise<void>} startMusicBed
  * @property {() => void} duckMusicBed
  * @property {() => void} killMusicBedInstantly
- * @property {() => AudioContext} getAudioContext
+ * @property {() => (AudioContext | null)} getAudioContext
+ *   Returns the singleton AudioContext if it's been created (i.e., if
+ *   attachContent has been called at least once). Returns null otherwise.
+ *   Does NOT lazily create — that would be a brittle contract on iOS,
+ *   where AudioContext must be created from a user gesture. Callers that
+ *   need the context during a transition should already have it via a
+ *   stored channel handle.
+ * @property {() => void} dispose
+ *   Full-player-unmount path: closes the AudioContext (irreversible).
+ *   Use teardown() for per-item cleanup that should keep the ctx alive.
  * @property {() => void} teardown
  * @property {'desktop'} kind
  */
@@ -78,10 +87,12 @@ export function createDesktopAudioPipeline(opts = {}) {
     kind: 'desktop',
     attachContent(element) {
       const audioContext = ensureContext();
-      // crossOrigin must be set BEFORE createMediaElementSource per
-      // the comment in audio.js / video.js (deferred to Step 9 wiring).
-      // If the element already has a src loaded without crossOrigin,
-      // setting it now may not help — but it's the right place to do it.
+      // crossOrigin is set by the audio + video renderers BEFORE
+      // assigning .src — that's the right insertion point. Defensive
+      // assignment here for any caller that bypasses the renderers
+      // (none today, but the cost is zero); it WON'T retro-fix an
+      // element that already started fetching without CORS — the
+      // analyser would silently return zero data in that case.
       if (!element.crossOrigin) element.crossOrigin = 'anonymous';
 
       const existing = channels.get(element);
@@ -145,7 +156,31 @@ export function createDesktopAudioPipeline(opts = {}) {
       activeBed?.killInstantly();
     },
     getAudioContext() {
-      return ensureContext();
+      return ctx;
+    },
+    dispose() {
+      activeBed?.teardown();
+      activeBed = null;
+      for (const [, ch] of channels) {
+        try {
+          ch.source.disconnect();
+          ch.analyser.disconnect();
+          ch.gain.disconnect();
+        } catch {
+          /* defensive */
+        }
+      }
+      channels.clear();
+      // Full-player-unmount path: close the context. Irreversibility
+      // is fine here — the SM, renderers, and providers are all gone
+      // too. Per-item cleanup uses teardown() which keeps ctx alive
+      // for the next mountItem.
+      try {
+        ctx?.close();
+      } catch {
+        /* may already be closed */
+      }
+      ctx = null;
     },
     teardown() {
       activeBed?.teardown();

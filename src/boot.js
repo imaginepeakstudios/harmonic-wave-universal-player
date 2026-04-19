@@ -248,7 +248,10 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     teardownActive = () => {
       activeSet?.teardown();
       activeSet = null;
-      audioPipeline.teardown();
+      // dispose() (full-unmount) closes the AudioContext irreversibly;
+      // teardown() keeps it alive for a re-mount. Boot's teardownActive
+      // is the SPA-unmount entry, so dispose is correct here.
+      audioPipeline.dispose();
     };
 
     /**
@@ -316,6 +319,8 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       // (cross-fade ramp on transition). Mobile pipeline returns
       // null analyser → visualizer keeps its silent default provider.
       let channelHandle = null;
+      /** @type {{ dispose: () => void } | null} */
+      let amplitudeProvider = null;
       const mediaElement = renderer?.channel?.element ?? null;
       if (
         mediaElement &&
@@ -326,9 +331,9 @@ globalThis.addEventListener?.('pagehide', onPageHide);
         // visualizer scene that mounted (its setAmplitudeProvider
         // was the load-bearing surface from FE arch P1 #2).
         if (channelHandle.analyser) {
-          const provider = createAnalyserAmplitudeProvider(channelHandle.analyser);
+          amplitudeProvider = createAnalyserAmplitudeProvider(channelHandle.analyser);
           for (const a of aux) {
-            /** @type {any} */ (a).setAmplitudeProvider?.(provider);
+            /** @type {any} */ (a).setAmplitudeProvider?.(amplitudeProvider);
           }
         }
       }
@@ -355,15 +360,13 @@ globalThis.addEventListener?.('pagehide', onPageHide);
 
       const controls = shell?.attachControls({
         onPlay: () => {
-          // First Play wakes the audio context (iOS gesture gate).
+          // First Play wakes the audio context (iOS gesture gate). The
+          // SM's audio:unlocked subscriber (above) starts the music bed
+          // for the currently-mounted item — we don't need to start it
+          // here too. P1 #5 from the FE review of 2218bd3.
           stateMachine.unlockAudio();
           renderer.start?.();
           controls?.setPlayingState(true);
-          // If the music bed was held back because audio was locked,
-          // start it now (we're in a user-gesture handler).
-          if (behavior.narration_music_bed !== 'none' && audioPipeline.kind === 'desktop') {
-            audioPipeline.startMusicBed({ experience: view.experience, item, behavior });
-          }
         },
         onPause: () => {
           renderer.pause?.();
@@ -378,12 +381,22 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       // Renderer.done resolution → tell the state machine; the SM
       // emits item:ended which the sequential subscription below
       // handles (auto-advance gated by content_advance).
-      renderer.done?.then(() => {
-        // Stale-done guard: if we're already on a different item,
-        // ignore. The advance counter was bumped by the next() call.
-        if (activeIndex !== index) return;
-        stateMachine.markCurrentItemEnded();
-      });
+      //
+      // Capture the advanceCounter at handler-call time and check
+      // before acting (SPEC #36 stale-callback guard). If the counter
+      // moved, this done belongs to a stale item that's already been
+      // torn down (renderer.teardown calls resolveDone) — discard.
+      const counterAtMount = stateMachine.getAdvanceCounter();
+      renderer.done
+        ?.then(() => {
+          if (stateMachine.getAdvanceCounter() !== counterAtMount) return;
+          if (activeIndex !== index) return;
+          stateMachine.markCurrentItemEnded();
+        })
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.error('[hwes/boot] renderer.done handler threw:', err);
+        });
 
       // Honor autoplay directive.
       if (behavior.autoplay !== 'off') {
@@ -398,6 +411,12 @@ globalThis.addEventListener?.('pagehide', onPageHide);
         renderer,
         shell,
         aux,
+        // Channel handle from the audio pipeline (desktop: { analyser,
+        // gain }; mobile: { analyser: null, gain: null }). Exposed so
+        // mountItem's crossfade branch can ramp the GainNode in lockstep
+        // with the renderer.fadeOut — desktop gets sample-accurate
+        // control, mobile falls back to renderer.fadeOut alone.
+        channelHandle,
         // Pending teardown timer ID from a crossfade — the rapid-skip
         // fix tracks this so a second skip can cancel + sync-teardown
         // (per FE arch review of f183286 P1 #1).
@@ -408,6 +427,14 @@ globalThis.addEventListener?.('pagehide', onPageHide);
             clearTimeout(this.pendingTeardown);
             this.pendingTeardown = null;
           }
+          // Reset visualizer to silence BEFORE detaching the analyser
+          // so the rAF loop stops calling Web Audio APIs on disconnected
+          // nodes (P1 #3 from the FE review of 2218bd3). Then dispose
+          // the provider so it drops its AnalyserNode reference.
+          for (const a of aux) {
+            /** @type {any} */ (a).setAmplitudeProvider?.(null);
+          }
+          amplitudeProvider?.dispose();
           // Detach the audio pipeline routing for this item.
           if (mediaElement) audioPipeline.detachContent(mediaElement);
           renderer.teardown();
@@ -442,8 +469,6 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       const oldSet = activeSet;
       // If oldSet has a pending teardown from a previous crossfade, cancel
       // + sync-teardown it now. The user wants to advance NOW; don't wait.
-      // eslint-disable-next-line no-unused-vars
-      const _legacy = null; // (placeholder so the next-old branch reads cleanly)
       if (oldSet?.pendingTeardown != null) {
         clearTimeout(oldSet.pendingTeardown);
         oldSet.pendingTeardown = null;
@@ -471,12 +496,20 @@ globalThis.addEventListener?.('pagehide', onPageHide);
         // eslint-disable-next-line no-unused-expressions
         oldSet.wrap.offsetWidth;
         oldSet.wrap.style.opacity = '0';
-        // Audio fade alongside visual — the renderer's optional fadeOut
-        // ramps element.volume in lockstep with the opacity transition.
-        // (Step 9: the audio pipeline can ALSO ramp the GainNode for
-        // tighter control; renderer-level fade is the always-available
-        // fallback that works on the mobile pipeline path too.)
+        // Audio fade alongside visual (SPEC #35 dual mechanism):
+        //   - renderer.fadeOut ramps element.volume — the universal
+        //     fallback that works on mobile (where pipeline gain is null)
+        //   - desktop ALSO ramps the GainNode via Web Audio for
+        //     sample-accurate timing
         oldSet.renderer?.fadeOut?.(CROSSFADE_MS);
+        const oldGain = oldSet.channelHandle?.gain;
+        const oldCtx = audioPipeline.kind === 'desktop' ? audioPipeline.getAudioContext() : null;
+        if (oldGain && oldCtx) {
+          const now = oldCtx.currentTime;
+          oldGain.gain.cancelScheduledValues(now);
+          oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+          oldGain.gain.linearRampToValueAtTime(0, now + CROSSFADE_MS / 1000);
+        }
         oldSet.pendingTeardown = setTimeout(() => {
           oldSet.pendingTeardown = null;
           oldSet.teardown();
@@ -485,9 +518,36 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     }
 
     // State machine wiring: subscribe to events that drive boot.
+    //
+    // lastMountedIndex tracks what's currently visible so the
+    // bootstrap mount (line below) and the post-unlock item:started
+    // emission don't race into a double mountItem(0). On unlock, the
+    // SM flushes its queued item:started — if the index matches
+    // what's already mounted, we just trigger playback on the existing
+    // renderer instead of tearing it down + rebuilding (which would
+    // leak the bootstrap audio element + race renderer.done).
+    let lastMountedIndex = -1;
     stateMachine.on('item:started', ({ index }) => {
       activeIndex = index;
+      if (index === lastMountedIndex && activeSet) {
+        // Bootstrap-then-unlock path: the visible card is already the
+        // right one; just kick playback now that audio is unlocked.
+        activeSet.renderer?.start?.();
+        return;
+      }
+      lastMountedIndex = index;
       mountItem(index);
+    });
+    // Music bed is gated on isAudioUnlocked + desktop. The bootstrap
+    // mountItem runs BEFORE first user gesture, so the bed is held back
+    // there. When unlock fires, start the bed for whatever item is
+    // currently mounted (P1 #5 from the FE review of 2218bd3).
+    stateMachine.on('audio:unlocked', () => {
+      if (!activeSet || audioPipeline.kind !== 'desktop') return;
+      const b = activeSet.behavior;
+      if (b?.narration_music_bed === 'none') return;
+      const item = view.items[activeIndex];
+      audioPipeline.startMusicBed({ experience: view.experience, item, behavior: b });
     });
     stateMachine.on('item:ended', () => {
       // Auto-advance when the current item's behavior says so. The
@@ -506,10 +566,12 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     // If audio is locked (no user gesture yet), the SM holds the first
     // item:started event until unlockAudio() fires. To bootstrap the
     // visible state in the meantime, mount item 0 ourselves with the
-    // controls' Play button as the eventual unlock trigger. This is
-    // the trade-off: visible card immediately, audio waits for gesture.
+    // controls' Play button as the eventual unlock trigger. The
+    // item:started subscriber above is idempotent vs. lastMountedIndex
+    // so the post-unlock emit doesn't double-mount.
     if (!stateMachine.isAudioUnlocked() && view.items.length > 0) {
       activeIndex = 0;
+      lastMountedIndex = 0;
       mountItem(0);
     }
 

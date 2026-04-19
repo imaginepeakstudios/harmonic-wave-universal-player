@@ -62,6 +62,41 @@ const MOOD_TABLE = [
     tags: ['warm', 'cozy', 'nostalgic'],
     params: { rootHz: 98, intervalSemis: 7, filterHz: 500, lfoHz: 0.08 },
   },
+  // Joyful/playful → bright + perfect-fourth + faster LFO (movement).
+  {
+    tags: ['joyful', 'playful', 'cheerful', 'whimsical'],
+    params: { rootHz: 175, intervalSemis: 4, filterHz: 1400, lfoHz: 0.35 },
+  },
+  // Dreamy/peaceful/meditative → very slow LFO, very soft filter.
+  {
+    tags: ['dreamy', 'peaceful', 'serene', 'meditative', 'tranquil'],
+    params: { rootHz: 87, intervalSemis: 7, filterHz: 350, lfoHz: 0.04 },
+  },
+  // Romantic → warm major-sixth (lush interval), slow breathing.
+  {
+    tags: ['romantic', 'tender', 'sensual'],
+    params: { rootHz: 110, intervalSemis: 9, filterHz: 700, lfoHz: 0.07 },
+  },
+  // Dark → low root + minor third + narrow Q (handled by very low filter).
+  {
+    tags: ['dark', 'brooding', 'ominous', 'foreboding'],
+    params: { rootHz: 73, intervalSemis: 3, filterHz: 300, lfoHz: 0.06 },
+  },
+  // Aggressive/anxious → fast LFO, low-mid root, perfect-fourth (uneasy).
+  {
+    tags: ['aggressive', 'anxious', 'frantic', 'urgent'],
+    params: { rootHz: 147, intervalSemis: 5, filterHz: 1100, lfoHz: 0.55 },
+  },
+  // Sacred/spiritual → low root + perfect-fifth + bright filter (cathedral feel).
+  {
+    tags: ['sacred', 'spiritual', 'reverent', 'ethereal'],
+    params: { rootHz: 87, intervalSemis: 7, filterHz: 1300, lfoHz: 0.05 },
+  },
+  // Epic/cinematic → low root + perfect-fifth + bright filter + slow swell.
+  {
+    tags: ['epic', 'cinematic', 'grand', 'majestic'],
+    params: { rootHz: 73, intervalSemis: 7, filterHz: 1600, lfoHz: 0.12 },
+  },
 ];
 
 /**

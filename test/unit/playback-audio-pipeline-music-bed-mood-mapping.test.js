@@ -50,6 +50,47 @@ describe('playback/audio-pipeline/music-bed/mood-mapping', () => {
     expect(params.rootHz).toBe(98);
   });
 
+  test('joyful / playful → fast LFO + perfect fourth', () => {
+    const params = synthesisParamsForMood('joyful');
+    expect(params.lfoHz).toBeGreaterThan(0.3);
+    expect(params.intervalSemis).toBe(4);
+  });
+
+  test('dreamy / meditative → very slow LFO + soft filter', () => {
+    const params = synthesisParamsForMood('dreamy');
+    expect(params.lfoHz).toBeLessThan(0.05);
+    expect(params.filterHz).toBeLessThan(400);
+  });
+
+  test('romantic → major sixth interval (lush)', () => {
+    const params = synthesisParamsForMood('romantic');
+    expect(params.intervalSemis).toBe(9);
+  });
+
+  test('dark / brooding → very low rootHz + minor third', () => {
+    const params = synthesisParamsForMood('dark');
+    expect(params.rootHz).toBe(73);
+    expect(params.intervalSemis).toBe(3);
+  });
+
+  test('aggressive / anxious → fastest LFO', () => {
+    const params = synthesisParamsForMood('aggressive');
+    expect(params.lfoHz).toBeGreaterThanOrEqual(0.5);
+  });
+
+  test('sacred / ethereal → low root + bright filter (cathedral)', () => {
+    const params = synthesisParamsForMood('sacred');
+    expect(params.rootHz).toBe(87);
+    expect(params.filterHz).toBeGreaterThan(1000);
+  });
+
+  test('epic / cinematic → low root + perfect fifth + bright filter', () => {
+    const params = synthesisParamsForMood('epic');
+    expect(params.rootHz).toBe(73);
+    expect(params.intervalSemis).toBe(7);
+    expect(params.filterHz).toBe(1600);
+  });
+
   test('comma-separated tags: production "intimate, melancholy" → first match wins', () => {
     const params = synthesisParamsForMood('intimate, melancholy');
     expect(params).toEqual(MOOD_TABLE[0].params); // intimate row

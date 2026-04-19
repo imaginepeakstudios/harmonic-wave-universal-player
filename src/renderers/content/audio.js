@@ -103,14 +103,15 @@ export function createAudioRenderer(opts) {
   const audio = document.createElement('audio');
   audio.className = 'hwes-audio__element';
   audio.preload = 'metadata';
-  // crossOrigin is intentionally NOT set here. Standalone <audio> playback
-  // works without CORS; only `MediaElementSource` (Step 9 audio pipeline)
-  // requires `crossOrigin = "anonymous"` so the FFT analyser doesn't taint.
-  // Setting it here today preempts a problem that doesn't exist and
-  // narrows the set of media hosts the renderer can play (a creator with
-  // a self-hosted source that doesn't send ACAO would be blocked).
-  // Step 9 sets crossOrigin on the channel.element BEFORE wiring
-  // MediaElementSource — that's the right insertion point.
+  // crossOrigin MUST be set BEFORE assigning .src — once the element
+  // starts fetching media without CORS, MediaElementSource will silently
+  // produce zero analyser data and the visualizer goes dead. Setting it
+  // here narrows the set of acceptable hosts to those serving
+  // Access-Control-Allow-Origin (per IMPLEMENTATION-GUIDE.md CORS
+  // verification, all platform-proxied media URLs do; creators with
+  // self-hosted media without ACAO will need to enable it). The Step 9
+  // audio pipeline reads channel.element and trusts crossOrigin is set.
+  audio.crossOrigin = 'anonymous';
   if (behavior.loop) audio.loop = true;
   if (behavior.autoplay === 'muted') audio.muted = true;
   // Native controls are hidden — chrome/controls.js renders the
@@ -163,10 +164,12 @@ export function createAudioRenderer(opts) {
     channel,
     done,
     async start() {
-      // autoplay='off' means start() should not auto-fire; the chrome
-      // controls' Play button calls it explicitly. autoplay='on' or
-      // 'muted' means start() runs immediately after mount.
-      if (behavior.autoplay === 'off') return;
+      // start() unconditionally plays. The autoplay gate is upstream
+      // in boot.js mountItem (only calls start on autoplay !== 'off'),
+      // so when start IS called it's either an autoplay-allowed mount
+      // OR a user-gesture Play click — both should produce playback.
+      // (Pre-polish, the gate lived here too and silently swallowed
+      // user-gesture clicks for autoplay='off' items.)
       try {
         await audio.play();
       } catch (err) {
@@ -175,7 +178,7 @@ export function createAudioRenderer(opts) {
         // button is the user-gesture path that will succeed.
         const message = err instanceof Error ? err.message : String(err);
         // eslint-disable-next-line no-console
-        console.warn('[hwes/audio] autoplay rejected by browser policy:', message);
+        console.warn('[hwes/audio] play() rejected:', message);
       }
     },
     pause() {
