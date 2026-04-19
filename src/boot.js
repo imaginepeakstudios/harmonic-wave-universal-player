@@ -57,13 +57,16 @@ import { createDocumentRenderer } from './renderers/content/document.js';
 import { createSoundEffectRenderer } from './renderers/content/sound-effect.js';
 import { createBannerStaticRenderer } from './renderers/scene/banner-static.js';
 import { createBannerAnimatedRenderer } from './renderers/scene/banner-animated.js';
+import { createVisualizerSceneRenderer } from './renderers/scene/visualizer-canvas.js';
 import { createLyricsScrollingRenderer } from './renderers/overlay/lyrics-scrolling.js';
 import { createLyricsSpotlightRenderer } from './renderers/overlay/lyrics-spotlight.js';
 import { createLyricsTypewriterRenderer } from './renderers/overlay/lyrics-typewriter.js';
 import { createTextOverlayRenderer } from './renderers/overlay/text-overlay.js';
-import { createVisualizer } from './visualizer/canvas.js';
-import { createWaveformBars } from './visualizer/waveform-bars.js';
-import { extractPalette } from './visualizer/palette-extractor.js';
+import { createStateMachine } from './playback/state-machine.js';
+import { isMobile, readMobileOverride } from './playback/audio-pipeline/detect.js';
+import { createDesktopAudioPipeline } from './playback/audio-pipeline/desktop.js';
+import { createMobileAudioPipeline } from './playback/audio-pipeline/mobile.js';
+import { createAnalyserAmplitudeProvider } from './playback/audio-pipeline/analyser-amplitude-provider.js';
 
 const config = readConfig();
 const mcp = createMcpClient(config);
@@ -123,43 +126,10 @@ const OVERLAY_RENDERERS = {
   'text-overlay': createTextOverlayRenderer,
 };
 
-/**
- * Visualizer scene wrapper — extracts palette from cover art, mounts
- * the canvas, ALSO mounts a waveform-bars strip at the bottom (the
- * combined visualizer subsystems mirror the POC's cinematic backdrop).
- * Step 9 will wire the AmplitudeProvider to the audio pipeline's
- * AnalyserNode; both subsystems get the same provider via
- * setAmplitudeProvider, so the bars + canvas stay synchronized.
- *
- * @param {{ item: import('./schema/interpreter.js').ItemView, mount: HTMLElement }} opts
- */
-function createVisualizerSceneRenderer({ item, mount }) {
-  const viz = createVisualizer({ mount });
-  const bars = createWaveformBars({ mount });
-  // Async palette load — viz + bars both start with the default palette,
-  // lerp/swap when the extracted palette arrives. Cover failure →
-  // visualizer keeps rendering with the default palette (graceful).
-  const coverUrl =
-    item?.cover_art_url ??
-    /** @type {{ content_cover_art_url?: string }} */ (item)?.content_cover_art_url ??
-    item?.content_metadata?.cover_art_url ??
-    null;
-  if (coverUrl) {
-    extractPalette(coverUrl).then((palette) => {
-      viz.setPalette(palette);
-      bars.setPalette(palette);
-    });
-  }
-  viz.start();
-  bars.start();
-  return {
-    root: viz.canvas,
-    teardown: () => {
-      viz.teardown();
-      bars.teardown();
-    },
-  };
-}
+// Visualizer scene wrapper extracted to src/renderers/scene/visualizer-canvas.js
+// per FE arch review of f183286 P1 #2 (the wrapper now exposes
+// setAmplitudeProvider so Step 9's AnalyserNode-backed provider can
+// reach BOTH the canvas + waveform-bars subsystems).
 
 const app = /** @type {HTMLElement} */ (document.getElementById('app'));
 if (!app) {
@@ -255,10 +225,22 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     //  crossfade animation by reading behavior.transition.
     // -------------------------------------------------------------------
 
+    // Step 9 wiring: state machine + audio pipeline + per-recipe transitions.
+    // The state machine is the single source of truth for "what item is
+    // current"; previous inline auto-advance is gone. The audio pipeline
+    // (desktop or mobile based on UA) routes content audio through Web
+    // Audio when possible and exposes the AnalyserNode to the visualizer.
+    // Music-bed playback is provider-driven (synthesized default per
+    // SPEC §13 #34); behavior.narration_music_bed gates whether a bed
+    // starts at all.
+    const stateMachine = createStateMachine();
+    const useMobile = readMobileOverride(params) ?? isMobile() ?? false;
+    const audioPipeline = useMobile ? createMobileAudioPipeline() : createDesktopAudioPipeline();
+
     // Layer-set handle is just an inline-shape object: { wrap, renderer,
     // shell, aux, teardown, behavior }. Each item in the experience gets
-    // its own handle so transitions can hold both old + new alive
-    // briefly. The wrap is the unit of opacity-cross-fade.
+    // its own handle so transitions can hold both old + new alive briefly.
+    // The wrap is the unit of opacity-cross-fade.
     /** @type {any} */
     let activeSet = null;
     let activeIndex = 0;
@@ -266,6 +248,7 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     teardownActive = () => {
       activeSet?.teardown();
       activeSet = null;
+      audioPipeline.teardown();
     };
 
     /**
@@ -275,7 +258,16 @@ globalThis.addEventListener?.('pagehide', onPageHide);
      */
     function buildLayerSet(index) {
       const item = view.items[index];
-      const { behavior } = resolveBehavior(view, item);
+      const resolved = resolveBehavior(view, item);
+      // Dev-only URL override: `?music_bed=auto` forces the bed on so you
+      // can hear the synthesized provider without needing a recipe that
+      // sets narration_music_bed. Same shape as `?mobile=1` / `?debug` —
+      // a knob for exploring; production behavior unchanged.
+      const musicBedOverride = params.get('music_bed');
+      const behavior =
+        musicBedOverride === 'auto'
+          ? { ...resolved.behavior, narration_music_bed: 'auto' }
+          : resolved.behavior;
       const layers = composeItem(item, behavior);
 
       const wrap = document.createElement('div');
@@ -318,7 +310,43 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       const factory = RENDERERS[contentLayer?.renderer ?? 'unsupported'] ?? RENDERERS.unsupported;
       const renderer = factory({ item, behavior, mount: contentMount });
 
-      const audioEl = renderer?.channel?.element ?? null;
+      // STEP 9 audio routing: if the renderer carries a media element
+      // (audio/video kinds), route it through the audio pipeline so
+      // we get an AnalyserNode (visualizer reactivity) + a GainNode
+      // (cross-fade ramp on transition). Mobile pipeline returns
+      // null analyser → visualizer keeps its silent default provider.
+      let channelHandle = null;
+      const mediaElement = renderer?.channel?.element ?? null;
+      if (
+        mediaElement &&
+        (renderer.channel?.kind === 'audio' || renderer.channel?.kind === 'video')
+      ) {
+        channelHandle = audioPipeline.attachContent(mediaElement);
+        // Hand the AnalyserNode-backed amplitude provider to any
+        // visualizer scene that mounted (its setAmplitudeProvider
+        // was the load-bearing surface from FE arch P1 #2).
+        if (channelHandle.analyser) {
+          const provider = createAnalyserAmplitudeProvider(channelHandle.analyser);
+          for (const a of aux) {
+            /** @type {any} */ (a).setAmplitudeProvider?.(provider);
+          }
+        }
+      }
+
+      // Music bed: start when behavior.narration_music_bed !== 'none'
+      // AND the audio context is unlocked. Synthesized provider is
+      // the default per SPEC #34 — works without any external asset.
+      // Mobile pipeline's startMusicBed is a no-op (per IMPLEMENTATION-
+      // GUIDE §3.3 — bed coexistence is broken on iOS Safari).
+      if (
+        behavior.narration_music_bed !== 'none' &&
+        stateMachine.isAudioUnlocked() &&
+        audioPipeline.kind === 'desktop'
+      ) {
+        audioPipeline.startMusicBed({ experience: view.experience, item, behavior });
+      }
+
+      const audioEl = mediaElement;
       for (const ol of overlayLayers) {
         const overlayFactory = OVERLAY_RENDERERS[ol.renderer];
         if (!overlayFactory) continue;
@@ -327,32 +355,34 @@ globalThis.addEventListener?.('pagehide', onPageHide);
 
       const controls = shell?.attachControls({
         onPlay: () => {
+          // First Play wakes the audio context (iOS gesture gate).
+          stateMachine.unlockAudio();
           renderer.start?.();
           controls?.setPlayingState(true);
+          // If the music bed was held back because audio was locked,
+          // start it now (we're in a user-gesture handler).
+          if (behavior.narration_music_bed !== 'none' && audioPipeline.kind === 'desktop') {
+            audioPipeline.startMusicBed({ experience: view.experience, item, behavior });
+          }
         },
         onPause: () => {
           renderer.pause?.();
           controls?.setPlayingState(false);
         },
         onSkip: () => {
-          const next = index + 1;
-          if (next < view.items.length) {
-            activeIndex = next;
-            mountItem(next);
-          }
+          stateMachine.next();
         },
       });
       controls?.setNowPlaying(item?.content_title ?? `Item ${index + 1} of ${view.items.length}`);
 
-      // Auto-advance via renderer.done — same shape as before.
+      // Renderer.done resolution → tell the state machine; the SM
+      // emits item:ended which the sequential subscription below
+      // handles (auto-advance gated by content_advance).
       renderer.done?.then(() => {
+        // Stale-done guard: if we're already on a different item,
+        // ignore. The advance counter was bumped by the next() call.
         if (activeIndex !== index) return;
-        if (behavior.content_advance !== 'auto') return;
-        const next = index + 1;
-        if (next < view.items.length) {
-          activeIndex = next;
-          mountItem(next);
-        }
+        stateMachine.markCurrentItemEnded();
       });
 
       // Honor autoplay directive.
@@ -368,7 +398,18 @@ globalThis.addEventListener?.('pagehide', onPageHide);
         renderer,
         shell,
         aux,
+        // Pending teardown timer ID from a crossfade — the rapid-skip
+        // fix tracks this so a second skip can cancel + sync-teardown
+        // (per FE arch review of f183286 P1 #1).
+        /** @type {ReturnType<typeof setTimeout> | null} */
+        pendingTeardown: null,
         teardown() {
+          if (this.pendingTeardown != null) {
+            clearTimeout(this.pendingTeardown);
+            this.pendingTeardown = null;
+          }
+          // Detach the audio pipeline routing for this item.
+          if (mediaElement) audioPipeline.detachContent(mediaElement);
           renderer.teardown();
           shell?.teardown();
           for (const a of aux) {
@@ -388,27 +429,41 @@ globalThis.addEventListener?.('pagehide', onPageHide);
 
     /**
      * Mount a new item, optionally crossfading from the active one.
-     * For now ALL transitions are 'cut' (immediate dispose-then-mount);
-     * Step 9 turns on the opacity ramp by reading the new item's
-     * behavior.transition. The shape supports it today.
+     *
+     * Per FE arch review of f183286 P1 #1: rapid Skip during a
+     * crossfade used to leak layer-sets — the OLD set's deferred
+     * teardown timer kept firing on a stale handle while audio kept
+     * playing (silently) under the new layer-set. Fix: each LayerSet
+     * tracks its `pendingTeardown` timer; rapid mountItem calls cancel
+     * the prior timer and sync-teardown the previous-old, then start
+     * a fresh ramp on the now-old (just-built last time).
      */
     function mountItem(index) {
       const oldSet = activeSet;
+      // If oldSet has a pending teardown from a previous crossfade, cancel
+      // + sync-teardown it now. The user wants to advance NOW; don't wait.
+      // eslint-disable-next-line no-unused-vars
+      const _legacy = null; // (placeholder so the next-old branch reads cleanly)
+      if (oldSet?.pendingTeardown != null) {
+        clearTimeout(oldSet.pendingTeardown);
+        oldSet.pendingTeardown = null;
+        // Sync-teardown means the visual "old set" is gone immediately;
+        // we don't get a second ramp on it. Acceptable trade-off for
+        // rapid skip — user wants to be on the new content NOW.
+        oldSet.teardown();
+      }
       const newSet = buildLayerSet(index);
       activeSet = newSet;
 
-      if (!oldSet) return; // first mount — nothing to fade out
+      if (!oldSet || oldSet === newSet) return; // first mount or self
+      if (oldSet.pendingTeardown != null) return; // already cleared above
 
-      // Step 9 will pull a transition kind + duration from behavior here.
-      // Today we implement 'cut' (immediate teardown) so existing tests +
-      // smoke continue to pass exactly. The crossfade-capable shape
-      // exists; the ramp is the one-line addition Step 9 wires.
       const kind = /** @type {string} */ (newSet.behavior.transition ?? 'cut');
       if (kind === 'cut') {
         oldSet.teardown();
       } else {
-        // Cross-fade scaffold — opacity ramp on the OLD wrap from 1 → 0
-        // over CROSSFADE_MS while the NEW wrap stays at opacity 1.
+        // Cross-fade: opacity ramp on the OLD wrap from 1 → 0 over
+        // CROSSFADE_MS, with audio fade alongside (FE arch P1 #3).
         // Tear down the old set after the ramp completes.
         const CROSSFADE_MS = 800;
         oldSet.wrap.style.transition = `opacity ${CROSSFADE_MS}ms ease-in-out`;
@@ -416,18 +471,55 @@ globalThis.addEventListener?.('pagehide', onPageHide);
         // eslint-disable-next-line no-unused-expressions
         oldSet.wrap.offsetWidth;
         oldSet.wrap.style.opacity = '0';
-        setTimeout(() => oldSet.teardown(), CROSSFADE_MS);
+        // Audio fade alongside visual — the renderer's optional fadeOut
+        // ramps element.volume in lockstep with the opacity transition.
+        // (Step 9: the audio pipeline can ALSO ramp the GainNode for
+        // tighter control; renderer-level fade is the always-available
+        // fallback that works on the mobile pipeline path too.)
+        oldSet.renderer?.fadeOut?.(CROSSFADE_MS);
+        oldSet.pendingTeardown = setTimeout(() => {
+          oldSet.pendingTeardown = null;
+          oldSet.teardown();
+        }, CROSSFADE_MS);
       }
     }
 
-    mountItem(activeIndex);
+    // State machine wiring: subscribe to events that drive boot.
+    stateMachine.on('item:started', ({ index }) => {
+      activeIndex = index;
+      mountItem(index);
+    });
+    stateMachine.on('item:ended', () => {
+      // Auto-advance when the current item's behavior says so. The
+      // SM stays content-agnostic; we read the active behavior here.
+      if (activeSet?.behavior?.content_advance !== 'auto') return;
+      stateMachine.next();
+    });
+    stateMachine.on('experience:ended', () => {
+      // Step 12 will mount the completion card here. For now log + leave
+      // the last layer-set on screen.
+      // eslint-disable-next-line no-console
+      console.info('[hwes/boot] experience:ended');
+    });
+
+    stateMachine.start({ items: view.items });
+    // If audio is locked (no user gesture yet), the SM holds the first
+    // item:started event until unlockAudio() fires. To bootstrap the
+    // visible state in the meantime, mount item 0 ourselves with the
+    // controls' Play button as the eventual unlock trigger. This is
+    // the trade-off: visible card immediately, audio waits for gesture.
+    if (!stateMachine.isAudioUnlocked() && view.items.length > 0) {
+      activeIndex = 0;
+      mountItem(0);
+    }
 
     // Console banner: confirms the engine + composition + renderers
     // wired up cleanly. Useful for the README's "Open and you should
     // see…" expectation.
     // eslint-disable-next-line no-console
     console.info(
-      '[Harmonic Wave Universal Player] Steps 1-8 mounted.\n' +
+      '[Harmonic Wave Universal Player] Steps 1-9 mounted.\n' +
+        `  Audio:      ${audioPipeline.kind} pipeline${stateMachine.isAudioUnlocked() ? ' (unlocked)' : ' (locked — first Play unlocks)'}\n` +
         `  Source:     ${describeSource({ fixtureName })}\n` +
         `  Experience: ${view.experience?.name ?? '(unnamed)'} (${view.items.length} item${view.items.length === 1 ? '' : 's'})\n` +
         `  Recipes:    ${Object.keys(BUILTIN_DELIVERY_RECIPES).length} delivery + ${Object.keys(BUILTIN_DISPLAY_RECIPES).length} display\n` +

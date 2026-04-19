@@ -39,6 +39,9 @@
  * @property {() => void} resume
  * @property {() => void} teardown
  * @property {Promise<void>} done
+ * @property {(ms: number) => Promise<void>} [fadeOut]
+ *   Renderer-level audio fade-out for crossfade transitions. Same shape
+ *   as the audio renderer's fadeOut — ramps element.volume to 0.
  */
 
 /**
@@ -130,6 +133,29 @@ export function createVideoRenderer(opts) {
     resume() {
       video.play().catch(() => {
         /* same gesture-policy story */
+      });
+    },
+    /**
+     * Audio fade-out for crossfade transitions (video carries audio
+     * track too). Same shape as audio renderer's fadeOut.
+     * @param {number} ms
+     * @returns {Promise<void>}
+     */
+    async fadeOut(ms) {
+      const start = video.volume;
+      const startTs = Date.now();
+      return new Promise((resolve) => {
+        const tick = () => {
+          const t = (Date.now() - startTs) / ms;
+          if (t >= 1) {
+            video.volume = 0;
+            resolve();
+            return;
+          }
+          video.volume = start * (1 - t);
+          requestAnimationFrame(tick);
+        };
+        tick();
       });
     },
     teardown() {

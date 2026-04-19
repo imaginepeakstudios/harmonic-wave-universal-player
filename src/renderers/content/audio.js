@@ -46,6 +46,12 @@
  *   === 'auto'). Resolves at most once; never rejects (errors during
  *   playback also resolve this so the experience advances past failures
  *   instead of dead-stopping).
+ * @property {(ms: number) => Promise<void>} [fadeOut]
+ *   Renderer-level audio fade-out for crossfade transitions. Ramps
+ *   `element.volume` from current → 0 over `ms` and resolves when
+ *   complete. Step 9's audio pipeline can ALSO ramp the GainNode for
+ *   tighter control via `channel.gain` — fadeOut is the renderer-side
+ *   fallback that works without the audio pipeline (mobile path).
  */
 
 /**
@@ -178,6 +184,33 @@ export function createAudioRenderer(opts) {
     resume() {
       audio.play().catch(() => {
         /* same gesture-policy story; chrome's Play retries */
+      });
+    },
+    /**
+     * Audio fade-out for crossfade transitions (per FE arch review of
+     * f183286 P1 #3). Step 9's audio pipeline can also ramp the
+     * GainNode for tighter control; this method is the renderer-level
+     * fallback that works WITHOUT the audio pipeline (mobile path,
+     * pre-Step-9 state) by ramping element.volume.
+     *
+     * @param {number} ms  Duration of the volume ramp.
+     * @returns {Promise<void>}  Resolves when the ramp completes.
+     */
+    async fadeOut(ms) {
+      const start = audio.volume;
+      const startTs = Date.now();
+      return new Promise((resolve) => {
+        const tick = () => {
+          const t = (Date.now() - startTs) / ms;
+          if (t >= 1) {
+            audio.volume = 0;
+            resolve();
+            return;
+          }
+          audio.volume = start * (1 - t);
+          requestAnimationFrame(tick);
+        };
+        tick();
       });
     },
     teardown() {

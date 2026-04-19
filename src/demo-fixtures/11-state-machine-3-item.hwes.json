@@ -1,0 +1,38 @@
+{
+  "_comment": "Browser-demo fixture for Step 9 state machine — three back-to-back audio items, each cinematic with crossfade. Tests: (1) state machine waits for unlockAudio() before emitting first item:started (Play button gates iOS audio), (2) renderer.done resolves at end-of-track and SM auto-advances via item:ended subscription, (3) skip button calls stateMachine.next() and the rapid-skip teardown timer (P1 #1) cancels any in-flight crossfade cleanly, (4) audio pipeline's analyser routes into the visualizer scene so the orb + bars react to the actual audio, (5) palette lerps to the new cover at each transition. Final item:ended fires experience:ended (chrome shows 'experience complete' state).",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 1011,
+  "slug": "demo-state-machine-3-item",
+  "name": "Demo — State Machine: 3-Item Sequence",
+  "description": "Three audio items with crossfade — exercises Step 9 state machine + audio pipeline + cross-item palette lerp.",
+  "items": [
+    {
+      "item_id": 1,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Item 1 — Holding On",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen", "cross_fade_transitions"]
+    },
+    {
+      "item_id": 2,
+      "content_id": 101,
+      "content_type_slug": "song",
+      "content_title": "Item 2 — Without You",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/without-you-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen", "cross_fade_transitions"]
+    },
+    {
+      "item_id": 3,
+      "content_id": 102,
+      "content_type_slug": "song",
+      "content_title": "Item 3 — Holding On (reprise)",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen", "cross_fade_transitions"]
+    }
+  ]
+}

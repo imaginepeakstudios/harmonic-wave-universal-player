@@ -1,0 +1,23 @@
+{
+  "_comment": "Browser-demo fixture for Step 9 synthesized music bed (decision #34). Load with ?fixture=12-music-bed-mood-driven&music_bed=auto to force behavior.narration_music_bed='auto' (the dev override hook). The synthesized provider reads experience.mood_tags and parameterizes the drone: 'intimate' here gets a soft warm A2+P5 bed (root 110Hz, perfect-fifth above, low-pass at 600Hz, slow 0.1Hz LFO). Try swapping mood_tags to 'energetic' (165Hz + faster LFO), 'melancholy' (minor third), or 'triumphant' (bright 1500Hz filter) to hear the mapping table direct the bed differently. The bed plays under the audio item with a 1.5s fade-in to TARGET_GAIN=0.03 — low enough not to compete with the song. On mobile, the music bed is a no-op (iOS coexistence trap per IMPLEMENTATION-GUIDE §3.3) — the audio item still plays, just without the bed underneath.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 1012,
+  "slug": "demo-music-bed-mood-driven",
+  "name": "Demo \u2014 Mood-Driven Music Bed",
+  "description": "Synthesized music bed under an audio item, parameterized by experience mood_tags.",
+  "mood_tags": "intimate, contemplative",
+  "narrative_voice": "warm",
+  "arc_role": "opening",
+  "items": [
+    {
+      "item_id": 1,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Bed Demo \u2014 swap ?mood_tags via fixture edit",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen"]
+    }
+  ]
+}

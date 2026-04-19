@@ -16,12 +16,13 @@
  * Buttons are <button> elements (not divs styled as buttons). Keyboard
  * navigation, focus rings, and assistive-tech labeling come for free.
  *
- * TODO(step-9): The Play button is the natural place to wire
- * `audioCtx.resume()` once the audio pipeline introduces an AudioContext.
- * iOS Safari requires `resume()` from a user-gesture handler — the Play
- * button click is the canonical first-gesture entry point. Per
- * IMPLEMENTATION-GUIDE.md §3.6 + docs/sequence-narration-pipeline.md
- * "AudioContext fails on iOS first interaction" bug pattern.
+ * The Play button is the iOS-gesture entry point for `audioCtx.resume()`:
+ * boot.js's onPlay callback calls `stateMachine.unlockAudio()` from
+ * inside this button's click handler, which is the canonical first-gesture
+ * path on iOS Safari. Per IMPLEMENTATION-GUIDE.md §3.6 + docs/sequence-
+ * narration-pipeline.md "AudioContext fails on iOS first interaction"
+ * bug pattern. controls.js stays presentation-only — the click handler
+ * just fires the callback, the state machine in boot.js owns the unlock.
  */
 
 /**
