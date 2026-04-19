@@ -60,10 +60,9 @@ export function createAudioRenderer(opts) {
   // tainting the canvas. Per IMPLEMENTATION-GUIDE.md CORS verification
   // (2026-04-19), all relevant media hosts already serve `Access-Control-
   // Allow-Origin: *` for the proxied media path, so this is safe.
-  // Cover may live on content_metadata (typed) or as a top-level
-  // ItemView field that some platform versions/extensions surface.
-  const coverUrl =
-    item?.content_metadata?.cover_art_url ?? /** @type {any} */ (item)?.cover_art_url;
+  // Top-level cover_art_url wins (platforms that surface it there save
+  // a metadata lookup); falls back to content_metadata.cover_art_url.
+  const coverUrl = item?.cover_art_url ?? item?.content_metadata?.cover_art_url;
   if (coverUrl) {
     const cover = document.createElement('img');
     cover.className = 'hwes-audio__cover';
@@ -84,7 +83,14 @@ export function createAudioRenderer(opts) {
   const audio = document.createElement('audio');
   audio.className = 'hwes-audio__element';
   audio.preload = 'metadata';
-  audio.crossOrigin = 'anonymous';
+  // crossOrigin is intentionally NOT set here. Standalone <audio> playback
+  // works without CORS; only `MediaElementSource` (Step 9 audio pipeline)
+  // requires `crossOrigin = "anonymous"` so the FFT analyser doesn't taint.
+  // Setting it here today preempts a problem that doesn't exist and
+  // narrows the set of media hosts the renderer can play (a creator with
+  // a self-hosted source that doesn't send ACAO would be blocked).
+  // Step 9 sets crossOrigin on the channel.element BEFORE wiring
+  // MediaElementSource — that's the right insertion point.
   if (behavior.loop) audio.loop = true;
   if (behavior.autoplay === 'muted') audio.muted = true;
   // Native controls are hidden — chrome/controls.js renders the

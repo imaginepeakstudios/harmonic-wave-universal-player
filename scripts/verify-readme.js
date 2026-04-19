@@ -163,6 +163,32 @@ if (!claim) {
   }
 }
 
+// ---------- 3b. Steps-complete claim parity (README vs CONTRIBUTING) ----------
+// Both files claim "Steps 1-N of 15 complete". The two MUST agree —
+// drift here is the FE-arch-review-found bug from Steps 4+5 (CONTRIBUTING
+// said 1-3 while README said 1-5). Both are creator-facing surfaces; both
+// should match.
+console.log('\n\x1b[1mSteps-complete claim parity (README ↔ CONTRIBUTING)\x1b[0m');
+const STEPS_RE = /Steps?\s+1[-–](\d+)\s+of\s+15/;
+const readmeStepsMatch = readmeText.match(STEPS_RE);
+const contributingText = readFileSync(CONTRIBUTING_PATH, 'utf8');
+const contributingStepsMatch = contributingText.match(STEPS_RE);
+if (!readmeStepsMatch && !contributingStepsMatch) {
+  skip('steps-claim-parity', 'neither file makes a "Steps 1-N of 15" claim');
+} else if (!readmeStepsMatch || !contributingStepsMatch) {
+  fail(
+    'steps-claim-parity',
+    `only one file makes the "Steps 1-N of 15" claim — README: ${readmeStepsMatch?.[1] ?? 'none'}, CONTRIBUTING: ${contributingStepsMatch?.[1] ?? 'none'}`,
+  );
+} else if (readmeStepsMatch[1] !== contributingStepsMatch[1]) {
+  fail(
+    'steps-claim-parity',
+    `drift: README claims Steps 1-${readmeStepsMatch[1]}, CONTRIBUTING claims Steps 1-${contributingStepsMatch[1]}. Both should bump together.`,
+  );
+} else {
+  ok(`README + CONTRIBUTING agree on Steps 1-${readmeStepsMatch[1]} of 15`);
+}
+
 // ---------- 4. Platform version ----------
 // README references the harmonic-wave-api-platform version this engine
 // targets. If it drifts behind production, agents/devs will think the

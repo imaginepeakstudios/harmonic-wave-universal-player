@@ -76,4 +76,34 @@ describe('chrome/shell', () => {
     shell.teardown();
     expect(mount.querySelector('.hwes-shell')).toBeNull();
   });
+
+  test('attachControls returns the Controls instance so callers can drive it via API (no querySelector)', () => {
+    // Per FE arch review P0 #1: shell exposes the Controls instance
+    // so boot.js / Step 9 state machine can call setNowPlaying +
+    // setPlayingState directly instead of reaching in via DOM queries.
+    const shell = createShell({
+      mount,
+      experience: { name: 'Foo' },
+      actor: null,
+      behavior: defaultBehavior(),
+    });
+    const controls = shell.attachControls({});
+    expect(controls).not.toBeNull();
+    expect(typeof controls.setNowPlaying).toBe('function');
+    expect(typeof controls.setPlayingState).toBe('function');
+    controls.setNowPlaying('Track 5');
+    expect(mount.querySelector('.hwes-controls__now-playing').textContent).toBe('Track 5');
+    expect(shell.getControls()).toBe(controls);
+  });
+
+  test('chrome=none returns null from attachControls + getControls', () => {
+    const shell = createShell({
+      mount,
+      experience: { name: 'Foo' },
+      actor: null,
+      behavior: mergeBehavior(defaultBehavior(), { chrome: 'none' }),
+    });
+    expect(shell.attachControls({})).toBeNull();
+    expect(shell.getControls()).toBeNull();
+  });
 });

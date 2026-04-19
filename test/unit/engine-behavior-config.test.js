@@ -58,4 +58,33 @@ describe('engine/behavior-config', () => {
     expect(mergeBehavior(base, undefined)).toEqual(base);
     expect(mergeBehavior(base, 'not an object')).toEqual(base);
   });
+
+  test('mergeBehavior runtime-validates value type against the primitive declaration', () => {
+    // chrome is an enum (string), loop is a boolean, audio_ducking_db
+    // is a number. Wrong-typed values silently drop — symmetric with
+    // the unknown-key drop. Per FE arch review P1 #3.
+    const base = defaultBehavior();
+    const merged = mergeBehavior(base, {
+      chrome: 'none', // valid enum string → applied
+      loop: 'true', // wrong type (string, not boolean) → dropped
+      audio_ducking_db: '-3', // wrong type (string, not number) → dropped
+      sequence_dwell_seconds: 8, // valid number → applied
+      autoplay: 42, // wrong type (number, not enum string) → dropped
+    });
+    expect(merged.chrome).toBe('none');
+    expect(merged.loop).toBe(false); // unchanged from default
+    expect(merged.audio_ducking_db).toBe(-6); // unchanged from default
+    expect(merged.sequence_dwell_seconds).toBe(8);
+    expect(merged.autoplay).toBe('off'); // unchanged from default
+  });
+
+  test('mergeBehavior rejects non-finite numbers (NaN, Infinity)', () => {
+    const base = defaultBehavior();
+    const merged = mergeBehavior(base, {
+      sequence_dwell_seconds: NaN,
+      pause_after_narration_seconds: Infinity,
+    });
+    expect(merged.sequence_dwell_seconds).toBe(5); // default
+    expect(merged.pause_after_narration_seconds).toBe(0); // default
+  });
 });

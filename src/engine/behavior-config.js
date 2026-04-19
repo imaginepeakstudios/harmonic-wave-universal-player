@@ -50,12 +50,22 @@ export function mergeBehavior(base, overrides) {
   if (!overrides || typeof overrides !== 'object') return { ...base };
   const next = { ...base };
   for (const [key, value] of Object.entries(overrides)) {
-    if (!(key in PRIMITIVE_DEFINITIONS)) continue;
-    // The registry-snapshot is the source of truth for value types;
-    // we trust it. Cast through unknown to satisfy strict checkJs
-    // (Object.entries widens the value to unknown even when the source
-    // is typed).
-    next[key] = /** @type {string | number | boolean} */ (value);
+    const def = PRIMITIVE_DEFINITIONS[key];
+    if (!def) continue; // unknown key — graceful degradation per SPEC §5.4
+    // Type-check against the primitive's declared type. A snapshot drift
+    // or a bad fork-side custom snapshot can carry structurally wrong
+    // values; silently dropping them is the symmetric "wrong-typed
+    // values get the same treatment as unknown keys" rule. The renderer
+    // contract stays intact: BehaviorConfig values are always one of
+    // string / number / boolean per primitives.json.
+    if (def.type === 'enum' && typeof value === 'string') {
+      next[key] = value;
+    } else if (def.type === 'number' && typeof value === 'number' && Number.isFinite(value)) {
+      next[key] = value;
+    } else if (def.type === 'boolean' && typeof value === 'boolean') {
+      next[key] = value;
+    }
+    // else: silently drop — value didn't match the declared primitive type.
   }
   return next;
 }

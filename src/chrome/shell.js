@@ -25,7 +25,12 @@ import { createControls } from './controls.js';
  * @typedef {object} Shell
  * @property {HTMLElement} root  The mounted shell element.
  * @property {() => HTMLElement} getContentMount  Where content renderers attach.
- * @property {(opts: ControlsCallbacks) => void} attachControls
+ * @property {(opts: ControlsCallbacks) => import('./controls.js').Controls | null}
+ *   attachControls  Returns the Controls instance so callers can drive
+ *   setNowPlaying / setPlayingState directly. Returns null when chrome
+ *   level is 'none' (composition skips this layer; controls aren't mounted).
+ * @property {() => import('./controls.js').Controls | null} getControls
+ *   Accessor for the currently-attached controls instance, or null.
  * @property {() => void} teardown
  */
 
@@ -60,7 +65,8 @@ export function createShell(opts) {
     return {
       root: bare,
       getContentMount: () => contentMount,
-      attachControls: () => {},
+      attachControls: () => null,
+      getControls: () => null,
       teardown: () => bare.remove(),
     };
   }
@@ -97,6 +103,7 @@ export function createShell(opts) {
 
   mount.appendChild(root);
 
+  /** @type {import('./controls.js').Controls | null} */
   let controls = null;
   return {
     root,
@@ -104,7 +111,9 @@ export function createShell(opts) {
     attachControls(cbs) {
       if (controls) controls.teardown();
       controls = createControls({ mount: controlsMount, callbacks: cbs });
+      return controls;
     },
+    getControls: () => controls,
     teardown() {
       controls?.teardown();
       root.remove();

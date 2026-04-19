@@ -24,11 +24,15 @@ describe('renderers/content/audio', () => {
     const cover = mount.querySelector('.hwes-audio__cover');
     expect(cover).toBeTruthy();
     expect(cover.getAttribute('src')).toBe('https://example.com/holding-on.jpg');
+    // Cover art carries crossOrigin for Step 7's palette extractor.
     expect(cover.getAttribute('crossorigin')).toBe('anonymous');
     const audio = mount.querySelector('.hwes-audio__element');
     expect(audio).toBeTruthy();
     expect(audio.getAttribute('src')).toBe('https://example.com/holding-on.mp3');
-    expect(audio.getAttribute('crossorigin')).toBe('anonymous');
+    // crossOrigin is intentionally NOT set on <audio> until Step 9 (see
+    // comment in audio.js). Standalone <audio> playback works without CORS;
+    // Step 9's MediaElementSource wiring is what needs it.
+    expect(audio.hasAttribute('crossorigin')).toBe(false);
     expect(audio.hasAttribute('controls')).toBe(false); // chrome owns controls
   });
 
@@ -44,6 +48,22 @@ describe('renderers/content/audio', () => {
     });
     expect(mount.querySelector('.hwes-audio__cover').getAttribute('src')).toBe(
       'https://example.com/meta-cover.jpg',
+    );
+  });
+
+  test('top-level cover_art_url takes precedence over content_metadata', () => {
+    createAudioRenderer({
+      item: {
+        content_title: 'Foo',
+        media_play_url: 'https://example.com/foo.mp3',
+        cover_art_url: 'https://example.com/top-cover.jpg',
+        content_metadata: { cover_art_url: 'https://example.com/meta-cover.jpg' },
+      },
+      behavior: defaultBehavior(),
+      mount,
+    });
+    expect(mount.querySelector('.hwes-audio__cover').getAttribute('src')).toBe(
+      'https://example.com/top-cover.jpg',
     );
   });
 

@@ -93,6 +93,11 @@ import { categorizeExtensions } from './conformance.js';
  * @property {string | undefined} content_title
  * @property {string | undefined} content_type_slug
  * @property {string | undefined} media_play_url
+ * @property {string | undefined} cover_art_url
+ *   Optional top-level cover. When present, takes precedence over
+ *   `content_metadata.cover_art_url` (some platform versions surface it
+ *   here to save a metadata lookup; renderers should read both with
+ *   top-level winning).
  * @property {ActorView | undefined} resolved_actor
  * @property {string[] | undefined} display_directives
  * @property {string[] | undefined} delivery_instructions

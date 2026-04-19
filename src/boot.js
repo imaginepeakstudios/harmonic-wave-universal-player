@@ -130,52 +130,37 @@ const fixtureName = params.get('fixture');
       const factory = RENDERERS[contentLayer?.renderer ?? 'unsupported'] ?? RENDERERS.unsupported;
       activeRenderer = factory({ item, behavior, mount: contentMount });
 
-      if (activeShell) {
-        activeShell.attachControls({
-          onPlay: () => {
-            activeRenderer.start?.();
-            controlsState(true);
-          },
-          onPause: () => {
-            activeRenderer.pause?.();
-            controlsState(false);
-          },
-          onSkip: () => {
-            const next = activeIndex + 1;
-            if (next < view.items.length) {
-              activeIndex = next;
-              mountItem(next);
-            }
-          },
-        });
-        // Now-playing label.
-        const nowPlaying = item?.content_title ?? `Item ${index + 1} of ${view.items.length}`;
-        // controls expose setNowPlaying via the shell internals — we
-        // call through indirectly. Cleaner pattern lands in Step 9 when
-        // the state machine emits 'item:started' events the controls
-        // subscribe to. For now, query the controls element directly.
-        const nowPlayingEl = activeShell.root.querySelector('.hwes-controls__now-playing');
-        if (nowPlayingEl) nowPlayingEl.textContent = nowPlaying;
-      }
+      // attachControls returns the Controls instance — drive setNowPlaying
+      // / setPlayingState through its public API, not via DOM querySelector.
+      // Step 9's state machine subscribes to the same surface (e.g.
+      // stateMachine.on('item:started', ({ item }) => controls.setNowPlaying(...))).
+      const controls = activeShell?.attachControls({
+        onPlay: () => {
+          activeRenderer.start?.();
+          controls?.setPlayingState(true);
+        },
+        onPause: () => {
+          activeRenderer.pause?.();
+          controls?.setPlayingState(false);
+        },
+        onSkip: () => {
+          const next = activeIndex + 1;
+          if (next < view.items.length) {
+            activeIndex = next;
+            mountItem(next);
+          }
+        },
+      });
+      controls?.setNowPlaying(item?.content_title ?? `Item ${index + 1} of ${view.items.length}`);
 
       // Honor autoplay directive — some recipes (cinematic_fullscreen,
       // loop_ambient) set autoplay='on' or 'muted'. Browser gesture
       // policy may still reject; the renderer handles that gracefully.
       if (behavior.autoplay !== 'off') {
         activeRenderer.start?.();
-        controlsState(true);
+        controls?.setPlayingState(true);
       } else {
-        controlsState(false);
-      }
-    }
-
-    function controlsState(playing) {
-      // Reach into controls via shell — same temporary indirection as
-      // setNowPlaying above. Step 9 cleans this up.
-      const btn = activeShell?.root.querySelector('.hwes-controls__btn--primary');
-      if (btn) {
-        btn.textContent = playing ? 'Pause' : 'Play';
-        btn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+        controls?.setPlayingState(false);
       }
     }
 
