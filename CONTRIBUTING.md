@@ -114,9 +114,8 @@ Initial conventions:
 PRs should include tests where applicable:
 
 - **New engine logic** → unit test in `test/unit/`
-- **New renderer** → snapshot test in `test/snapshot/renderers/`
+- **New renderer** → snapshot test in `test/snapshot/` (subdirectories land alongside the first renderer in Step 5)
 - **New recipe** → snapshot test of rendered output
-- **New behavior across multiple modules** → integration test in `test/integration/`
 - **New HWES v1 conformance edge case** → fixture pair in `test/conformance/fixtures/` + `test/conformance/expected/` ← see [`test/conformance/README.md`](test/conformance/README.md)
 
 The recipe-registry snapshot under `src/registry-snapshot/` has a CI gate (`test/ci/registry-sync.test.js`) that fails when it drifts from the live `https://harmonicwave.ai/hwes/v1/recipes.json` endpoint. Update it via `scripts/sync-registry.sh` and commit the result — the gate is there to make sure the snapshot bump is intentional, not silent.
@@ -150,7 +149,20 @@ Re-verify means: open `README.md` and spot-check that each of these still matche
 | URL examples                                                                    | The `?backend=...&debug=1` form, port number, and slug examples should still work against the current dev script                                                     |
 | File references in tables (`src/registry-snapshot/`, `test/conformance/`, etc.) | Paths exist; descriptions still accurate                                                                                                                             |
 
-A `bun run verify:readme` mechanical drift gate (paths exist + test count matches + platform version matches) is planned for the next infra commit and will run in CI. Even with the gate in place, it can't catch semantic drift (e.g., "the engine boots" is technically true but misleading because Step 4 just removed boot path X). Eyes on the README every commit, every time.
+A mechanical drift gate (`bun run verify:readme`) catches the most common failure modes:
+
+- Path drift — every backtick-quoted `src/...`, `test/...`, `docs/...`, `scripts/...`, `deploy/...`, `examples/...` reference must exist on disk
+- Script drift — every `` `bun run X` `` mentioned in docs must be defined in `package.json`
+- Test-count drift — README's "N tests + M skipped" claim must match actual `bun run test` output
+- Platform-version drift — README's `harmonic-wave-api-platform vX.Y.Z` claim must match production `harmonicwave.ai/health`
+
+The gate runs in GitHub Actions on every push and PR (see `.github/workflows/ci.yml`) and locally as a pre-commit hook (see `.githooks/pre-commit`). Enable the local hook in your clone with:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Even with the gate in place, it can't catch semantic drift (e.g., "the engine boots" is technically true but misleading because Step 4 just removed boot path X). Eyes on the README every commit, every time.
 
 The same discipline applies to `CONTRIBUTING.md`, `docs/SPEC.md`, and `docs/IMPLEMENTATION-GUIDE.md` — re-read on commits that touch the things they describe.
 

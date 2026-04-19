@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  gates:
+    name: Gates (test + typecheck + format + verify-readme + registry drift)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node (for verify-readme.js)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Test suite
+        run: bun run test
+
+      - name: TypeScript check
+        run: bun run typecheck
+
+      - name: Prettier check
+        run: bun run format:check
+
+      - name: README drift gate
+        # The script gracefully SKIPS the platform-version check on network
+        # failure (so fork PRs without internet pass) but FAILS on path
+        # drift, missing scripts, or test-count mismatches.
+        run: bun run verify:readme
+
+      - name: Registry drift gate
+        # Confirms src/registry-snapshot/ matches live /hwes/v1/recipes.json
+        # + primitives.json. Forces snapshot bumps to be intentional.
+        run: bun run ci:registry-drift

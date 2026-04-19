@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# pre-commit — local fast-feedback gate.
+#
+# Mirrors the CI workflow at .github/workflows/ci.yml so a failing CI
+# run is rare; the gates that depend on the network (verify:readme's
+# platform-version check) are tolerated with a SKIP locally too.
+#
+# Enable in your clone with:
+#   git config core.hooksPath .githooks
+# (One-time per clone. CONTRIBUTING.md "Documentation discipline" section
+# explains the why.)
+#
+# Run order is fastest → slowest so failures surface early.
+
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+
+# Helper: announce + run.
+gate() {
+  printf '\n\033[1;36m[pre-commit]\033[0m %s\n' "$1"
+  shift
+  "$@"
+}
+
+gate "Prettier check"   bun run format:check
+gate "TypeScript check" bun run typecheck
+gate "Test suite"       bun run test
+gate "README drift gate" bun run verify:readme
+
+printf '\n\033[1;32m[pre-commit]\033[0m All gates passed.\n'
