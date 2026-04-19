@@ -1,0 +1,184 @@
+# Harmonic Wave Universal Player
+
+**Open-source HWES v1 reference implementation.** A modular, recipe-driven, theme-aware player for [Harmonic Wave Experience Schema (HWES)](https://harmonicwave.ai/hwes/v1) experiences. Runs against any HWES v1-conformant backend.
+
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
+> **Status:** Pre-1.0 / engine implementation in progress. **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.73, 2026-04-19) — the data contract this engine builds against is now stable. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
+
+### Foundational positioning
+
+> **HWES is not an AI content generator.** It is a structured way to take content the creator OWNS and wrap it into a composited, immersive experience the creator DIRECTS — with AI as the delivery mechanism, not the source.
+
+This player honors that end-to-end: it receives proxied `media_play_url` references (never raw bytes), respects per-request access verification, and renders composition + intent without ever ingesting the underlying audio / video / document files. Forks of the player can change everything about presentation — but must not route around the proxied-URL access model without breaking conformance. See [Copyright-preserving architecture](https://harmonicwave.ai/hwes/v1#copyright-architecture) on the spec page for the full mechanism.
+
+---
+
+## What this is
+
+The Universal Player is a standalone HTML player that consumes a published HWES v1 experience and renders it for listeners. It's the **first-party reference implementation** of the HWES v1 spec — a working demonstration that the structured-experience model can be rendered end-to-end with consistent, predictable, themeable output.
+
+You can:
+
+- **Use it as-is** — point it at a Harmonic Wave experience URL and play it
+- **Fork it** — build a custom-branded variant for your own creators or your own customers
+- **Embed it** — drop it on any web page; it consumes HWES via standard MCP / REST
+- **Hand it to AI** — give Claude or another LLM the [HWES v1 spec](https://harmonicwave.ai/hwes/v1) plus this codebase, and it can generate custom player variants from a prompt
+- **Port it** — the engine modules are written so a future iOS/Android native client can reuse the schema interpreter, recipe engine, and composition pipeline
+
+---
+
+## Why open source
+
+Harmonic Wave's defensible IP is in the schema (HWES v1), the platform backend (cascade resolution, recipe execution, plan-tier gating), and the patent claims that describe the structured-experience model. The player is **one renderer** of that schema. Open-sourcing it:
+
+- Validates HWES as a real standard (a public reference implementation IS the spec, in the same way browser engines are CSS specs in practice)
+- Lets creators verify their content is delivered correctly (no black box)
+- Enables ecosystem leverage: forks, native clients, AI-generated variants, partner integrations
+- Removes the "you have to use our player" lock-in — creators choose
+
+The license is **Apache 2.0** for an explicit patent grant alongside copyright permission.
+
+---
+
+## Architecture (one paragraph)
+
+The Universal Player is built as ~10-12 small, single-responsibility modules with explicit typed interfaces. The engine **never queries the platform database, never resolves cascades, never applies plan-tier logic** — it consumes a single fully-resolved JSON document (the HWES v1 response from `get_experience`) and renders it deterministically. Recipes (delivery + display) describe HOW each item is presented; the engine reads built-in recipe definitions from code and ignores creator-defined custom recipes (those are a feature for AI-agent listeners, not the deterministic player). Themes inject as CSS custom properties at render time. The full architecture is in [`docs/SPEC.md`](docs/SPEC.md).
+
+```
+HWES v1 schema response → schema-interpreter → recipe-engine → composition → renderers → DOM
+                                                       ↓
+                                                player_directives
+                                                (BehaviorConfig)
+```
+
+---
+
+## Quick start
+
+> *Implementation is in progress — quick start instructions land when the engine is buildable.*
+
+When ready, expect something like:
+
+```bash
+git clone https://github.com/imaginepeakstudios/harmonic-wave-universal-player.git
+cd harmonic-wave-universal-player
+# No build step — vanilla HTML/CSS/JS modules
+# Open src/index.html in a browser pointed at a HWES backend
+```
+
+For local development against the Harmonic Wave platform's dev server:
+
+```bash
+# In one terminal: start the platform's dev server
+cd ../harmonic-wave-api-platform && NODE_ENV=test bun run dev:legacy
+
+# In another terminal: serve the player
+cd harmonic-wave-universal-player && python3 -m http.server 8080
+# Open http://localhost:8080/src/?backend=http://localhost:3000&token=<share_token>
+```
+
+---
+
+## Project structure
+
+```
+harmonic-wave-universal-player/
+├── docs/                          ← Design + architecture documentation
+│   └── SPEC.md                    ← The full v2 spec (architectural decisions, modules, build sequence)
+├── src/                           ← Engine source (modular ES modules — no build step)
+│   ├── boot.js                    ← Entry: fetch schema, instantiate engine, mount
+│   ├── schema/                    ← Schema interpreter (typed accessors over HWES response)
+│   ├── recipe-registry/           ← Recipe DEFINITIONS (data files, zero logic)
+│   │   ├── delivery/
+│   │   └── display/
+│   ├── engine/                    ← Rules engine (composes recipes → BehaviorConfig)
+│   ├── composition/               ← Layering (decides which layers to render per item)
+│   ├── renderers/                 ← Presentation (DOM/CSS, per-layer, per-content-type)
+│   │   ├── content/
+│   │   ├── overlay/
+│   │   ├── narration/
+│   │   └── scene/
+│   ├── chrome/                    ← Page shell + controls
+│   ├── theme/                     ← CSS custom properties from player_theme
+│   ├── playback/                  ← State machine + audio pipeline (desktop / mobile)
+│   ├── interactions/              ← Keyboard / gestures / single-audio guard
+│   ├── visualizer/                ← Audio-reactive Canvas + palette extraction
+│   ├── end-of-experience/         ← Completion card + Share / Try Another / What's Next
+│   ├── api/                       ← MCP client (configurable backend)
+│   └── client-runtime/            ← Browser bootstrap
+├── examples/                      ← Reference deployments
+│   ├── minimal/                   ← Tiny example — fetch HWES, render audio
+│   ├── matthew-hartley/           ← Music experience deployment (the v1 POC, expressed as HWES)
+│   └── white-label/               ← Branded variant
+├── test/
+│   ├── fixtures/                  ← Canned HWES schemas + recipe combinations
+│   ├── unit/
+│   ├── snapshot/                  ← Per-renderer DOM + recipe-registry snapshots
+│   └── integration/               ← Headless playback against canned MCP backend
+├── deploy/
+│   └── cloudflare-pages.sh
+├── LICENSE                        ← Apache 2.0
+├── CONTRIBUTING.md
+├── CODE_OF_CONDUCT.md
+└── CHANGELOG.md
+```
+
+See [`docs/SPEC.md`](docs/SPEC.md) for the full architectural rationale + module-by-module responsibilities.
+
+---
+
+## Acceptance criterion
+
+The v2 engine must be able to recreate Matthew Hartley's existing music experience POC at `experience.matthewhartleymusic.com` exactly — same look, same feel, same DJ Layla narration, same audio-reactive visualizer, same LRC-synced lyrics, same chapter system, same mobile audio pipeline — driven entirely by HWES schema + recipes + theme + actor profile, with **zero hardcoded creator-specific code**.
+
+If it can do that, it can do it for any creator. That's the bar.
+
+The original POC remains available at [imaginepeakstudios/harmonic-wave-player](https://github.com/imaginepeakstudios/harmonic-wave-player) as a reference example of what the engine must reproduce.
+
+---
+
+## How this relates to the platform
+
+| Component | Repo | Purpose |
+|---|---|---|
+| **Harmonic Wave Universal Player** (this repo) | `imaginepeakstudios/harmonic-wave-universal-player` | Open source HWES v1 player engine + reference implementation |
+| **Harmonic Wave API Platform** | `imaginepeakstudios/harmonic-wave-api-platform` | Closed-source platform backend (D1, R2, KV), MCP server, dashboard, creator workflow |
+| **Harmonic Wave Player POC** | `imaginepeakstudios/harmonic-wave-player` | Original single-file proof-of-concept (Matthew Hartley's music experience) — kept as reference example until v2 is at parity |
+
+The Universal Player consumes the platform via **MCP only** — no privileged backend access; `get_experience` over the public API. The player works against any HWES v1-conformant backend (production, dev, staging, self-hosted, partner). The platform's `/run/:token` route redirects to a hosted instance of the player.
+
+---
+
+## Contributing
+
+> *Contribution guidelines land when the engine reaches a stable shape worth contributing to. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for early guidance.*
+
+We welcome:
+
+- **Issues** for bugs, design questions, or HWES v1 conformance edge cases
+- **Pull requests** for engine improvements, new built-in display recipes (after design discussion), bug fixes, documentation
+- **Forks** for white-label variants, native client experiments, AI-generated variants
+
+We do NOT accept:
+
+- Pull requests that edit recipe definitions in `src/recipe-registry/` without a versioning plan (definitions are public contracts; changes require a new versioned slug, not in-place edits)
+- Pull requests that bypass the modular architecture (e.g. inlining renderers into chrome, mixing concerns)
+- Pull requests that introduce platform backend coupling (the engine consumes HWES via the public MCP API only)
+
+---
+
+## License
+
+Apache License 2.0. See [`LICENSE`](LICENSE).
+
+Copyright 2026 Imagine Peak Studios.
+
+---
+
+## Links
+
+- HWES v1 spec: https://harmonicwave.ai/hwes/v1
+- Harmonic Wave platform: https://harmonicwave.ai
+- Reference deployment (POC): https://experience.matthewhartleymusic.com
+- Issues: https://github.com/imaginepeakstudios/harmonic-wave-universal-player/issues
