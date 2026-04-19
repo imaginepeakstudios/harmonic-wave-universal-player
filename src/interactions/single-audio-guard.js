@@ -82,14 +82,26 @@ export function createSingleAudioGuard(callbacks) {
     // ping-pong races between tabs.
   }
 
+  function announcePause() {
+    channel?.postMessage({ type: 'paused', tabId, ts: Date.now() });
+  }
+
+  // Broadcast 'paused' on pagehide so other tabs that yielded to us
+  // know they're free to take over again. Without this, when the
+  // playing tab is closed mid-playback, sibling tabs that paused
+  // themselves never receive a signal — they sit silent waiting for
+  // a 'playing' from this dead tab. P1 from FE arch review of
+  // 3d675a6.
+  const onPageHide = () => announcePause();
+  globalThis.addEventListener?.('pagehide', onPageHide);
+
   return {
     announcePlay() {
       channel?.postMessage({ type: 'playing', tabId, ts: Date.now() });
     },
-    announcePause() {
-      channel?.postMessage({ type: 'paused', tabId, ts: Date.now() });
-    },
+    announcePause,
     teardown() {
+      globalThis.removeEventListener?.('pagehide', onPageHide);
       if (!channel) return;
       try {
         channel.removeEventListener('message', onMessage);

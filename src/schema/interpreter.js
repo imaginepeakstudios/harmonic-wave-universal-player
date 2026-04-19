@@ -178,12 +178,28 @@ function normalizeItem(rawItem) {
  * @property {object | undefined} seo
  * @property {string[] | undefined} starter_prompts_resolved
  * @property {string | undefined} creator_name
- *   Display name of the experience's creator (Step 12 byline).
- *   Production wire shape; cleaner fixtures may use nested
- *   `creator: { display_name }` which the completion card resolves.
+ *   Display name of the experience's creator (Step 12 byline). Cleaner
+ *   fixtures may use this; production wire actually sends `profile_name`
+ *   (joined from users.name) — both are passed through and the
+ *   completion card resolver tries each.
  * @property {string | undefined} creator_slug
- *   Creator profile slug for the "What's Next from this creator" CTA
- *   (Step 12). Resolves to /p/<slug> by default.
+ *   Creator profile slug for the "What's Next from this creator" CTA.
+ *   Production wire actually sends `profile_slug` — both are passed
+ *   through and the resolver tries each.
+ * @property {string | undefined} profile_name
+ *   Production wire field for the experience owner's display name.
+ *   Joined from `users.name` per harmonic-wave-api-platform/src/routes/
+ *   mcp/user-tools.ts:60-63 SELECT. The actual field that ships in
+ *   production responses for ~all experiences.
+ * @property {string | undefined} profile_slug
+ *   Production wire field for the experience owner's slug. Joined from
+ *   `users.slug` per the same SELECT. Production-canonical equivalent
+ *   of `creator_slug`.
+ * @property {string | undefined} discover_url
+ *   Optional override for the "Try Another" CTA's default destination.
+ *   Production wire passes through; forks running the player on a
+ *   non-platform domain set this to point at their own discover surface
+ *   instead of the local `/` fallback.
  */
 
 /**
@@ -316,12 +332,19 @@ export function interpret(rawResponse, opts = {}) {
     seo: rawResponse.seo,
     starter_prompts_resolved: /** @type {string[] | undefined} */ (starterPrompts),
     // Creator attribution — surfaced to Step 12's end-of-experience
-    // completion card ("by {creator_name}" + "/p/{creator_slug}" link
-    // for the What's Next CTA). Pass-through from the production wire
-    // shape; cleaner test fixtures may use nested `creator: { ... }`
-    // which the completion card's resolver also accepts.
+    // completion card ("by {name}" + "/p/{slug}" link for the What's
+    // Next CTA). Production wire (per harmonic-wave-api-platform's
+    // user-tools.ts SELECT) joins from `users.name`/`users.slug` AS
+    // `profile_name`/`profile_slug`. Cleaner fixtures may use the
+    // shorter `creator_name`/`creator_slug` aliases. Both are passed
+    // through; the completion card's resolver tries each in priority
+    // order (production wire wins where it exists).
     creator_name: rawResponse.creator_name,
     creator_slug: rawResponse.creator_slug,
+    profile_name: rawResponse.profile_name,
+    profile_slug: rawResponse.profile_slug,
+    // Optional discover surface — overrides Try Another default.
+    discover_url: rawResponse.discover_url,
   };
 
   /** @type {HwesView} */

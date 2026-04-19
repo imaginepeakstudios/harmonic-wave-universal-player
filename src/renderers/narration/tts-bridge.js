@@ -209,10 +209,19 @@ export function createTtsBridge(opts = {}) {
         const message = err instanceof Error ? err.message : String(err);
         // eslint-disable-next-line no-console
         console.warn('[hwes/tts] platform-audio play() rejected:', message);
-        // Don't reject — emit end so the pipeline advances past this
-        // narration instead of dead-stopping.
-        emit('end', undefined);
-        resolve();
+        // Fall through to browser TTS instead of silently dropping
+        // narration. The author intent was "speak this text" — the
+        // pre-rendered URL was just the preferred provider. P1 from
+        // FE arch review of 3d675a6.
+        const speechAvailable =
+          typeof globalThis !== 'undefined' && /** @type {any} */ (globalThis).speechSynthesis;
+        if (speechAvailable) {
+          speakBrowserTts(opts).then(resolve, reject);
+        } else {
+          // No fallback available — emit end so the pipeline advances.
+          emit('end', undefined);
+          resolve();
+        }
       });
     });
   }
@@ -239,13 +248,33 @@ export function createTtsBridge(opts = {}) {
     else activeUtterance.rate = 0.95; // POC default for DJ Layla
     if (opts.volume != null) activeUtterance.volume = opts.volume;
 
-    // Voice mapping — best-effort substring match.
+    // Voice mapping — best-effort substring match. On iOS Safari +
+    // some Chromes, `getVoices()` returns `[]` until the
+    // `voiceschanged` event fires. If empty on first call, wait up
+    // to 200ms for the list to populate before matching so the
+    // creator's configured voice actually gets picked up (otherwise
+    // we'd always fall through to the default voice on cold launch).
+    // P1 from FE arch review of 3d675a6.
     const voiceName = opts.voiceName;
     if (voiceName) {
-      const voices = speech.getVoices();
+      let voices = speech.getVoices();
+      if (voices.length === 0) {
+        voices = await new Promise((resolve) => {
+          const timeout = setTimeout(() => {
+            speech.removeEventListener('voiceschanged', onChanged);
+            resolve(speech.getVoices());
+          }, 200);
+          const onChanged = () => {
+            clearTimeout(timeout);
+            speech.removeEventListener('voiceschanged', onChanged);
+            resolve(speech.getVoices());
+          };
+          speech.addEventListener('voiceschanged', onChanged);
+        });
+      }
       const needle = voiceName.toLowerCase();
       const match = voices.find((v) => v.name.toLowerCase().includes(needle)) ?? null;
-      if (match) activeUtterance.voice = match;
+      if (match && activeUtterance) activeUtterance.voice = match;
     }
 
     return new Promise((resolve, reject) => {

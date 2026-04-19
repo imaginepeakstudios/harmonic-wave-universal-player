@@ -62,11 +62,16 @@ export function renderWhatsNextCta(opts) {
 }
 
 /**
+ * Resolve the creator slug. Resolution order matches resolveCreatorLine
+ * in completion-card.js — production wire (`profile_slug`, joined from
+ * `users.slug`) wins, with cleaner-fixture aliases as fallbacks.
+ *
  * @param {any} experience
  * @returns {string | null}
  */
 function resolveCreatorSlug(experience) {
   const candidates = [
+    experience?.profile_slug,
     experience?.creator_slug,
     experience?.creator?.profile_slug,
     experience?.creator?.slug,

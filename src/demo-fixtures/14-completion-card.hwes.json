@@ -1,13 +1,13 @@
 {
-  "_comment": "Browser-demo fixture for Step 12 — end-of-experience completion card. Two short audio items so the card mounts within seconds. Includes creator_name + creator_slug so all three CTAs render (Share + Try Another + What's Next). Load with ?fixture=14-completion-card&debug. Audio is autoplay='muted' for fast playback through both items so the experience:ended event fires + the completion card mounts. Add &bumper=off to skip the network bumper for faster iteration.",
+  "_comment": "Browser-demo fixture for Step 12 — end-of-experience completion card. Two short audio items so the card mounts within seconds. Uses production-wire `profile_name` + `profile_slug` (P0 fix from FE review of 3d675a6 — production joins users.name/users.slug AS profile_name/profile_slug, NOT creator_name/creator_slug). All three CTAs render (Share + Try Another + What's Next). Load with ?fixture=14-completion-card&debug. Audio is autoplay='muted' for fast playback through both items so the experience:ended event fires + the completion card mounts. Add &bumper=off to skip the network bumper for faster iteration.",
   "hwes_version": 1,
   "hwes_extensions": ["display_recipes_v1"],
   "id": 1014,
   "slug": "demo-completion-card",
   "name": "Demo \u2014 Completion Card",
   "description": "Two short audio items \u2014 watch the end-of-experience card mount.",
-  "creator_name": "Matthew Hartley",
-  "creator_slug": "matthew-hartley",
+  "profile_name": "Matthew Hartley",
+  "profile_slug": "matthew-hartley",
   "items": [
     {
       "item_id": 1,

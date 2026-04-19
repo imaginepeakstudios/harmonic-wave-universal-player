@@ -27,15 +27,31 @@
 /**
  * @typedef {object} TryAnotherCtaOpts
  * @property {() => void} [onActivate]   Override the default navigation.
- * @property {string} [href]             Override default URL ("/").
+ * @property {string} [href]             Explicit destination override.
+ * @property {string} [discoverUrl]      Pass-through from `view.experience.
+ *   discover_url` — the platform sets this so forks running the player on
+ *   a non-platform domain land users on a working discover surface
+ *   instead of their own site root.
  */
 
 /**
+ * Default destination resolution (most specific first):
+ *   1. `onActivate` callback wins absolutely
+ *   2. `href` opt — explicit per-mount override
+ *   3. `discoverUrl` — pass-through from experience.discover_url
+ *   4. fallback to `/` (works for hosted player at harmonicwave.ai/run/:token,
+ *      lands on the platform's home which IS the discover surface;
+ *      breaks for forks at forks-domain.com/embed/... — those should
+ *      pass `discoverUrl` from the experience response)
+ *
+ * P1 from FE arch review of 3d675a6.
+ *
  * @param {TryAnotherCtaOpts} [opts]
  * @returns {HTMLButtonElement}
  */
 export function renderTryAnotherCta(opts = {}) {
-  const { onActivate, href = '/' } = opts;
+  const { onActivate, href, discoverUrl } = opts;
+  const target = href ?? discoverUrl ?? '/';
 
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -48,10 +64,8 @@ export function renderTryAnotherCta(opts = {}) {
       onActivate();
       return;
     }
-    // Default: navigate to the platform home page. Same-origin so the
-    // bundled-deploy pattern from #31 works without a CORS dance.
     if (globalThis.location) {
-      globalThis.location.href = href;
+      globalThis.location.href = target;
     }
   });
 

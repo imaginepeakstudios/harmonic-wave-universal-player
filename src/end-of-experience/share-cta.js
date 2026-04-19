@@ -61,6 +61,7 @@ async function defaultShare(opts) {
   const { btn, shareUrl, experienceName } = opts;
 
   const nav = /** @type {any} */ (globalThis.navigator);
+  let webShareErrored = false;
   if (nav?.share) {
     try {
       await nav.share({
@@ -74,7 +75,11 @@ async function defaultShare(opts) {
       // surface it as an error — the user explicitly bailed.
       const message = err instanceof Error ? err.message : String(err);
       if (/cancel|abort/i.test(message)) return;
-      // Fall through to clipboard fallback on real errors.
+      // Real error — flag so we surface a brief notice before falling
+      // through to clipboard. Otherwise the user just sees "Link copied"
+      // immediately after a share-sheet error, which is confusing.
+      // P1 from FE arch review of 3d675a6.
+      webShareErrored = true;
       // eslint-disable-next-line no-console
       console.warn('[hwes/share] navigator.share failed, falling back:', message);
     }
@@ -88,7 +93,14 @@ async function defaultShare(opts) {
       // Legacy fallback for very old browsers without clipboard API.
       legacyCopyToClipboard(shareUrl);
     }
-    flashCopiedFeedback(btn);
+    // If we got here after a real navigator.share error (not a cancel),
+    // show a briefer "Share failed, link copied" so the user knows
+    // both what happened AND the recovery path worked.
+    if (webShareErrored) {
+      flashLabel(btn, 'Share failed, link copied', 'hwes-completion__cta--error');
+    } else {
+      flashCopiedFeedback(btn);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     // eslint-disable-next-line no-console
@@ -123,7 +135,16 @@ function legacyCopyToClipboard(text) {
  * @param {HTMLButtonElement} btn
  */
 function flashCopiedFeedback(btn) {
-  setLabel(btn, 'Link copied', 'hwes-completion__cta--success');
+  flashLabel(btn, 'Link copied', 'hwes-completion__cta--success');
+}
+
+/**
+ * @param {HTMLButtonElement} btn
+ * @param {string} text
+ * @param {string} stateClass
+ */
+function flashLabel(btn, text, stateClass) {
+  setLabel(btn, text, stateClass);
   setTimeout(() => setLabel(btn, 'Share'), COPIED_FEEDBACK_MS);
 }
 

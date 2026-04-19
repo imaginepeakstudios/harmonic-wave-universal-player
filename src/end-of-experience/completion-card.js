@@ -41,7 +41,10 @@ import { renderWhatsNextCta } from './what-is-next.js';
 /**
  * @typedef {object} CompletionCard
  * @property {HTMLElement} root
- * @property {() => void} teardown
+ * @property {() => Promise<void>} teardown
+ *   Resolves AFTER the 600ms CSS leave transition + DOM removal so
+ *   callers re-mounting on `experience:ended` re-fire don't stack
+ *   two cards (P1 from FE arch review of 3d675a6).
  */
 
 /**
@@ -69,7 +72,10 @@ export function createCompletionCard(opts) {
     img.src = url;
     img.alt = '';
     img.className = 'hwes-completion__montage-img';
-    img.crossOrigin = 'anonymous';
+    // No canvas readback needed (montage is purely visual), so don't
+    // request CORS — that would block loads on origins that don't send
+    // Access-Control-Allow-Origin even though we don't need pixel
+    // access. P1 from FE arch review of 3d675a6.
     montage.appendChild(img);
   }
   root.appendChild(montage);
@@ -108,7 +114,16 @@ export function createCompletionCard(opts) {
       onShare,
     }),
   );
-  ctas.appendChild(renderTryAnotherCta({ onActivate: onTryAnother }));
+  ctas.appendChild(
+    renderTryAnotherCta({
+      onActivate: onTryAnother,
+      // Pass-through from experience.discover_url — forks running the
+      // player on a non-platform domain set this on the experience
+      // response so Try Another lands users on a working discover
+      // surface instead of the fork's site root.
+      discoverUrl: /** @type {string | undefined} */ (experience?.discover_url),
+    }),
+  );
   // What's Next renders null when there's no creator slug + no override
   // — skip the appendChild so the row stays centered with 2 buttons.
   const whatsNext = renderWhatsNextCta({ experience, onActivate: onWhatsNext });
@@ -119,14 +134,38 @@ export function createCompletionCard(opts) {
   // Trigger entry animation on next frame so styles take hold first.
   requestAnimationFrame(() => root.classList.add('hwes-completion--in'));
 
+  // Listen for Escape key from Step 10 keyboard interactions — gives
+  // kbd-only users a way out of the dialog (a11y). Default Escape
+  // behavior: navigate to the Try Another destination (the
+  // platform's discover surface or fork's discoverUrl override).
+  /** @type {EventListener} */
+  const onEscape = () => {
+    const tryAnotherBtn = /** @type {HTMLButtonElement | null} */ (
+      root.querySelector('.hwes-completion__cta--try-another')
+    );
+    tryAnotherBtn?.click();
+  };
+  document.addEventListener('hwes:close-completion', onEscape);
+
   return {
     root,
-    teardown() {
+    /**
+     * Teardown returns a Promise that resolves AFTER the 600ms CSS
+     * leave transition completes + the DOM node is removed. Callers
+     * that need to remount a fresh card on `experience:ended` re-fire
+     * (e.g. browser history nav back+forward, or the future Step 14
+     * replay path) MUST await this before re-mounting; otherwise the
+     * old + new cards stack for ~600ms and the leaving class stays on
+     * the previous node. P1 from FE arch review of 3d675a6.
+     *
+     * @returns {Promise<void>}
+     */
+    async teardown() {
+      document.removeEventListener('hwes:close-completion', onEscape);
       root.classList.remove('hwes-completion--in');
       root.classList.add('hwes-completion--leaving');
-      // Allow the CSS leave transition to complete before yanking the
-      // node so the unmount reads as a fade rather than a cut.
-      setTimeout(() => root.remove(), 600);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      root.remove();
     },
   };
 }
@@ -159,14 +198,24 @@ function collectCovers(items, experience) {
 
 /**
  * Build the "by {creator}" line if creator info is available on the
- * experience. Falls back to actor name → null. Production HWES uses
- * `creator_name`; cleaner fixtures use `creator.display_name`.
+ * experience. Resolution order (most-specific-first):
+ *   1. `profile_name` — production wire (joined from `users.name` per
+ *      `harmonic-wave-api-platform/src/routes/mcp/user-tools.ts:60-63`).
+ *      The actual field that ships in production responses.
+ *   2. `creator_name` — alias supported by cleaner test fixtures.
+ *   3. nested `creator.display_name` / `creator.name`
+ *   4. `profile.name`
+ *   5. fallback to actor name
+ *
+ * Without (1) the byline silently failed in production for every
+ * experience prior to the post-Step-12 P0 fix.
  *
  * @param {any} experience
  * @returns {string | null}
  */
 function resolveCreatorLine(experience) {
   const candidates = [
+    experience?.profile_name,
     experience?.creator_name,
     experience?.creator?.display_name,
     experience?.creator?.name,

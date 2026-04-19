@@ -61,7 +61,29 @@ function installSpeechStub() {
 }
 
 describe('composition/narration-pipeline — text resolution', () => {
-  test('intro: prefers item.intro_hint', () => {
+  test('intro: prefers item.item_script (production wire shape)', () => {
+    expect(
+      resolveNarrationText({
+        item: {
+          item_script: 'DJ Layla here. This next one is special.',
+          intro_hint: 'fixture-only field',
+          content_title: 'X',
+        },
+        phase: 'intro',
+      }),
+    ).toBe('DJ Layla here. This next one is special.');
+  });
+
+  test('intro: falls back to item.script (alternate production alias)', () => {
+    expect(
+      resolveNarrationText({
+        item: { script: 'Authored on the experience_items row.', content_title: 'X' },
+        phase: 'intro',
+      }),
+    ).toBe('Authored on the experience_items row.');
+  });
+
+  test('intro: falls back to item.intro_hint', () => {
     expect(
       resolveNarrationText({
         item: { intro_hint: 'Welcome to the show.', content_title: 'Holding On' },

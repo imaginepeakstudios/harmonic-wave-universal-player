@@ -36,7 +36,17 @@ describe('end-of-experience/completion-card — helpers', () => {
     expect(collectCovers(undefined, {})).toEqual([]);
   });
 
-  test('resolveCreatorLine: prefers creator_name', () => {
+  test('resolveCreatorLine: prefers profile_name (production wire shape)', () => {
+    expect(resolveCreatorLine({ profile_name: 'Matthew Hartley' })).toBe('by Matthew Hartley');
+  });
+
+  test('resolveCreatorLine: production profile_name beats fixture creator_name', () => {
+    expect(resolveCreatorLine({ profile_name: 'Production Name', creator_name: 'Test Name' })).toBe(
+      'by Production Name',
+    );
+  });
+
+  test('resolveCreatorLine: falls back to creator_name when no profile_name', () => {
     expect(resolveCreatorLine({ creator_name: 'Matthew Hartley' })).toBe('by Matthew Hartley');
   });
 

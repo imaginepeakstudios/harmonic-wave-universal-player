@@ -46,6 +46,11 @@ const FILTER_START_HZ = 150;
 const FILTER_END_HZ = 2400;
 const BELL_ROOT_HZ = 440; // A4
 
+// Brown-noise buffer cache. The bumper plays once per page load on the
+// shared singleton AudioContext, so the cache lookup hits zero times
+// in production. Kept for forward-compat: forks that re-trigger the
+// bumper (e.g. between-program idents) reuse the buffer instead of
+// regenerating the 96k random samples.
 /** @type {WeakMap<AudioContext, AudioBuffer>} */
 const NOISE_CACHE = new WeakMap();
 

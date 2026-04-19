@@ -46,7 +46,12 @@ const ARROW_DEBOUNCE_MS = 250;
  * @returns {KeyboardInteractions}
  */
 export function createKeyboardInteractions(callbacks) {
-  let lastArrowTs = 0;
+  // Per-direction debounce timestamps so pressing Right then Left
+  // within the debounce window doesn't eat the Left press. Prior
+  // shared `lastArrowTs` ate "skip → back" navigation. P1 from FE
+  // arch review of 3d675a6.
+  let lastArrowLeftTs = 0;
+  let lastArrowRightTs = 0;
 
   /**
    * @param {KeyboardEvent} event
@@ -67,16 +72,16 @@ export function createKeyboardInteractions(callbacks) {
         break;
       case 'ArrowLeft': {
         const now = Date.now();
-        if (now - lastArrowTs < ARROW_DEBOUNCE_MS) return;
-        lastArrowTs = now;
+        if (now - lastArrowLeftTs < ARROW_DEBOUNCE_MS) return;
+        lastArrowLeftTs = now;
         event.preventDefault();
         callbacks.onPrevious?.();
         break;
       }
       case 'ArrowRight': {
         const now = Date.now();
-        if (now - lastArrowTs < ARROW_DEBOUNCE_MS) return;
-        lastArrowTs = now;
+        if (now - lastArrowRightTs < ARROW_DEBOUNCE_MS) return;
+        lastArrowRightTs = now;
         event.preventDefault();
         callbacks.onNext?.();
         break;
@@ -85,8 +90,17 @@ export function createKeyboardInteractions(callbacks) {
       case 'N':
         callbacks.onSkipNarration?.();
         break;
-      // Escape, Enter, etc. intentionally not bound — they belong to
-      // the chrome (e.g., closing a modal) which we don't have yet.
+      case 'Escape':
+      case 'Esc': // older browsers
+        // Esc closes the end-of-experience completion card if mounted
+        // (a11y — kbd-only users need a way out of the dialog). The
+        // card itself doesn't intercept; we dispatch a custom event
+        // it can listen for.
+        if (document.querySelector('.hwes-completion')) {
+          event.preventDefault();
+          document.dispatchEvent(new CustomEvent('hwes:close-completion'));
+        }
+        break;
       default:
         break;
     }

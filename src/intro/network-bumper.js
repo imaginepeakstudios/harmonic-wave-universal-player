@@ -106,8 +106,14 @@ function buildLogoWaveform(container) {
  */
 export function createNetworkBumper({ mount, audioPipeline, options = {} }) {
   const logoUrl = options.logoUrl ?? DEFAULT_LOGO_URL;
-  const silent = options.silent === true || audioPipeline.kind === 'mobile';
   const skipEntirely = options.skip === true;
+  // Bumper plays its SFX even on mobile (P1 from FE review of 3d675a6)
+  // — the production gesture chain (harmonicwave.ai/p/:token landing
+  // → /run/:token click) DOES grant AudioContext audibility on iOS.
+  // Bumper is a one-shot pre-experience so the music-bed coexistence
+  // trap (IMPLEMENTATION-GUIDE §3.3) doesn't apply yet. Caller can
+  // still force silence via opts.silent.
+  const silent = options.silent === true;
 
   const root = document.createElement('div');
   root.className = 'hwes-network-bumper';
@@ -140,6 +146,8 @@ export function createNetworkBumper({ mount, audioPipeline, options = {} }) {
   let endTimer = null;
   /** @type {ReturnType<typeof setTimeout> | null} */
   let fadeOutTimer = null;
+  /** @type {AudioContext | null} */
+  let bumperOwnedCtx = null;
   let resolved = false;
 
   function complete() {
@@ -190,23 +198,35 @@ export function createNetworkBumper({ mount, audioPipeline, options = {} }) {
           root.classList.add('hwes-network-bumper--in');
         });
         if (!silent) {
-          const ctx = audioPipeline.getAudioContext();
+          // Try the pipeline's context first. On mobile (where the
+          // pipeline is the no-op shim and getAudioContext returns
+          // null) fall back to a one-shot AudioContext owned by the
+          // bumper — released in teardown when the SFX completes.
+          // The music-bed coexistence trap (IMPLEMENTATION-GUIDE §3.3)
+          // doesn't apply at boot because no bed has started yet.
+          let ctx = audioPipeline.getAudioContext();
+          if (!ctx) {
+            /** @type {any} */
+            const C = globalThis.AudioContext || /** @type {any} */ (globalThis).webkitAudioContext;
+            if (C) {
+              try {
+                bumperOwnedCtx = /** @type {AudioContext} */ (new C());
+                ctx = bumperOwnedCtx;
+              } catch {
+                ctx = null;
+              }
+            }
+          }
           if (ctx) {
-            // Try to resume the AudioContext if the browser parked it
-            // in 'suspended'. Browser autoplay policy may still block
-            // — e.g. first-visit-without-engagement on Safari. In that
-            // case the visual still plays but the SFX is silent.
+            // Resume if the browser parked it in 'suspended'. May reject
+            // on first-visit-without-engagement; then the visual plays
+            // silently. The production gesture chain (landing-page
+            // click → /run/:token nav) usually grants audibility.
             const tryResume =
-              ctx.state === 'suspended'
-                ? ctx.resume().catch(() => {
-                    /* swallow — bumper visual continues regardless */
-                  })
-                : Promise.resolve();
+              ctx.state === 'suspended' ? ctx.resume().catch(() => {}) : Promise.resolve();
+            const audibleCtx = ctx;
             tryResume.then(() => {
-              playNetworkBumperSfx(ctx, ctx.destination).catch((err) => {
-                // eslint-disable-next-line no-console
-                console.warn('[hwes/bumper] SFX failed:', err);
-              });
+              playNetworkBumperSfx(audibleCtx, audibleCtx.destination);
             });
           }
         }
@@ -221,6 +241,17 @@ export function createNetworkBumper({ mount, audioPipeline, options = {} }) {
       if (fadeOutTimer != null) {
         clearTimeout(fadeOutTimer);
         fadeOutTimer = null;
+      }
+      // Close the bumper-owned mobile fallback AudioContext (if any)
+      // so it doesn't leak past the bumper. The desktop pipeline's
+      // shared context is NOT owned by the bumper and is left alone.
+      if (bumperOwnedCtx) {
+        try {
+          bumperOwnedCtx.close();
+        } catch {
+          /* may already be closed */
+        }
+        bumperOwnedCtx = null;
       }
       root.remove();
     },

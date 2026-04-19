@@ -193,6 +193,14 @@ globalThis.addEventListener?.('pagehide', onPageHide);
 // Run the pipeline. Wrapped in an async IIFE so top-level await isn't
 // required and the surrounding script keeps its synchronous side effects
 // (registry counts, debug global) ordered before the awaits.
+// Bumper handle hoisted to module scope so the catch path below can
+// teardown the bumper if loadHwesResponse / interpret rejects mid-
+// playback. Without this, setError() replaceChildren()s the bumper
+// out of the DOM but the SFX continues + endTimer/fadeOutTimer keep
+// firing on a detached node (P0 from FE arch review of 3d675a6).
+/** @type {ReturnType<typeof createNetworkBumper> | null} */
+let activeBumper = null;
+
 (async () => {
   try {
     // Network Station ID Bumper IS the loading state — no separate
@@ -211,12 +219,12 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     const bumperDone = (async () => {
       if (bumperDisabled) return;
       bumperPipeline.ensureAudioContext?.();
-      const bumper = createNetworkBumper({ mount: app, audioPipeline: bumperPipeline });
+      activeBumper = createNetworkBumper({ mount: app, audioPipeline: bumperPipeline });
       // bumper.play() resolves the moment the bumper enters its leaving
       // state — boot.js mounts the experience underneath WHILE the
       // bumper continues to fade out (CSS opacity transition + auto-
       // teardown when the fade completes). No explicit teardown here.
-      await bumper.play();
+      await activeBumper.play();
     })();
 
     const raw = await loadHwesResponse({ fixtureName });
@@ -284,6 +292,16 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     // — useful for demos. Without the flag, only items with
     // intro_hint / tts_intro_text get narration.
     const narrateAuto = params.get('narrate') === 'auto';
+
+    // Hoisted bindings — `teardownActive` (assigned below) is an arrow
+    // that captures these in its closure. If pagehide / `__hwes.dispose`
+    // fires DURING the await window between this point and the later
+    // assignment of `narration` at the bottom of boot, accessing the
+    // unbound `let` would throw a TDZ ReferenceError. Declared as
+    // `null` up here + reassigned later. P1 from FE arch review of
+    // 3d675a6.
+    /** @type {ReturnType<typeof createNarrationPipeline> | null} */
+    let narration = null;
 
     // Module-scope playing flag — kept in lockstep with whatever the
     // currently-mounted controls show. Read by the keyboard space-bar
@@ -633,7 +651,10 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     // leak the bootstrap audio element + race renderer.done).
     // Narration pipeline (Step 11) — mounted at boot scope so it
     // survives across mountItem. Subscribes to narration:skip itself.
-    const narration = createNarrationPipeline({
+    // Reassigning the hoisted `narration` binding (declared `null` at
+    // the top to avoid TDZ in teardownActive's closure if pagehide
+    // fires during the await window).
+    narration = createNarrationPipeline({
       audioPipeline,
       stateMachine,
       mount: app,
@@ -684,15 +705,21 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       if (activeSet?.behavior?.content_advance !== 'auto') return;
       stateMachine.next();
     });
-    /** @type {{ teardown: () => void } | null} */
+    /** @type {{ teardown: () => Promise<void> } | null} */
     let completionCard = null;
-    stateMachine.on('experience:ended', () => {
+    stateMachine.on('experience:ended', async () => {
       // eslint-disable-next-line no-console
       console.info('[hwes/boot] experience:ended');
       // Step 12: mount the completion card on top of the last layer-set
       // (which stays underneath as the visual fade target). 3 retention
       // CTAs: Share / Try Another / What's Next from this creator.
-      if (completionCard) completionCard.teardown();
+      // Await any prior card's teardown (returns Promise after 600ms
+      // CSS fade) before re-mounting so successive experience:ended
+      // fires don't stack two cards for the duration of the fade.
+      if (completionCard) {
+        await completionCard.teardown();
+        completionCard = null;
+      }
       completionCard = createCompletionCard({
         mount: app,
         experience: view.experience,
@@ -735,6 +762,20 @@ globalThis.addEventListener?.('pagehide', onPageHide);
   } catch (err) {
     // Any uncaught failure — network, malformed JSON, hwes_version
     // mismatch — surfaces as a visible error state. Don't swallow.
+    // Teardown the bumper FIRST so the SFX stops + timers clear before
+    // setError replaces the DOM (P0 from FE arch review of 3d675a6 —
+    // without this, the SFX continues playing through ctx.destination
+    // over the rendered error message + the fadeOutTimer fires on a
+    // detached node).
+    const bumperToTeardown = /** @type {{ teardown: () => void } | null} */ (activeBumper);
+    if (bumperToTeardown) {
+      try {
+        bumperToTeardown.teardown();
+      } catch {
+        /* defensive */
+      }
+      activeBumper = null;
+    }
     setError(err);
     // eslint-disable-next-line no-console
     console.error('[Harmonic Wave Universal Player] Boot failed:', err);

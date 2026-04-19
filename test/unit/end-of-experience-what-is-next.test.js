@@ -5,7 +5,17 @@ import {
 } from '../../src/end-of-experience/what-is-next.js';
 
 describe('end-of-experience/what-is-next — slug resolution', () => {
-  test('prefers experience.creator_slug', () => {
+  test('prefers experience.profile_slug (production wire shape)', () => {
+    expect(resolveCreatorSlug({ profile_slug: 'matthew-hartley' })).toBe('matthew-hartley');
+  });
+
+  test('production profile_slug beats fixture creator_slug', () => {
+    expect(resolveCreatorSlug({ profile_slug: 'production', creator_slug: 'fixture' })).toBe(
+      'production',
+    );
+  });
+
+  test('falls back to creator_slug when no profile_slug', () => {
     expect(resolveCreatorSlug({ creator_slug: 'matthew-hartley' })).toBe('matthew-hartley');
   });
 

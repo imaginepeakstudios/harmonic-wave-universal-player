@@ -89,21 +89,21 @@ export function createNarrationPipeline(opts) {
   const { audioPipeline, stateMachine, mount, allowDefaultNarration = false } = opts;
   const bridge = createTtsBridge();
 
-  /** @type {HTMLElement | null} */
-  let activeOverlay = null;
   /** @type {((value?: any) => void) | null} */
   let activeSkipResolver = null;
 
   // Subscribe to skip requests from the state machine (keyboard 'N',
   // chrome's future skip-narration button). Cancels the active TTS +
   // resolves the speakForItem promise so the pipeline advances past
-  // the narration immediately.
+  // the narration immediately. Passes `true` to the resolver so
+  // speakForItem knows to bypass the post-narration pause (P1 from
+  // FE review of 3d675a6 — skip should advance NOW).
   const unsubSkip = stateMachine.on('narration:skip', () => {
     bridge.cancel();
     if (activeSkipResolver) {
       const r = activeSkipResolver;
       activeSkipResolver = null;
-      r();
+      r(true);
     }
   });
 
@@ -183,7 +183,14 @@ export function createNarrationPipeline(opts) {
       const voiceName = actor?.voice_name ?? actor?.name ?? undefined;
       const overlay = mountOverlay(text);
 
-      // Duck the music bed (desktop only — mobile is a no-op).
+      // Duck the music bed. Despite the "duck" name, this is a
+      // ONE-WAY ramp-to-zero per `synthesized-provider.js:duck()` —
+      // there's no automatic re-rampup after narration ends. By design:
+      // the broadcast pattern is "bed plays under the host's intro,
+      // then drops out so the listener moves into the program clean."
+      // If a future product decision wants the bed to swell back, add
+      // a `restoreMusicBed()` call here after the speak/finally.
+      // (Desktop only — mobile pipeline's duck is a no-op.)
       audioPipeline.duckMusicBed();
 
       // Wire the TTS bridge boundary events to the overlay highlight.
@@ -191,11 +198,24 @@ export function createNarrationPipeline(opts) {
         overlay.setHighlight(event.charStart, event.charEnd);
       });
 
+      // Track whether the speech ended via natural completion or via
+      // user skip. The skip flow (narration:skip event) bypasses the
+      // post-narration pause — user pressed N to advance NOW, making
+      // them wait `pause_after_narration_seconds` after defies intent.
+      // P1 from FE arch review of 3d675a6.
+      let wasSkipped = false;
+
       // Speak. Skip flow (state machine 'narration:skip' event) cancels
       // the bridge AND resolves this promise via activeSkipResolver.
       try {
-        await new Promise((resolve, reject) => {
-          activeSkipResolver = resolve;
+        await new Promise((resolve) => {
+          // Wrap the resolver so we can mark wasSkipped if the skip
+          // path was the trigger. Natural .then/.catch from the bridge
+          // bypass this wrapper and leave wasSkipped false.
+          activeSkipResolver = (skipFlag) => {
+            if (skipFlag === true) wasSkipped = true;
+            resolve(undefined);
+          };
           bridge
             .speak({ text, audioUrl, voiceName, rate: 0.95 })
             .then(() => {
@@ -213,14 +233,17 @@ export function createNarrationPipeline(opts) {
       } finally {
         unsubBoundary();
         overlay.teardown();
-        // Honor pause_after_narration_seconds before resolving so the
-        // beat between narration and content lands as authored.
-        const pauseSec = /** @type {number} */ (
-          /** @type {any} */ (behavior).pause_after_narration_seconds ??
-            PAUSE_AFTER_NARRATION_DEFAULT_S
-        );
-        if (pauseSec > 0) {
-          await new Promise((r) => setTimeout(r, pauseSec * 1000));
+        // Honor pause_after_narration_seconds before resolving — but
+        // skip the pause if the user explicitly skipped (they want to
+        // advance NOW, not wait the post-narration beat).
+        if (!wasSkipped) {
+          const pauseSec = /** @type {number} */ (
+            /** @type {any} */ (behavior).pause_after_narration_seconds ??
+              PAUSE_AFTER_NARRATION_DEFAULT_S
+          );
+          if (pauseSec > 0) {
+            await new Promise((r) => setTimeout(r, pauseSec * 1000));
+          }
         }
       }
     },
@@ -229,14 +252,12 @@ export function createNarrationPipeline(opts) {
       if (activeSkipResolver) {
         const r = activeSkipResolver;
         activeSkipResolver = null;
-        r();
+        r(true); // mark as skip so speakForItem bypasses post-narration pause
       }
     },
     teardown() {
       unsubSkip();
       bridge.teardown();
-      if (activeOverlay) activeOverlay.remove();
-      activeOverlay = null;
     },
   };
 }
@@ -247,10 +268,16 @@ export function createNarrationPipeline(opts) {
  */
 function resolveNarrationText(opts) {
   const { item, phase, allowDefault = false } = opts;
-  // Per-item authored intro/outro fields. Field name varies between
-  // production wire shape and clean fixtures — try both.
+  // Per-item authored intro/outro fields. Production wire shape (per
+  // `harmonic-wave-api-platform/src/routes/mcp/user-tools.ts:136`)
+  // attaches authored narration on `experience_items` as `script`, then
+  // SELECTed AS `item_script`. Cleaner fixtures may use the shorter
+  // `intro_hint` alias from the content table. Try the production
+  // fields FIRST so authored creator narration wins.
   if (phase === 'intro' || phase === 'between') {
     const candidates = [
+      item?.item_script,
+      item?.script,
       item?.intro_hint,
       item?.content_metadata?.intro_hint,
       item?.tts_intro_text,
@@ -268,7 +295,11 @@ function resolveNarrationText(opts) {
     return null;
   }
   if (phase === 'outro') {
-    const candidates = [item?.outro_hint, item?.content_metadata?.outro_hint];
+    const candidates = [
+      item?.outro_hint,
+      item?.content_metadata?.outro_hint,
+      item?.item_outro_script,
+    ];
     for (const c of candidates) {
       if (typeof c === 'string' && c.trim().length > 0) return c.trim();
     }
