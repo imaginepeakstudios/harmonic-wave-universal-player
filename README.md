@@ -150,6 +150,27 @@ The Universal Player consumes the platform via **MCP only** — no privileged ba
 
 ---
 
+## Testing & conformance
+
+The full test suite ships with the engine — open source under the same Apache 2.0 license as the rest of the player. Three layers:
+
+| Layer | Path | What it covers |
+|---|---|---|
+| **Unit tests** | `test/unit/` | Per-module pure logic — recipe-engine, schema-interpreter, composition, palette-extractor, LRC parser, state-machine. Fast, headless, run on every commit. |
+| **Snapshot tests** | `test/snapshot/` | DOM output per renderer + canned input. Reviewers see exactly what a PR changes; regressions surface as snapshot diffs. |
+| **Conformance tests** ← **the spec validator** | `test/conformance/` | Canned HWES v1 payloads → expected resolved behavior (BehaviorConfig values, layer composition, cascade results, hwes_extensions handling). Any third-party player, fork, or AI-generated variant runs this suite to claim "HWES v1 conformant." |
+| **Registry drift gate** | `test/ci/registry-sync.test.js` | Fails when the local registry snapshot drifts from production `/hwes/v1/recipes.json` + `/primitives.json`. Forces snapshot updates to be intentional. |
+
+**Why the conformance suite is the most important part:**
+
+Browser engines have web-platform-tests. CSS has the CSS Working Group test suite. PDF readers have reference renders. **HWES needs the same — and the Universal Player's `test/conformance/` directory IS that suite.** Without it, "HWES v1 conformant" is just marketing.
+
+If you're building a fork, a white-label variant, a native iOS/Android port, or letting an AI generate a custom player from the HWES spec, point your implementation at `test/conformance/` and run it. Pass = conformant. The fixtures are deliberately small JSON documents (not platform-coupled) so any HTTP-capable runtime can execute them.
+
+See [`test/conformance/README.md`](test/conformance/README.md) for fixture format + how to add new conformance cases as the HWES v1 surface grows additively.
+
+---
+
 ## Contributing
 
 > *Contribution guidelines land when the engine reaches a stable shape worth contributing to. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for early guidance.*
@@ -158,6 +179,7 @@ We welcome:
 
 - **Issues** for bugs, design questions, or HWES v1 conformance edge cases
 - **Pull requests** for engine improvements, new built-in display recipes (after design discussion), bug fixes, documentation
+- **Test contributions** — especially conformance fixtures that exercise edge cases the existing suite misses (ambiguous cascade resolution, unusual recipe combinations, plan-tier degradation, malformed-but-recoverable HWES payloads)
 - **Forks** for white-label variants, native client experiments, AI-generated variants
 
 We do NOT accept:

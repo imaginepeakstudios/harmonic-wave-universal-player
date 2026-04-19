@@ -113,12 +113,25 @@ Initial conventions:
 
 PRs should include tests where applicable:
 
-- New engine logic → unit test in `test/unit/`
-- New renderer → snapshot test in `test/snapshot/renderers/`
-- New recipe → snapshot test of rendered output
-- New behavior across multiple modules → integration test in `test/integration/`
+- **New engine logic** → unit test in `test/unit/`
+- **New renderer** → snapshot test in `test/snapshot/renderers/`
+- **New recipe** → snapshot test of rendered output
+- **New behavior across multiple modules** → integration test in `test/integration/`
+- **New HWES v1 conformance edge case** → fixture pair in `test/conformance/fixtures/` + `test/conformance/expected/` ← see [`test/conformance/README.md`](test/conformance/README.md)
 
-The recipe-registry has a snapshot test that fails on any unintended definition edit. If your PR legitimately needs to update that snapshot, include the rationale + versioning plan in the PR description.
+The recipe-registry snapshot under `src/registry-snapshot/` has a CI gate (`test/ci/registry-sync.test.js`) that fails when it drifts from the live `https://harmonicwave.ai/hwes/v1/recipes.json` endpoint. Update it via `scripts/sync-registry.sh` and commit the result — the gate is there to make sure the snapshot bump is intentional, not silent.
+
+### Conformance fixtures are first-class contributions
+
+The `test/conformance/` suite is the spec validator — what makes "HWES v1 conformant" mean something concrete. We especially welcome PRs that add fixtures exercising:
+
+- Cascade edge cases (display + delivery + actor cascades interacting in unexpected ways)
+- Plan-tier degradation (Free vs. Pro+ response shape differences)
+- Unusual recipe combinations (multiple display recipes unioning, conflicting directives)
+- Malformed-but-recoverable HWES payloads (graceful degradation paths)
+- New built-in display recipe behavior verification
+
+A conformance fixture is a JSON file plus an expected-output JSON file. No engine code required to contribute one. See the conformance suite README for the format.
 
 ---
 

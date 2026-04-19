@@ -9,6 +9,10 @@
     "sync-registry": "scripts/sync-registry.sh",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:unit": "vitest run test/unit",
+    "test:snapshot": "vitest run test/snapshot",
+    "test:conformance": "vitest run test/conformance",
+    "test:ci": "vitest run test/ci",
     "dev": "python3 -m http.server 8080 --directory src",
     "ci:registry-drift": "vitest run test/ci/registry-sync.test.js"
   },
