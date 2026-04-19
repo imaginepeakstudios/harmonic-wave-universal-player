@@ -1,0 +1,20 @@
+{
+  "_comment": "Cascade-interaction fixture: locks the SPEC §13 decision #30 ordering at the conformance level (not just unit-test). Display recipe `cinematic_fullscreen` sets prominence:hero, sizing:fullscreen, chrome:none, autoplay:muted. Delivery recipe `story_then_play` sets narration_position:before_content, pause_after_narration_seconds:1, audio_ducking_db:-6 (already -6 by default but recipe-stamped). NO conflict on any primitive — display covers visual, delivery covers narration timing — so both fully apply. The fixture proves both arrays are walked and merged in the documented order. (A future conflict-fixture would set chrome on both to verify delivery wins.)",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 11,
+  "slug": "cascade-display-and-delivery",
+  "name": "Cascade Interaction Conformance Fixture",
+  "description": "Display + delivery recipe stack on the same item.",
+  "items": [
+    {
+      "item_id": 1101,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Cascade Interaction Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["cinematic_fullscreen"],
+      "delivery_instructions": ["story_then_play"]
+    }
+  ]
+}

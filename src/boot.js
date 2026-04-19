@@ -75,6 +75,18 @@ if (!app) {
 const params = new URLSearchParams(globalThis.location?.search || '');
 const fixtureName = params.get('fixture');
 
+// Local-dev gate — used by both setError (to surface stack traces in
+// dev) and the __hwes global (to never expose internals on production).
+// Same logic as Step 3: localhost / file:// / explicit ?debug.
+const isLocalDev = (() => {
+  const host = globalThis.location?.hostname || '';
+  const proto = globalThis.location?.protocol || '';
+  if (proto === 'file:') return true;
+  if (host === 'localhost' || host === '127.0.0.1') return true;
+  if (params.has('debug')) return true;
+  return false;
+})();
+
 /**
  * Top-level dispose chain. Boot's module-scope captures the active
  * renderer + shell so SPA-style unmounts (or programmatic teardown via
@@ -91,13 +103,21 @@ const fixtureName = params.get('fixture');
  * functions to these module-scope hooks. dispose() is also wired to
  * pagehide (more reliable than beforeunload on mobile + bfcache) so a
  * normal navigation away releases resources without host code.
+ *
+ * Per FE arch re-review (d8d2352): dispose() ALSO removes its own
+ * pagehide listener. An SPA host that mounts → unmounts → remounts
+ * the player would otherwise accumulate one pagehide listener per
+ * remount cycle. The returned teardown handle (and the auto-detach
+ * inside dispose itself) keeps the listener set bounded.
  */
 let teardownActive = () => {};
+const onPageHide = () => dispose();
 function dispose() {
   teardownActive();
   teardownActive = () => {}; // idempotent — second dispose() is a no-op
+  globalThis.removeEventListener?.('pagehide', onPageHide);
 }
-globalThis.addEventListener?.('pagehide', dispose);
+globalThis.addEventListener?.('pagehide', onPageHide);
 
 // Run the pipeline. Wrapped in an async IIFE so top-level await isn't
 // required and the surrounding script keeps its synchronous side effects
@@ -308,6 +328,34 @@ function setError(err) {
   const p = document.createElement('p');
   p.textContent = err?.message ?? String(err);
   wrap.append(h1, p);
+
+  // In local dev, surface the full stack inside a collapsed <details>
+  // so the developer doesn't have to bounce to the console for it. Per
+  // FE arch re-review (d8d2352): production users should never see a
+  // stack, but a Step-9 state-machine error firing in the wild needs
+  // the stack visible RIGHT WHERE the failure happens.
+  if (isLocalDev && err instanceof Error && err.stack) {
+    const details = document.createElement('details');
+    details.className = 'boot-error__stack';
+    details.style.marginTop = '24px';
+    details.style.maxWidth = '80ch';
+    details.style.textAlign = 'left';
+    const summary = document.createElement('summary');
+    summary.textContent = 'Stack trace (dev only)';
+    summary.style.cursor = 'pointer';
+    summary.style.color = 'var(--player-text-muted)';
+    const pre = document.createElement('pre');
+    pre.textContent = err.stack;
+    pre.style.fontSize = '0.75rem';
+    pre.style.lineHeight = '1.4';
+    pre.style.overflow = 'auto';
+    pre.style.padding = '12px';
+    pre.style.background = 'rgba(255, 255, 255, 0.03)';
+    pre.style.borderRadius = '8px';
+    details.append(summary, pre);
+    wrap.appendChild(details);
+  }
+
   app.appendChild(wrap);
 }
 
@@ -336,16 +384,7 @@ function createUnsupportedRenderer({ item, mount }) {
   };
 }
 
-// Debug-only globals — same gating as Step 3.
-const isLocalDev = (() => {
-  const host = globalThis.location?.hostname || '';
-  const proto = globalThis.location?.protocol || '';
-  if (proto === 'file:') return true;
-  if (host === 'localhost' || host === '127.0.0.1') return true;
-  if (params.has('debug')) return true;
-  return false;
-})();
-
+// Debug-only globals — gated by isLocalDev (defined near top of file).
 if (isLocalDev) {
   globalThis.__hwes = {
     config,

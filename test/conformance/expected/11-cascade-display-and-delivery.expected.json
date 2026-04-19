@@ -1,0 +1,33 @@
+{
+  "_comment": "cinematic_fullscreen (display): prominence=hero, sizing=fullscreen, chrome=none, autoplay=muted. story_then_play (delivery): narration_position=before_content (already default), pause_after_narration_seconds=1, audio_ducking_db=-6 (already default). chrome=none drops the chrome layer, so layers = [content] only. This expected payload is what the cascade order MUST produce; if it ever drifts, the engine's merge order is broken.",
+  "experience": {
+    "id": 11,
+    "slug": "cascade-display-and-delivery"
+  },
+  "hwes_extensions_honored": ["display_recipes_v1"],
+  "hwes_extensions_ignored": [],
+  "items": [
+    {
+      "item_id": 1101,
+      "resolved_behavior": {
+        "prominence": "hero",
+        "sizing": "fullscreen",
+        "chrome": "none",
+        "autoplay": "muted",
+        "loop": false,
+        "transition": "cut",
+        "lyrics_display": "none",
+        "doc_display": "none",
+        "expand_button": false,
+        "sequence_dwell_seconds": 5,
+        "pause_between_items_seconds": 0,
+        "content_advance": "auto",
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 1,
+        "audio_ducking_db": -6,
+        "narration_music_bed": "none"
+      },
+      "layers": ["content"]
+    }
+  ]
+}
