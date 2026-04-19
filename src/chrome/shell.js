@@ -111,13 +111,30 @@ export function createShell(opts) {
   // Auto-hide is disabled when chrome=none (no chrome to hide) or in
   // headless test envs (no document event registry of value).
   const IDLE_MS = 3_000;
+  // Throttle: pointermove fires hundreds of times/sec on desktop hover.
+  // Only do real work (DOM mutation + timer reset) once per ~250ms when
+  // the chrome is already visible — that's plenty for "still here, don't
+  // hide yet" intent. When chrome IS idle, every wake event runs in full
+  // so the unhide is instant. Per FE arch review of 14333c9 (P1 #4).
+  const WAKE_THROTTLE_MS = 250;
   /** @type {ReturnType<typeof setTimeout> | null} */
   let idleTimer = null;
+  let isIdle = false;
+  let lastWakeTs = 0;
   function scheduleIdle() {
     if (behavior.chrome === 'none') return;
-    root.classList.remove('hwes-shell--idle');
+    const now = Date.now();
+    if (!isIdle && now - lastWakeTs < WAKE_THROTTLE_MS) return;
+    lastWakeTs = now;
+    if (isIdle) {
+      root.classList.remove('hwes-shell--idle');
+      isIdle = false;
+    }
     if (idleTimer != null) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => root.classList.add('hwes-shell--idle'), IDLE_MS);
+    idleTimer = setTimeout(() => {
+      root.classList.add('hwes-shell--idle');
+      isIdle = true;
+    }, IDLE_MS);
   }
   /** @type {Array<[string, EventListener]>} */
   const wakeListeners = [

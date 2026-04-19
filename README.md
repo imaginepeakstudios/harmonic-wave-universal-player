@@ -4,7 +4,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-> **Status:** Pre-1.0 / engine implementation in progress (Steps 1-8 of 15 complete: registry snapshot, schema interpreter (incl. production wire-shape parsing), MCP client, recipe engine + BehaviorConfig, composition + 5 content renderers + chrome + theme + boot orchestrator with auto-advance via a uniform `done` Promise contract, visualizer canvas + palette extractor + waveform bars + amplitude provider abstraction (Step 9 wires real FFT), 3 lyric overlay variants + LRC parser + doc-excerpt overlay, banner-static + banner-animated scene renderers. The engine boots, fetches an HWES response from one of three sources, resolves per-item BehaviorConfig, picks layers (scene → content → overlay → chrome → narration), and mounts the right renderers in z-order. Steps 9-12 add the state machine + audio pipeline (which plugs the real AnalyserNode into the visualizer), narration with browser-TTS-default, interactions, and end-of-experience). **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.74, 2026-04-19) — the data contract this engine builds against is now stable, and the MCP endpoint is reachable cross-origin from any host. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
+> **Status:** Pre-1.0 / engine implementation in progress (Steps 1-8 of 15 complete: registry snapshot, schema interpreter (incl. production wire-shape parsing), MCP client, recipe engine + BehaviorConfig, composition + 5 content renderers + chrome + theme + boot orchestrator with auto-advance via a uniform `done` Promise contract, visualizer canvas + palette extractor + waveform bars + amplitude provider abstraction (Step 9 wires real FFT), 3 lyric overlay variants + LRC parser + generic text-overlay (broadcast-chyron pattern), banner-static + banner-animated scene renderers. The engine boots, fetches an HWES response from one of three sources, resolves per-item BehaviorConfig, picks layers (scene → content → overlay → chrome → narration), and mounts the right renderers in z-order. Steps 9-12 add the state machine + audio pipeline (which plugs the real AnalyserNode into the visualizer), narration with browser-TTS-default, interactions, and end-of-experience). **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.74, 2026-04-19) — the data contract this engine builds against is now stable, and the MCP endpoint is reachable cross-origin from any host. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
 
 ### Foundational positioning
 
@@ -62,7 +62,7 @@ The engine ships as vanilla ES modules — no bundler required. What works today
 git clone https://github.com/imaginepeakstudios/harmonic-wave-universal-player.git
 cd harmonic-wave-universal-player
 bun install         # installs vitest + happy-dom + prettier + typescript (devDeps only — engine has zero runtime deps)
-bun run test        # 304 tests — should be green
+bun run test        # 312 tests — should be green
 bun run typecheck   # tsc --checkJs --noEmit on src/
 bun run dev         # python3 -m http.server 8080 --directory src
 # Open http://localhost:8080/?fixture=01-bare-audio&debug=1
@@ -102,8 +102,8 @@ harmonic-wave-universal-player/
 │   ├── composition/               ← Layering — decides which layers to render per item
 │   ├── renderers/                 ← Presentation per layer + content type
 │   │   ├── content/               (audio, video, image, document, sound-effect — all 5 shipping)
-│   │   ├── overlay/               ← (Step 8) lyrics-scrolling, lyrics-spotlight, doc-excerpt
-│   │   ├── scene/                 ← (Step 8) banner-static, banner-animated
+│   │   ├── overlay/               ← lyrics-scrolling, lyrics-spotlight, lyrics-typewriter, text-overlay (chyron)
+│   │   ├── scene/                 ← banner-static, banner-animated
 │   │   └── narration/             ← (Step 11) tts-bridge, word-sync
 │   ├── chrome/                    ← Page shell + Play/Skip controls
 │   ├── theme/                     ← CSS custom properties from player_theme

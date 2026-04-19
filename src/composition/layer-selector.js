@@ -165,17 +165,14 @@ export const LAYER_RULES = [
       return typeof ot === 'string' && ot.length > 0;
     },
   },
-  // Waveform-bars FFT overlay — activates when a future recipe sets
-  // behavior.waveform_overlay (a primitive that doesn't exist in
-  // primitives.json today; reserved for Step 9's audio-pipeline wiring
-  // when the AnalyserNode actually feeds the bars). Today the rule is
-  // present so the renderer registry is reachable + the activation
-  // criterion is documented in version control.
-  {
-    layer: 'overlay',
-    renderer: 'waveform-bars',
-    when: (_item, behavior) => /** @type {any} */ (behavior).waveform_overlay === true,
-  },
+  // (Earlier shape had a `waveform-bars` overlay rule keyed off
+  // `behavior.waveform_overlay`. Removed per FE arch review of 14333c9
+  // (P0 #2): no `waveform_overlay` primitive exists in primitives.json,
+  // so mergeBehavior would drop any recipe trying to set it — the rule
+  // could never activate. The waveform-bars renderer is now mounted by
+  // the visualizer scene wrapper alongside the canvas, NOT via an
+  // overlay rule. When Step 9 wires the AnalyserNode, both subsystems
+  // get a real amplitude provider via setAmplitudeProvider.)
 
   // CHROME — render unless behavior says hide it entirely. 'minimal' and
   // 'full' both render the chrome layer; the chrome renderer reads

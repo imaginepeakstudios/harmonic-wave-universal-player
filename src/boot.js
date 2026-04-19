@@ -106,60 +106,58 @@ const SCENE_RENDERERS = {
 /**
  * Overlay-layer renderer factories. Signature: `({ item, behavior,
  * audioElement, mount }) → { root, teardown }`. Lyrics overlays need
- * the audio element's currentTime to drive their tick loop; doc-excerpt
+ * the audio element's currentTime to drive their tick loop; text-overlay
  * is purely textual and ignores audioElement.
+ *
+ * NOTE: waveform-bars is intentionally NOT here. It's mounted by the
+ * visualizer-canvas scene wrapper alongside the canvas — Step 9's
+ * AnalyserNode will feed both via setAmplitudeProvider. (Earlier
+ * shape had it as a standalone overlay rule keyed off a primitive
+ * that doesn't exist in primitives.json — FE arch review of 14333c9
+ * P0 #2.)
  */
 const OVERLAY_RENDERERS = {
   'lyrics-scrolling': createLyricsScrollingRenderer,
   'lyrics-spotlight': createLyricsSpotlightRenderer,
   'lyrics-typewriter': createLyricsTypewriterRenderer,
   'text-overlay': createTextOverlayRenderer,
-  'waveform-bars': createWaveformBarsOverlayRenderer,
 };
 
 /**
- * Waveform-bars overlay wrapper — adapts the visualizer/waveform-bars
- * factory (which returns a Visualizer-shaped { canvas, start, stop, ... })
- * into the OverlayRenderer shape ({ root, teardown }) that boot.js
- * expects. Step 9's audio pipeline will call setAmplitudeProvider on
- * the underlying instance to wire the AnalyserNode.
- *
- * @param {{ item: import('./schema/interpreter.js').ItemView, mount: HTMLElement }} opts
- */
-function createWaveformBarsOverlayRenderer({ mount }) {
-  const bars = createWaveformBars({ mount });
-  bars.start();
-  return {
-    root: bars.canvas,
-    teardown: () => bars.teardown(),
-  };
-}
-
-/**
  * Visualizer scene wrapper — extracts palette from cover art, mounts
- * the canvas, returns a SceneRenderer-shaped object. Step 9 will wire
- * the AmplitudeProvider to the audio pipeline's AnalyserNode; today
- * the default silence provider keeps the visualizer calm.
+ * the canvas, ALSO mounts a waveform-bars strip at the bottom (the
+ * combined visualizer subsystems mirror the POC's cinematic backdrop).
+ * Step 9 will wire the AmplitudeProvider to the audio pipeline's
+ * AnalyserNode; both subsystems get the same provider via
+ * setAmplitudeProvider, so the bars + canvas stay synchronized.
  *
  * @param {{ item: import('./schema/interpreter.js').ItemView, mount: HTMLElement }} opts
  */
 function createVisualizerSceneRenderer({ item, mount }) {
   const viz = createVisualizer({ mount });
-  // Async palette load — viz starts with the default palette + lerps
-  // when the extracted palette arrives. Cover failure → visualizer
-  // keeps rendering with the default palette (gracefully degraded).
+  const bars = createWaveformBars({ mount });
+  // Async palette load — viz + bars both start with the default palette,
+  // lerp/swap when the extracted palette arrives. Cover failure →
+  // visualizer keeps rendering with the default palette (graceful).
   const coverUrl =
     item?.cover_art_url ??
     /** @type {{ content_cover_art_url?: string }} */ (item)?.content_cover_art_url ??
     item?.content_metadata?.cover_art_url ??
     null;
   if (coverUrl) {
-    extractPalette(coverUrl).then((palette) => viz.setPalette(palette));
+    extractPalette(coverUrl).then((palette) => {
+      viz.setPalette(palette);
+      bars.setPalette(palette);
+    });
   }
   viz.start();
+  bars.start();
   return {
     root: viz.canvas,
-    teardown: () => viz.teardown(),
+    teardown: () => {
+      viz.teardown();
+      bars.teardown();
+    },
   };
 }
 
@@ -232,116 +230,112 @@ globalThis.addEventListener?.('pagehide', onPageHide);
 
     injectTheme(view.experience?.player_theme);
 
-    // Step 5 single-item path. State machine (Step 9) replaces this with
-    // a real sequential controller; the renderer factories already
-    // support teardown so the upgrade is mechanical.
+    // app needs to be a positioning context for absolute scene/overlay layers.
+    app.style.position = 'relative';
+
+    // -------------------------------------------------------------------
+    //  Layer-set handle + crossfade-capable mountItem
+    // -------------------------------------------------------------------
+    //  Per FE arch review of 14333c9: Step 9's "tune-between-channels"
+    //  cross-fade transitions need both the OLD layer-set and the NEW
+    //  layer-set mounted simultaneously during the transition window.
+    //  The pre-refactor mountItem did teardown-old → replaceChildren →
+    //  mount-new, with no slot for overlap. This refactor introduces a
+    //  LayerSetHandle: each item gets its own absolutely-positioned
+    //  wrapper element + its own renderer/shell/aux instances. mountItem
+    //  builds the new handle WITHOUT tearing the old down first; the
+    //  fade-in/out is driven by transition behavior + a CSS opacity
+    //  shift; old set is released after the transition completes.
+    //
+    //  For behavior.transition === 'cut' (default), there's no overlap
+    //  window — old is torn down immediately. For 'crossfade' /
+    //  'fade_through_black' we'd run the opacity ramp; today we wire the
+    //  shape but ALL transitions are cut for backward compatibility
+    //  with existing tests + browser smoke. Step 9 turns on the actual
+    //  crossfade animation by reading behavior.transition.
+    // -------------------------------------------------------------------
+
+    // Layer-set handle is just an inline-shape object: { wrap, renderer,
+    // shell, aux, teardown, behavior }. Each item in the experience gets
+    // its own handle so transitions can hold both old + new alive
+    // briefly. The wrap is the unit of opacity-cross-fade.
+    /** @type {any} */
+    let activeSet = null;
     let activeIndex = 0;
-    let activeRenderer = null;
-    let activeShell = null;
-    /** @type {Array<{ teardown: () => void }>} */
-    let activeAuxRenderers = []; // scene + overlay layers (Step 7-8)
 
-    function disposeAux() {
-      for (const aux of activeAuxRenderers) {
-        try {
-          aux.teardown();
-        } catch {
-          /* defensive — tearing down a partially-mounted aux must
-             never block the next mount */
-        }
-      }
-      activeAuxRenderers = [];
-    }
-
-    // Wire the module-scope dispose hook so __hwes.dispose() / pagehide
-    // tears down the active item cleanly.
     teardownActive = () => {
-      activeRenderer?.teardown();
-      activeShell?.teardown();
-      disposeAux();
-      activeRenderer = null;
-      activeShell = null;
+      activeSet?.teardown();
+      activeSet = null;
     };
 
-    function mountItem(index) {
-      activeRenderer?.teardown();
-      activeShell?.teardown();
-      disposeAux();
-      app.replaceChildren();
-      // app needs to be a positioning context for absolute scene/overlay layers.
-      app.style.position = 'relative';
+    /**
+     * Build a layer-set for one item — mounts scene + content + overlay +
+     * chrome into a wrapper that's positioned absolute inside #app. The
+     * wrapper is the unit of opacity-cross-fade between items.
+     */
+    function buildLayerSet(index) {
       const item = view.items[index];
       const { behavior } = resolveBehavior(view, item);
       const layers = composeItem(item, behavior);
 
-      // Mount in z-order: scene (back) → content → overlay → chrome.
-      // Each scene/overlay rule that activated gets its own mount slot
-      // appended to the app element directly so it sits behind/in-front
-      // of content with absolute positioning.
+      const wrap = document.createElement('div');
+      wrap.className = 'hwes-layer-set';
+      wrap.style.position = 'absolute';
+      wrap.style.inset = '0';
+      wrap.style.opacity = '1';
+      app.appendChild(wrap);
+
       const sceneLayers = layers.filter((l) => l.layer === 'scene');
       const overlayLayers = layers.filter((l) => l.layer === 'overlay');
       const shellLayer = layers.find((l) => l.layer === 'chrome');
       const contentLayer = layers.find((l) => l.layer === 'content');
 
-      // SCENE layers — mount first so they sit at the bottom of the
-      // z-stack. Each scene renderer creates its own absolutely-
-      // positioned root that fills the app.
+      /** @type {Array<{ teardown: () => void }>} */
+      const aux = [];
+
+      // SCENE layers — bottom of z-stack inside the wrap.
       for (const sl of sceneLayers) {
         const sceneFactory = SCENE_RENDERERS[sl.renderer];
         if (!sceneFactory) continue;
-        const aux = sceneFactory({ item, behavior, mount: app });
-        activeAuxRenderers.push(aux);
+        aux.push(sceneFactory({ item, behavior, mount: wrap }));
       }
 
-      let contentMount = app;
+      let shell = null;
+      /** @type {HTMLElement} */
+      let contentMount = wrap;
       if (shellLayer) {
-        activeShell = createShell({
-          mount: app,
+        shell = createShell({
+          mount: wrap,
           experience: view.experience,
           actor: view.getItemActor(item),
           behavior,
         });
-        contentMount = activeShell.getContentMount();
-        // Shell needs to sit ABOVE the absolutely-positioned scene
-        // layer; relative positioning with z-index does that.
-        activeShell.root.style.position = 'relative';
-        activeShell.root.style.zIndex = '1';
+        contentMount = shell.getContentMount();
+        shell.root.style.position = 'relative';
+        shell.root.style.zIndex = '1';
       }
 
-      // composeItem ALWAYS returns a content layer (selector-side
-      // invariant). Defensive fallback to 'unsupported' renderer if it
-      // ever doesn't, so the experience surfaces a card instead of
-      // crashing.
       const factory = RENDERERS[contentLayer?.renderer ?? 'unsupported'] ?? RENDERERS.unsupported;
-      activeRenderer = factory({ item, behavior, mount: contentMount });
+      const renderer = factory({ item, behavior, mount: contentMount });
 
-      // OVERLAY layers — mount AFTER content so they overlay on top.
-      // Lyrics overlays need the audio element from the content
-      // renderer's channel for currentTime sync.
-      const audioEl = activeRenderer?.channel?.element ?? null;
-      const overlayMount = contentMount; // overlays mount inside chrome's content slot
+      const audioEl = renderer?.channel?.element ?? null;
       for (const ol of overlayLayers) {
         const overlayFactory = OVERLAY_RENDERERS[ol.renderer];
         if (!overlayFactory) continue;
-        const aux = overlayFactory({ item, behavior, audioElement: audioEl, mount: overlayMount });
-        activeAuxRenderers.push(aux);
+        aux.push(overlayFactory({ item, behavior, audioElement: audioEl, mount: contentMount }));
       }
 
-      // attachControls returns the Controls instance — drive setNowPlaying
-      // / setPlayingState through its public API, not via DOM querySelector.
-      // Step 9's state machine subscribes to the same surface (e.g.
-      // stateMachine.on('item:started', ({ item }) => controls.setNowPlaying(...))).
-      const controls = activeShell?.attachControls({
+      const controls = shell?.attachControls({
         onPlay: () => {
-          activeRenderer.start?.();
+          renderer.start?.();
           controls?.setPlayingState(true);
         },
         onPause: () => {
-          activeRenderer.pause?.();
+          renderer.pause?.();
           controls?.setPlayingState(false);
         },
         onSkip: () => {
-          const next = activeIndex + 1;
+          const next = index + 1;
           if (next < view.items.length) {
             activeIndex = next;
             mountItem(next);
@@ -350,34 +344,79 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       });
       controls?.setNowPlaying(item?.content_title ?? `Item ${index + 1} of ${view.items.length}`);
 
-      // Auto-advance: when content_advance==='auto' (default) AND there's
-      // a next item, subscribe to the renderer's `done` Promise — when it
-      // resolves (audio ended, image dwell expired, etc.), mount the next
-      // item. Step 9's state machine replaces this with a real sequential
-      // controller; the contract (renderer.done resolves on completion)
-      // stays the same so the upgrade is mechanical.
-      const indexAtMount = index;
-      activeRenderer.done?.then(() => {
-        // Defensive: only advance if we're still the active item AND a
-        // next item exists. Protects against (a) teardown firing done
-        // before transition completes, (b) skip having already advanced.
-        if (activeIndex !== indexAtMount) return;
+      // Auto-advance via renderer.done — same shape as before.
+      renderer.done?.then(() => {
+        if (activeIndex !== index) return;
         if (behavior.content_advance !== 'auto') return;
-        const next = indexAtMount + 1;
+        const next = index + 1;
         if (next < view.items.length) {
           activeIndex = next;
           mountItem(next);
         }
       });
 
-      // Honor autoplay directive — some recipes (cinematic_fullscreen,
-      // loop_ambient) set autoplay='on' or 'muted'. Browser gesture
-      // policy may still reject; the renderer handles that gracefully.
+      // Honor autoplay directive.
       if (behavior.autoplay !== 'off') {
-        activeRenderer.start?.();
+        renderer.start?.();
         controls?.setPlayingState(true);
       } else {
         controls?.setPlayingState(false);
+      }
+
+      return {
+        wrap,
+        renderer,
+        shell,
+        aux,
+        teardown() {
+          renderer.teardown();
+          shell?.teardown();
+          for (const a of aux) {
+            try {
+              a.teardown();
+            } catch {
+              /* defensive */
+            }
+          }
+          wrap.remove();
+        },
+        get behavior() {
+          return behavior;
+        },
+      };
+    }
+
+    /**
+     * Mount a new item, optionally crossfading from the active one.
+     * For now ALL transitions are 'cut' (immediate dispose-then-mount);
+     * Step 9 turns on the opacity ramp by reading the new item's
+     * behavior.transition. The shape supports it today.
+     */
+    function mountItem(index) {
+      const oldSet = activeSet;
+      const newSet = buildLayerSet(index);
+      activeSet = newSet;
+
+      if (!oldSet) return; // first mount — nothing to fade out
+
+      // Step 9 will pull a transition kind + duration from behavior here.
+      // Today we implement 'cut' (immediate teardown) so existing tests +
+      // smoke continue to pass exactly. The crossfade-capable shape
+      // exists; the ramp is the one-line addition Step 9 wires.
+      const kind = /** @type {string} */ (newSet.behavior.transition ?? 'cut');
+      if (kind === 'cut') {
+        oldSet.teardown();
+      } else {
+        // Cross-fade scaffold — opacity ramp on the OLD wrap from 1 → 0
+        // over CROSSFADE_MS while the NEW wrap stays at opacity 1.
+        // Tear down the old set after the ramp completes.
+        const CROSSFADE_MS = 800;
+        oldSet.wrap.style.transition = `opacity ${CROSSFADE_MS}ms ease-in-out`;
+        // Force a layout flush so the transition takes hold.
+        // eslint-disable-next-line no-unused-expressions
+        oldSet.wrap.offsetWidth;
+        oldSet.wrap.style.opacity = '0';
+        setTimeout(() => oldSet.teardown(), CROSSFADE_MS);
       }
     }
 
@@ -388,7 +427,7 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     // see…" expectation.
     // eslint-disable-next-line no-console
     console.info(
-      '[Harmonic Wave Universal Player] Step 5 mounted.\n' +
+      '[Harmonic Wave Universal Player] Steps 1-8 mounted.\n' +
         `  Source:     ${describeSource({ fixtureName })}\n` +
         `  Experience: ${view.experience?.name ?? '(unnamed)'} (${view.items.length} item${view.items.length === 1 ? '' : 's'})\n` +
         `  Recipes:    ${Object.keys(BUILTIN_DELIVERY_RECIPES).length} delivery + ${Object.keys(BUILTIN_DISPLAY_RECIPES).length} display\n` +

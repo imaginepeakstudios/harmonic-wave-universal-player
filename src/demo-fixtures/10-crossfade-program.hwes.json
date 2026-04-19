@@ -1,0 +1,28 @@
+{
+  "_comment": "Browser-demo fixture for the layer-set + crossfade refactor (post-FE-arch-review of 14333c9). Two items: an image (5s dwell) followed by an audio item with cinematic visualizer. Each item carries display_directives:[cross_fade_transitions], so behavior.transition resolves to 'crossfade'. The mountItem refactor builds the new layer-set BEFORE tearing down the old one; the OLD wrapper opacity-ramps from 1 to 0 over 800ms while the new layer-set sits at full opacity above it. This is the broadcasting feel — tuning between channels, not loading a new page.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 1010,
+  "slug": "demo-crossfade-program",
+  "name": "Demo — Crossfade Program",
+  "description": "Image → audio cinematic, with crossfade between items.",
+  "items": [
+    {
+      "item_id": 1,
+      "content_id": 100,
+      "content_type_slug": "photo",
+      "content_title": "Cover image (5s, then crossfade)",
+      "media_play_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg",
+      "display_directives": ["cross_fade_transitions"]
+    },
+    {
+      "item_id": 2,
+      "content_id": 101,
+      "content_type_slug": "song",
+      "content_title": "T-Rex Roar (cinematic)",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/without-you-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen", "cross_fade_transitions"]
+    }
+  ]
+}

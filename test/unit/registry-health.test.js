@@ -1,52 +1,31 @@
 import { describe, test, expect } from 'vitest';
 import { LAYER_RULES } from '../../src/composition/layer-selector.js';
+import {
+  CONTENT_RENDERERS,
+  SCENE_RENDERER_NAMES,
+  OVERLAY_RENDERERS,
+  CHROME_RENDERER_NAMES,
+  NARRATION_RENDERER_NAMES,
+  ALL_RENDERER_NAMES,
+} from '../../src/renderers/registry.js';
+import { defaultBehavior, mergeBehavior } from '../../src/engine/behavior-config.js';
 
 /**
- * Registry-health invariants — locks the rule that every renderer
- * string emitted by LAYER_RULES must exist in boot.js's factory maps,
- * and every factory must be reachable by some rule. Catches the
- * "dead module" failure mode the FE arch review of 2aaf5a3 surfaced
- * (doc-excerpt overlay was registered as a factory but no LAYER_RULE
- * activated it; waveform-bars shipped as a factory unwired).
- *
- * The test imports the renderer NAMES (strings) from each factory map
- * — but the factories live in boot.js, which has DOM side effects on
- * import (it tries to find #app). To avoid those side effects, we
- * hard-code the expected renderer-name set here and assert in BOTH
- * directions: every rule-emitted name is in the set, and every set
- * member appears in some rule. If a renderer is added/removed, this
- * test must be updated AT THE SAME TIME as boot.js — that's the
- * intentional friction.
+ * Registry-health invariants. Per FE arch review of 14333c9:
+ *   - P1 #6: imports the actual registry module (single source of truth)
+ *     instead of duplicating the renderer-name sets here. Adding a new
+ *     factory in src/renderers/registry.js automatically tightens the
+ *     test; no second list to keep in sync.
+ *   - "Predicate-realistic" check: for every rule whose predicate CAN
+ *     activate, build a sample (item, behavior) pair that should trigger
+ *     it and assert the predicate returns true. Catches the "dead rule
+ *     keyed off a non-existent primitive" failure mode that bit
+ *     waveform-bars in the previous commit.
  */
 
-const KNOWN_CONTENT_RENDERERS = new Set([
-  'audio',
-  'video',
-  'image',
-  'document',
-  'sound-effect',
-  'unsupported',
-]);
-const KNOWN_SCENE_RENDERERS = new Set(['banner-static', 'banner-animated', 'visualizer-canvas']);
-const KNOWN_OVERLAY_RENDERERS = new Set([
-  'lyrics-scrolling',
-  'lyrics-spotlight',
-  'lyrics-typewriter',
-  'text-overlay',
-  'waveform-bars',
-]);
-// Chrome layer has a single 'shell' renderer (not a factory map entry —
-// it's createShell directly in boot.js's mountItem).
-const KNOWN_CHROME_RENDERERS = new Set(['shell']);
-// Narration layer renderers — Step 11 will add tts-bridge. Today the
-// narration rule activates `tts-bridge` but `when` returns false.
-const KNOWN_NARRATION_RENDERERS = new Set(['tts-bridge']);
+const KNOWN_CONTENT_NAMES = new Set([...Object.keys(CONTENT_RENDERERS), 'unsupported']);
+const KNOWN_OVERLAY_NAMES = new Set(Object.keys(OVERLAY_RENDERERS));
 
-/**
- * For rules whose `renderer` is a function (content layer dispatches
- * by content_type_slug), invoke it with each content type to enumerate
- * the strings it can produce.
- */
 function enumerateRendererStrings(rule) {
   if (typeof rule.renderer === 'string') return [rule.renderer];
   // Content rule: dispatch over every known content_type_slug.
@@ -72,39 +51,41 @@ describe('registry-health invariants', () => {
     for (const rule of LAYER_RULES) {
       const names = enumerateRendererStrings(rule);
       for (const name of names) {
-        const inContent = KNOWN_CONTENT_RENDERERS.has(name);
-        const inScene = KNOWN_SCENE_RENDERERS.has(name);
-        const inOverlay = KNOWN_OVERLAY_RENDERERS.has(name);
-        const inChrome = KNOWN_CHROME_RENDERERS.has(name);
-        const inNarration = KNOWN_NARRATION_RENDERERS.has(name);
         expect(
-          inContent || inScene || inOverlay || inChrome || inNarration,
+          ALL_RENDERER_NAMES.has(name),
           `rule { layer: '${rule.layer}', renderer: '${name}' } emits a renderer name not in any factory map`,
         ).toBe(true);
 
-        // Also assert layer/factory-map alignment: a content rule
-        // shouldn't emit a scene renderer name, etc.
         if (rule.layer === 'content')
-          expect(inContent, `content rule emits non-content '${name}'`).toBe(true);
+          expect(KNOWN_CONTENT_NAMES.has(name), `content rule emits non-content '${name}'`).toBe(
+            true,
+          );
         if (rule.layer === 'scene')
-          expect(inScene, `scene rule emits non-scene '${name}'`).toBe(true);
+          expect(SCENE_RENDERER_NAMES.has(name), `scene rule emits non-scene '${name}'`).toBe(true);
         if (rule.layer === 'overlay')
-          expect(inOverlay, `overlay rule emits non-overlay '${name}'`).toBe(true);
+          expect(KNOWN_OVERLAY_NAMES.has(name), `overlay rule emits non-overlay '${name}'`).toBe(
+            true,
+          );
         if (rule.layer === 'chrome')
-          expect(inChrome, `chrome rule emits non-chrome '${name}'`).toBe(true);
+          expect(CHROME_RENDERER_NAMES.has(name), `chrome rule emits non-chrome '${name}'`).toBe(
+            true,
+          );
         if (rule.layer === 'narration')
-          expect(inNarration, `narration rule emits non-narration '${name}'`).toBe(true);
+          expect(
+            NARRATION_RENDERER_NAMES.has(name),
+            `narration rule emits non-narration '${name}'`,
+          ).toBe(true);
       }
     }
   });
 
-  test('every scene renderer factory is reachable by some LAYER_RULE', () => {
+  test('every scene factory name is reachable by some LAYER_RULE', () => {
     const reachable = new Set();
     for (const rule of LAYER_RULES) {
       if (rule.layer !== 'scene') continue;
       for (const name of enumerateRendererStrings(rule)) reachable.add(name);
     }
-    for (const name of KNOWN_SCENE_RENDERERS) {
+    for (const name of SCENE_RENDERER_NAMES) {
       expect(
         reachable.has(name),
         `scene factory '${name}' is registered but no LAYER_RULE activates it (dead module)`,
@@ -112,13 +93,13 @@ describe('registry-health invariants', () => {
     }
   });
 
-  test('every overlay renderer factory is reachable by some LAYER_RULE', () => {
+  test('every overlay factory name is reachable by some LAYER_RULE', () => {
     const reachable = new Set();
     for (const rule of LAYER_RULES) {
       if (rule.layer !== 'overlay') continue;
       for (const name of enumerateRendererStrings(rule)) reachable.add(name);
     }
-    for (const name of KNOWN_OVERLAY_RENDERERS) {
+    for (const name of KNOWN_OVERLAY_NAMES) {
       expect(
         reachable.has(name),
         `overlay factory '${name}' is registered but no LAYER_RULE activates it (dead module)`,
@@ -129,11 +110,99 @@ describe('registry-health invariants', () => {
   test('content layer is unconditionally activated', () => {
     const contentRules = LAYER_RULES.filter((r) => r.layer === 'content');
     expect(contentRules.length).toBeGreaterThan(0);
-    // The content rule's `when` should always return true (every item
-    // gets SOME content renderer, even if 'unsupported').
     for (const rule of contentRules) {
       expect(rule.when({ content_type_slug: 'song' }, {})).toBe(true);
       expect(rule.when({}, {})).toBe(true);
+    }
+  });
+
+  /**
+   * Per FE arch review of 14333c9 P1 #6 — the dead-rule masquerade
+   * fix. For every rule whose predicate ought to activate under SOME
+   * realistic combination of (item, behavior), prove it does.
+   */
+  const PREDICATE_ACTIVATORS = {
+    'visualizer-canvas': () => [
+      { content_type_slug: 'song' },
+      mergeBehavior(defaultBehavior(), { prominence: 'hero', sizing: 'fullscreen' }),
+    ],
+    'banner-animated': () => [
+      {
+        content_type_slug: 'song',
+        content_metadata: { visual_scene: { banner1_url: 'a.jpg', banner2_url: 'b.jpg' } },
+      },
+      defaultBehavior(),
+    ],
+    'banner-static': () => [
+      {
+        content_type_slug: 'song',
+        content_metadata: { visual_scene: { banner1_url: 'a.jpg' } },
+      },
+      defaultBehavior(),
+    ],
+    'lyrics-scrolling': () => [
+      { content_type_slug: 'song', content_metadata: { lrc_lyrics: '[00:00]hi' } },
+      mergeBehavior(defaultBehavior(), { lyrics_display: 'scroll_synced' }),
+    ],
+    'lyrics-spotlight': () => [
+      { content_type_slug: 'song', content_metadata: { lrc_lyrics: '[00:00]hi' } },
+      mergeBehavior(defaultBehavior(), { lyrics_display: 'spotlight_line' }),
+    ],
+    'lyrics-typewriter': () => [
+      { content_type_slug: 'song', content_metadata: { lrc_lyrics: '[00:00]hi' } },
+      mergeBehavior(defaultBehavior(), { lyrics_display: 'typewriter' }),
+    ],
+    'text-overlay': () => [
+      { content_type_slug: 'song', content_metadata: { overlay_text: 'A title card' } },
+      defaultBehavior(),
+    ],
+    shell: () => [{ content_type_slug: 'song' }, defaultBehavior()],
+  };
+  const INTENTIONALLY_DORMANT = new Set([
+    'tts-bridge', // Step 11
+  ]);
+
+  test('every NON-content rule emits a renderer with EITHER a predicate-activator OR an intentional-dormant marker', () => {
+    // Content-layer rule is exempt: it's always-on (every item gets
+    // SOME content renderer), so its emitted names (audio/video/image/
+    // document/sound-effect/unsupported) don't need predicate-activator
+    // entries — the unconditional-activation invariant is its own test.
+    for (const rule of LAYER_RULES) {
+      if (rule.layer === 'content') continue;
+      for (const name of enumerateRendererStrings(rule)) {
+        const hasActivator = name in PREDICATE_ACTIVATORS;
+        const isDormant = INTENTIONALLY_DORMANT.has(name);
+        expect(
+          hasActivator || isDormant,
+          `rule for '${name}' must either be exercisable (entry in PREDICATE_ACTIVATORS) OR explicitly INTENTIONALLY_DORMANT — otherwise it's a dead rule`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  test('every PREDICATE_ACTIVATORS entry actually activates its rule', () => {
+    for (const [name, build] of Object.entries(PREDICATE_ACTIVATORS)) {
+      const rule = LAYER_RULES.find((r) => {
+        const emitted = enumerateRendererStrings(r);
+        return emitted.includes(name);
+      });
+      expect(rule, `no LAYER_RULE emits renderer name '${name}'`).toBeTruthy();
+      const [item, behavior] = build();
+      expect(
+        rule.when(item, behavior),
+        `rule for '${name}' does not activate under what should be a triggering (item, behavior) pair — dead rule?`,
+      ).toBe(true);
+    }
+  });
+
+  test('intentionally-dormant rules do return false under the canonical activator pattern', () => {
+    for (const name of INTENTIONALLY_DORMANT) {
+      const rule = LAYER_RULES.find((r) => {
+        const emitted = enumerateRendererStrings(r);
+        return emitted.includes(name);
+      });
+      if (!rule) continue;
+      expect(rule.when({ content_type_slug: 'song' }, defaultBehavior())).toBe(false);
     }
   });
 });

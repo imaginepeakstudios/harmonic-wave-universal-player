@@ -157,9 +157,17 @@
         font-size: clamp(0.75rem, 1.5vw, 0.9rem);
         color: var(--player-text-muted);
       }
-      /* CONTENT — fills the screen behind chrome overlays. */
+      /* CONTENT — fills the screen behind chrome overlays.
+         min-height: 0 is the load-bearing fix for flex-child sizing:
+         WITHOUT it, flex items default to min-height:auto (= content
+         size), so a large image inside the content slot would push the
+         flex chain to its natural size and overflow the viewport.
+         WITH it, the flex item can actually shrink to its allotted
+         space and object-fit:contain on the image takes effect. */
       .hwes-shell__content {
         flex: 1;
+        min-height: 0;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         position: relative;
@@ -185,29 +193,51 @@
         pointer-events: none;
       }
 
-      /* CARD BASE — content cards live inside the content slot. */
+      /* CARD BASE — content cards live inside the content slot.
+         min-height/min-width: 0 + overflow: hidden is the recipe to
+         keep large content (esp. images and videos with intrinsic
+         dimensions larger than the viewport) inside the card box,
+         so object-fit:contain on the inner element actually scales
+         down to fit. Without these, intrinsic content size leaks
+         through the flex chain and overflows the viewport. */
       .hwes-audio,
       .hwes-video,
       .hwes-image,
       .hwes-document,
       .hwes-sfx {
         flex: 1;
+        min-height: 0;
+        min-width: 0;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         padding: clamp(16px, 4vw, 48px);
         gap: clamp(16px, 3vw, 32px);
+        overflow: hidden;
       }
 
-      /* AUDIO — cover-art-forward by default; controls drive playback. */
+      /* AUDIO — cover-art-forward by default; controls drive playback.
+         Cover sizing is constrained by viewport AND chrome height so it
+         can never overflow the available content slot:
+           - vmin floor handles narrow phones
+           - 50vh cap leaves room for title + chrome (header + controls)
+           - 360px ceiling for very wide desktops (don't go cinema-poster)
+         Use min() so the smallest constraint wins. */
       .hwes-audio__cover {
-        width: clamp(180px, 40vmin, 360px);
-        height: clamp(180px, 40vmin, 360px);
+        width: min(50vh, 60vmin, 360px);
+        height: min(50vh, 60vmin, 360px);
         object-fit: cover;
         border-radius: 16px;
         background: rgba(255, 255, 255, 0.04);
         box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+      }
+      /* CINEMATIC mode (prominence=hero + sizing=fullscreen): visualizer
+         IS the primary visual — cover art is a secondary element, sized
+         smaller so it doesn't compete. */
+      .hwes-audio--hero.hwes-audio--fullscreen .hwes-audio__cover {
+        width: min(35vh, 35vmin, 280px);
+        height: min(35vh, 35vmin, 280px);
       }
       .hwes-audio__title {
         font-family: var(--player-font-display);
@@ -238,7 +268,12 @@
         display: none; /* TV mode: title lives in the chrome header */
       }
 
-      /* IMAGE — same layout as video. */
+      /* IMAGE — same layout as video. The image element fills its
+         flex parent (the audio card surrounds it with center alignment)
+         and uses object-fit:contain so the source image is letterboxed
+         instead of stretched on aspect mismatch. max-width / max-height
+         constraints keep the image inside the viewport even when the
+         container reports oversized intrinsic dimensions. */
       .hwes-image {
         padding: 0;
       }
@@ -246,6 +281,8 @@
         display: block;
         width: 100%;
         height: 100%;
+        max-width: 100%;
+        max-height: 100%;
         background: rgba(255, 255, 255, 0.04);
         object-fit: contain;
       }

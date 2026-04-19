@@ -104,29 +104,78 @@ export function createTextOverlayRenderer(opts) {
  * the result as DOM children of `parent`. Plain text is appended via
  * createTextNode so hostile content can't escape into HTML.
  *
+ * Robust against:
+ *   - Unclosed markers (`**not closed`) — falls through to literal text
+ *     instead of swallowing the rest of the input
+ *   - Nested patterns (`**bold *italic* bold**`) — outer `**` claims
+ *     greedy first; inner `*italic*` lands as literal text inside the
+ *     bold span (we don't recurse — keeping the parser one-pass)
+ *   - Underscores in identifiers (`path_to_file.txt`) — when no closing
+ *     `_` exists on the line, the `_` is treated as a literal character
+ *
+ * The regex alternative ORDER matters: longer/more-specific markers come
+ * first (`**...**` before `*...*`), and the LAST alternative is a single
+ * literal char so the loop ALWAYS advances and never silently drops text.
+ * Per FE arch review of 14333c9 (P0 #1) — earlier shape lost any text
+ * after an unclosed marker because no alternative could match the orphan.
+ *
  * @param {HTMLElement} parent
  * @param {string} text
  */
 function appendInline(parent, text) {
-  // Tokenize: alternating runs of plain | bold | italic. The regex
-  // matches a run of (bold | italic | plain-up-to-next-marker).
-  const TOKEN_RE = /(\*\*[^*]+?\*\*)|(\*[^*]+?\*)|(_[^_]+?_)|([^*_]+)/g;
+  // Five alternatives in priority order:
+  //   1. **bold**   — must have a closing pair on the same line
+  //   2. *italic*   — same
+  //   3. _italic_   — REQUIRES word boundary on both sides so word-
+  //                    internal underscores (file_name.txt) stay literal
+  //   4. plain run  — any non-marker chars
+  //   5. literal *  or _ — single-char fallback so unmatched markers
+  //      become literal chars and the loop always advances
+  // The trailing single-char alternative is the load-bearing fix for
+  // unclosed markers; the (?<!\w) and (?!\w) on the underscore pattern
+  // is the load-bearing fix for word-internal underscores.
+  const TOKEN_RE = /(\*\*[^*\n]+?\*\*)|(\*[^*\n]+?\*)|((?<!\w)_[^_\n]+?_(?!\w))|([^*_]+)|([*_])/g;
+  /** @type {RegExpExecArray | null} */
   let m;
+  /** @type {Text | null} */
+  let pendingText = null;
+  /** Flush any accumulated plain text as a single text node. */
+  function flush() {
+    if (pendingText) {
+      parent.appendChild(pendingText);
+      pendingText = null;
+    }
+  }
+  function appendPlain(s) {
+    if (s.length === 0) return;
+    if (pendingText) {
+      pendingText.data += s;
+    } else {
+      pendingText = document.createTextNode(s);
+    }
+  }
   while ((m = TOKEN_RE.exec(text)) !== null) {
     if (m[1]) {
+      flush();
       const strong = document.createElement('strong');
       strong.textContent = m[1].slice(2, -2);
       parent.appendChild(strong);
     } else if (m[2]) {
+      flush();
       const em = document.createElement('em');
       em.textContent = m[2].slice(1, -1);
       parent.appendChild(em);
     } else if (m[3]) {
+      flush();
       const em = document.createElement('em');
       em.textContent = m[3].slice(1, -1);
       parent.appendChild(em);
     } else if (m[4]) {
-      parent.appendChild(document.createTextNode(m[4]));
+      appendPlain(m[4]);
+    } else if (m[5]) {
+      // Literal asterisk/underscore — coalesce with adjacent plain text.
+      appendPlain(m[5]);
     }
   }
+  flush();
 }

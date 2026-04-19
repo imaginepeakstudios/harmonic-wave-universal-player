@@ -106,4 +106,50 @@ describe('chrome/shell', () => {
     expect(shell.attachControls({})).toBeNull();
     expect(shell.getControls()).toBeNull();
   });
+
+  test('auto-hide listeners are cleaned up across N mount/teardown cycles (no leak)', () => {
+    // Per FE arch review of 14333c9 (P1 #5): SPA hosts that mount →
+    // unmount → remount the player must not accumulate listeners on
+    // document. Spy on document.addEventListener / removeEventListener
+    // and verify each shell.teardown() removes everything its mount added.
+    const addedTypes = [];
+    const removedTypes = [];
+    const realAdd = document.addEventListener.bind(document);
+    const realRemove = document.removeEventListener.bind(document);
+    document.addEventListener = (type, handler, opts) => {
+      // Only count the shell's wake events; the test runner registers
+      // unrelated listeners we don't want to attribute.
+      if (['pointermove', 'pointerdown', 'touchstart', 'keydown'].includes(type)) {
+        addedTypes.push(type);
+      }
+      return realAdd(type, handler, opts);
+    };
+    document.removeEventListener = (type, handler, opts) => {
+      if (['pointermove', 'pointerdown', 'touchstart', 'keydown'].includes(type)) {
+        removedTypes.push(type);
+      }
+      return realRemove(type, handler, opts);
+    };
+    try {
+      for (let i = 0; i < 5; i++) {
+        const local = document.createElement('div');
+        document.body.appendChild(local);
+        const shell = createShell({
+          mount: local,
+          experience: { name: 'Foo' },
+          actor: null,
+          behavior: defaultBehavior(),
+        });
+        shell.teardown();
+        local.remove();
+      }
+      expect(addedTypes.length).toBe(removedTypes.length);
+      // Sanity: each cycle added 4 listeners (pointermove, pointerdown,
+      // touchstart, keydown); 5 cycles = 20 add + 20 remove.
+      expect(addedTypes.length).toBe(20);
+    } finally {
+      document.addEventListener = realAdd;
+      document.removeEventListener = realRemove;
+    }
+  });
 });

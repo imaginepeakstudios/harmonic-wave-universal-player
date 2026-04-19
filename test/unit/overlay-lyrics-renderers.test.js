@@ -103,6 +103,54 @@ describe('renderers/overlay — lyrics + text-overlay variants', () => {
     expect(mount.textContent).toContain('<script>');
   });
 
+  test('text-overlay handles unclosed emphasis markers (P0 fix per FE review of 14333c9)', () => {
+    // Earlier regex would silently drop the rest of the input after an
+    // unclosed `**` or `*`. New shape falls through to literal text.
+    createTextOverlayRenderer({
+      item: { content_metadata: { overlay_text: '**not closed text here' } },
+      mount,
+    });
+    expect(mount.textContent).toContain('not closed text here');
+    expect(mount.textContent).toContain('**');
+  });
+
+  test('text-overlay handles underscores in identifiers (e.g. file paths)', () => {
+    createTextOverlayRenderer({
+      item: {
+        content_metadata: { overlay_text: 'See path/to/file_name_v2.txt for details' },
+      },
+      mount,
+    });
+    expect(mount.textContent).toContain('file_name_v2.txt');
+  });
+
+  test('text-overlay handles nested emphasis without dropping text', () => {
+    // With same-character emphasis nested (`**bold *italic* bold**`),
+    // outer bold can't match (inner content has `*`), so the parser
+    // falls through to inner italic + literal stars. The load-bearing
+    // assertion is "no text gets dropped."
+    createTextOverlayRenderer({
+      item: {
+        content_metadata: { overlay_text: '**bold *italic* bold** end' },
+      },
+      mount,
+    });
+    expect(mount.textContent).toContain('end');
+    expect(mount.textContent).toContain('bold');
+    expect(mount.textContent).toContain('italic');
+    // Inner italic does render.
+    expect(mount.querySelector('em')).toBeTruthy();
+  });
+
+  test('text-overlay handles non-overlapping bold + italic together', () => {
+    createTextOverlayRenderer({
+      item: { content_metadata: { overlay_text: '**bold here** then *italic here*' } },
+      mount,
+    });
+    expect(mount.querySelector('strong').textContent).toBe('bold here');
+    expect(mount.querySelector('em').textContent).toBe('italic here');
+  });
+
   test('text-overlay no-ops gracefully when overlay_text is empty', () => {
     const r = createTextOverlayRenderer({
       item: { content_metadata: {} },

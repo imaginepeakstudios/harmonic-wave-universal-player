@@ -241,7 +241,7 @@ harmonic-wave-universal-player/
 │   │   │   ├── lyrics-scrolling.js       (LRC-synced — preserves POC's "never auto-time" rule)
 │   │   │   ├── lyrics-spotlight.js
 │   │   │   ├── lyrics-typewriter.js
-│   │   │   └── doc-excerpt.js
+│   │   │   └── text-overlay.js           (generic chyron — any text/MD content reference)
 │   │   ├── narration/
 │   │   │   └── tts-bridge.js
 │   │   └── scene/
@@ -599,7 +599,7 @@ The modular structure allows incremental shipping. Each step produces a working 
 - `renderers/overlay/lyrics-scrolling.js` — sweep-in/hold/sweep-out per LRC entry. NEVER auto-times when LRC missing (POC hard rule).
 - `renderers/overlay/lyrics-spotlight.js` — 5-line vertical column with active line highlighted.
 - `renderers/overlay/lyrics-typewriter.js` — per-character reveal across the active line's duration.
-- `renderers/overlay/doc-excerpt.js` — 200-word truncation overlay (rare; standalone documents use the content-layer renderer).
+- `renderers/overlay/text-overlay.js` — generic text/MD chyron (broadcast lower-third pattern); activates on `content_metadata.overlay_text`. Handles plain text, simple markdown (#, ##, **bold**, *italic*, _italic_), unclosed/nested emphasis without dropping content. XSS-safe (textContent + createElement only). Replaces the doc-excerpt overlay (FE arch review of 14333c9 P0 #2 — doc-excerpt was over-specific; text-overlay subsumes it with broader applicability).
 - `renderers/scene/banner-static.js` — single image backdrop with blur(40px) brightness(0.4); fade-in on load.
 - `renderers/scene/banner-animated.js` — Ken Burns (slow zoom) + cross-fade between banner1_url and banner2_url every 8s.
 - All overlays drive off `audio.currentTime` via `requestAnimationFrame` (NOT timeupdate — too coarse on mobile per IMPLEMENTATION-GUIDE §3.5).
