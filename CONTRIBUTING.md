@@ -2,7 +2,7 @@
 
 Thanks for your interest. This document covers how to contribute, what we accept, and what we don't — read it before opening a PR.
 
-> **Status:** Pre-1.0. The architecture is locked (see [`docs/SPEC.md`](docs/SPEC.md)) and the platform-side data contract this engine builds against is LIVE in production (harmonic-wave-api-platform v0.9.73, 2026-04-19). Engine implementation is in active build. Some contribution paths aren't ready yet — see "Current state" below.
+> **Status:** Pre-1.0. The architecture is locked (see [`docs/SPEC.md`](docs/SPEC.md)) and the platform-side data contract this engine builds against is LIVE in production (harmonic-wave-api-platform v0.9.74, 2026-04-19). Engine implementation is in active build (Steps 1-3 of 15 complete). Some contribution paths aren't ready yet — see "Current state" below.
 
 ---
 
@@ -32,12 +32,12 @@ If your PR makes one module do two things (e.g., adding lyrics rendering to the 
 
 ### 2. Stability discipline — definitions are contracts; engine is iteration surface
 
-Recipe definitions in `src/recipe-registry/` are PUBLIC CONTRACTS. They're part of HWES v1 conformance. **You may NOT edit them in place.** If a recipe needs to change behavior, the answer is one of:
+Recipe definitions in `src/registry-snapshot/` are PUBLIC CONTRACTS. They're part of HWES v1 conformance. **You may NOT edit them in place.** If a recipe needs to change behavior, the answer is one of:
 
 - **Adding a new versioned recipe slug** (e.g., `cinematic_fullscreen_v2`) and deprecating the old one
 - **Fixing the engine** — almost always, "the recipe is wrong" is actually "the engine is interpreting the recipe wrong" or "the renderer is wrong." Fix in the engine or renderer.
 
-PRs that touch `src/recipe-registry/` without a versioning plan will be closed.
+PRs that touch `src/registry-snapshot/` without a versioning plan will be closed.
 
 ### 3. Engine is bounded — never reaches into the backend
 
@@ -72,7 +72,7 @@ If you have a strong case for a new built-in display recipe:
    - Which content types it's meant for
 2. Wait for design discussion + maintainer agreement before writing a PR
 3. PR includes:
-   - The recipe definition file in `src/recipe-registry/display/`
+   - The recipe definition file in `src/registry-snapshot/` (with the appropriate kind: `display_recipes_v1`)
    - A snapshot test showing its rendered output for each applicable content type
    - Documentation update in `docs/SPEC.md`
 4. Recipe slug must be unique and follow `snake_case` convention
@@ -132,6 +132,27 @@ The `test/conformance/` suite is the spec validator — what makes "HWES v1 conf
 - New built-in display recipe behavior verification
 
 A conformance fixture is a JSON file plus an expected-output JSON file. No engine code required to contribute one. See the conformance suite README for the format.
+
+---
+
+## Documentation discipline
+
+**Before any commit that changes the surface of the repo, re-verify the README.** The README is what new contributors and AI agents read first — if it drifts from reality, the bar for contribution silently rises (someone follows broken instructions, gives up, and the project pays the cost).
+
+Re-verify means: open `README.md` and spot-check that each of these still matches the working tree:
+
+| README claim                                                                    | What to check                                                                                                                                                        |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status block (Steps complete, platform version)                                 | Does it reflect what just landed? Bump the step count when a new step ships; bump the platform version when the platform deploys a new release this player relies on |
+| Quick start commands                                                            | Run them top-to-bottom in a clean shell — `bun install && bun run test && bun run dev` should still work                                                             |
+| Test count ("N tests + M skipped")                                              | Run `bun run test`; the printed count should match                                                                                                                   |
+| Project structure tree                                                          | Every `src/...` and `test/...` path mentioned should exist on disk; new directories added in this commit should appear                                               |
+| URL examples                                                                    | The `?backend=...&debug=1` form, port number, and slug examples should still work against the current dev script                                                     |
+| File references in tables (`src/registry-snapshot/`, `test/conformance/`, etc.) | Paths exist; descriptions still accurate                                                                                                                             |
+
+A `bun run verify:readme` mechanical drift gate (paths exist + test count matches + platform version matches) is planned for the next infra commit and will run in CI. Even with the gate in place, it can't catch semantic drift (e.g., "the engine boots" is technically true but misleading because Step 4 just removed boot path X). Eyes on the README every commit, every time.
+
+The same discipline applies to `CONTRIBUTING.md`, `docs/SPEC.md`, and `docs/IMPLEMENTATION-GUIDE.md` — re-read on commits that touch the things they describe.
 
 ---
 

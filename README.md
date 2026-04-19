@@ -4,7 +4,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-> **Status:** Pre-1.0 / engine implementation in progress. **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.73, 2026-04-19) — the data contract this engine builds against is now stable. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
+> **Status:** Pre-1.0 / engine implementation in progress (Steps 1-3 of 15 complete: registry snapshot, schema interpreter, MCP client, conformance harness scaffolded; the engine boots and reaches the platform but doesn't render content yet — that lands in Step 4). **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.9.74, 2026-04-19) — the data contract this engine builds against is now stable, and the MCP endpoint is reachable cross-origin from any host. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
 
 ### Foundational positioning
 
@@ -56,26 +56,30 @@ HWES v1 schema response → schema-interpreter → recipe-engine → composition
 
 ## Quick start
 
-> _Implementation is in progress — quick start instructions land when the engine is buildable._
-
-When ready, expect something like:
+The engine ships as vanilla ES modules — no bundler required. What works today (Step 3): the boot path loads the registry snapshot, resolves runtime config, instantiates the MCP client + schema interpreter, and prints a status line to the browser console. The actual content renderer lands in Step 4.
 
 ```bash
 git clone https://github.com/imaginepeakstudios/harmonic-wave-universal-player.git
 cd harmonic-wave-universal-player
-# No build step — vanilla HTML/CSS/JS modules
-# Open src/index.html in a browser pointed at a HWES backend
+bun install         # installs vitest + prettier + typescript (devDeps only — engine has zero runtime deps)
+bun run test        # 92 tests + 2 skipped — should be green
+bun run typecheck   # tsc --checkJs --noEmit on src/
+bun run dev         # python3 -m http.server 8080 --directory src
+# Open http://localhost:8080/?backend=https://harmonicwave.ai&debug=1
+# Console will print: "Step 3 scaffolding loaded — 12 delivery + 10 display recipes, ..."
 ```
 
-For local development against the Harmonic Wave platform's dev server:
+The `?debug=1` flag exposes `globalThis.__hwes` so you can poke at the MCP client interactively from devtools (`await __hwes.mcp.verifyAccess({ email: "..." })`). The flag is gated to localhost / file:// / explicit `?debug` — production hosts won't expose the global even if listed.
+
+For local development against a self-hosted platform instance:
 
 ```bash
-# In one terminal: start the platform's dev server
+# Terminal 1 — platform dev server
 cd ../harmonic-wave-api-platform && NODE_ENV=test bun run dev:legacy
 
-# In another terminal: serve the player
-cd harmonic-wave-universal-player && python3 -m http.server 8080
-# Open http://localhost:8080/src/?backend=http://localhost:3000&token=<share_token>
+# Terminal 2 — player dev server
+cd harmonic-wave-universal-player && bun run dev
+# Open http://localhost:8080/?backend=http://localhost:3000
 ```
 
 ---
@@ -185,7 +189,7 @@ We welcome:
 
 We do NOT accept:
 
-- Pull requests that edit recipe definitions in `src/recipe-registry/` without a versioning plan (definitions are public contracts; changes require a new versioned slug, not in-place edits)
+- Pull requests that edit recipe definitions in `src/registry-snapshot/` without a versioning plan (definitions are public contracts; changes require a new versioned slug, not in-place edits)
 - Pull requests that bypass the modular architecture (e.g. inlining renderers into chrome, mixing concerns)
 - Pull requests that introduce platform backend coupling (the engine consumes HWES via the public MCP API only)
 
