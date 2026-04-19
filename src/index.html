@@ -300,6 +300,95 @@
         display: none;
       }
 
+      /* Scene layers — visualizer + banner backdrops sit behind content. */
+      .hwes-scene,
+      .hwes-visualizer {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      /* Lyric overlays */
+      .hwes-lyrics {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 18%;
+        width: 90%;
+        max-width: 720px;
+        text-align: center;
+        z-index: 2;
+        pointer-events: none;
+      }
+      .hwes-lyrics--scrolling .hwes-lyrics__line {
+        font-family: var(--player-font-display);
+        font-size: 1.6rem;
+        color: var(--player-text);
+        opacity: 0;
+        transform: translateX(0);
+      }
+      .hwes-lyrics--scrolling .hwes-lyrics__line--sweep {
+        animation: hwes-lyric-sweep 2.6s cubic-bezier(0.2, 0.8, 0.4, 1);
+      }
+      @keyframes hwes-lyric-sweep {
+        0% { opacity: 0; transform: translateX(-100px); }
+        20% { opacity: 1; transform: translateX(0); }
+        80% { opacity: 1; transform: translateX(0); }
+        100% { opacity: 0; transform: translateX(100px); }
+      }
+
+      .hwes-lyrics--spotlight {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .hwes-lyrics__slot {
+        font-family: var(--player-font-display);
+        font-size: 1.05rem;
+        color: var(--player-text-muted);
+        opacity: 0.4;
+        transition: all 240ms ease-out;
+      }
+      .hwes-lyrics__slot--active {
+        font-size: 1.6rem;
+        color: var(--player-text);
+        opacity: 1;
+      }
+
+      .hwes-lyrics--typewriter .hwes-lyrics__line {
+        font-family: var(--player-font-display);
+        font-size: 1.6rem;
+        color: var(--player-text);
+        display: inline;
+      }
+      .hwes-lyrics__cursor {
+        animation: hwes-lyric-cursor 1s steps(2) infinite;
+        color: var(--player-primary);
+      }
+      @keyframes hwes-lyric-cursor {
+        0% { opacity: 1; }
+        50% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+
+      /* Doc excerpt overlay (rare; standalone document content uses
+         the content-layer renderer instead). */
+      .hwes-doc-excerpt {
+        position: absolute;
+        right: 24px;
+        bottom: 24px;
+        max-width: 360px;
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.65);
+        border: 1px solid var(--player-border);
+        border-radius: 8px;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        z-index: 2;
+      }
+
       /* Controls */
       .hwes-controls {
         display: flex;

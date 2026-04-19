@@ -78,13 +78,39 @@ export function pickContentRenderer(item) {
  * @type {LayerRule[]}
  */
 export const LAYER_RULES = [
-  // SCENE — Step 7 (visualizer + cinematic backdrops). Activates when
-  // item or experience has visual_scene metadata AND chrome is rendered
-  // (otherwise scene + content stack weirdly under fullscreen).
+  // SCENE — banner-animated when both banner1_url + banner2_url are
+  // present (Step 8); banner-static when only banner1_url is present;
+  // visualizer-canvas for audio items shown in cinematic mode (hero +
+  // fullscreen) — this is the POC's cinematic background. Order matters:
+  // banner-animated wins over banner-static (more specific), and
+  // visualizer wins over both when it's an audio item in cinematic
+  // mode (the visualizer IS the cinematic backdrop for audio).
+  {
+    layer: 'scene',
+    renderer: 'visualizer-canvas',
+    when: (item, behavior) => {
+      const isAudio = pickContentRenderer(item) === 'audio';
+      const isCinematic = behavior.prominence === 'hero' && behavior.sizing === 'fullscreen';
+      return isAudio && isCinematic;
+    },
+  },
+  {
+    layer: 'scene',
+    renderer: 'banner-animated',
+    when: (item, _behavior) => {
+      const vs = /** @type {{ banner1_url?: string, banner2_url?: string }} */ (
+        item?.content_metadata?.visual_scene
+      );
+      return !!(vs && vs.banner1_url && vs.banner2_url);
+    },
+  },
   {
     layer: 'scene',
     renderer: 'banner-static',
-    when: (_item, _behavior) => false, // TODO(step-7): activate
+    when: (item, _behavior) => {
+      const vs = /** @type {{ banner1_url?: string }} */ (item?.content_metadata?.visual_scene);
+      return !!(vs && vs.banner1_url);
+    },
   },
 
   // CONTENT — always present. The single load-bearing layer.
@@ -94,15 +120,35 @@ export const LAYER_RULES = [
     when: () => true,
   },
 
-  // OVERLAY — Step 8. Activates when behavior says lyrics should render
-  // AND content_metadata carries the data the renderer needs. Defense in
-  // depth: the engine's precondition check should already have prevented
-  // lyrics_display!=='none' without lrc_lyrics, but composition guards
-  // again for direct BehaviorConfig manipulation in tests.
+  // OVERLAY — three lyric variants based on behavior.lyrics_display.
+  // All require content_metadata.lrc_lyrics (precondition checker
+  // already enforces; defense in depth here too).
   {
     layer: 'overlay',
     renderer: 'lyrics-scrolling',
-    when: (_item, _behavior) => false, // TODO(step-8): activate when behavior.lyrics_display !== 'none' && item.content_metadata?.lrc_lyrics
+    when: (item, behavior) =>
+      behavior.lyrics_display === 'scroll_synced' &&
+      typeof (/** @type {{ lrc_lyrics?: string }} */ (item?.content_metadata)?.lrc_lyrics) ===
+        'string' &&
+      /** @type {{ lrc_lyrics?: string }} */ (item?.content_metadata).lrc_lyrics.length > 0,
+  },
+  {
+    layer: 'overlay',
+    renderer: 'lyrics-spotlight',
+    when: (item, behavior) =>
+      behavior.lyrics_display === 'spotlight_line' &&
+      typeof (/** @type {{ lrc_lyrics?: string }} */ (item?.content_metadata)?.lrc_lyrics) ===
+        'string' &&
+      /** @type {{ lrc_lyrics?: string }} */ (item?.content_metadata).lrc_lyrics.length > 0,
+  },
+  {
+    layer: 'overlay',
+    renderer: 'lyrics-typewriter',
+    when: (item, behavior) =>
+      behavior.lyrics_display === 'typewriter' &&
+      typeof (/** @type {{ lrc_lyrics?: string }} */ (item?.content_metadata)?.lrc_lyrics) ===
+        'string' &&
+      /** @type {{ lrc_lyrics?: string }} */ (item?.content_metadata).lrc_lyrics.length > 0,
   },
 
   // CHROME — render unless behavior says hide it entirely. 'minimal' and

@@ -84,12 +84,26 @@ describe('composition/layer-selector — selectLayers', () => {
 });
 
 describe('composition/layer-selector — LAYER_RULES registry', () => {
-  test('registry has one entry per layer in z-order', () => {
-    // Lock the contract: every layer kind in the order it should mount.
-    // Adding a new layer means adding an entry; reordering means a real
-    // visual change that needs a deliberate edit.
+  test('registry layer order is back-to-front (scene → content → overlay → chrome → narration)', () => {
+    // Lock the z-order contract. Multiple rules per layer are expected
+    // (e.g., scene has visualizer-canvas + banner-animated + banner-static
+    // alternatives; overlay has 3 lyric variants). What matters is that
+    // each layer KIND appears as a contiguous run, in the documented order.
     const order = LAYER_RULES.map((r) => r.layer);
-    expect(order).toEqual(['scene', 'content', 'overlay', 'chrome', 'narration']);
+    const kinds = ['scene', 'content', 'overlay', 'chrome', 'narration'];
+    let cursor = 0;
+    for (const kind of kinds) {
+      // Skip past any rules of the previous kind.
+      const runStart = cursor;
+      while (cursor < order.length && order[cursor] === kind) cursor++;
+      // After this kind's run, no rule of this kind should appear later.
+      const restAfterRun = order.slice(cursor);
+      expect(
+        restAfterRun.includes(kind),
+        `layer "${kind}" rules must form a contiguous run starting at index ${runStart}`,
+      ).toBe(false);
+    }
+    expect(cursor).toBe(order.length);
   });
 
   test('every rule has the expected shape (layer + renderer + when)', () => {
@@ -101,19 +115,85 @@ describe('composition/layer-selector — LAYER_RULES registry', () => {
     }
   });
 
-  test('Step 7/8/11 rules currently return false (renderers not shipped yet)', () => {
-    // Sanity check that activation predicates default to off until the
-    // renderer ships. When Step 7 lands the visualizer, this test
-    // intentionally fails for the scene rule — that's the signal the
-    // implementer needs to update the predicate.
+  test('default-behavior + bare item triggers no scene/overlay/narration rules', () => {
+    // With default behavior + an item that has no metadata: scene
+    // requires hero+fullscreen OR visual_scene URLs; overlay requires
+    // lyrics_display + lrc_lyrics; narration requires (eventually) a
+    // resolved actor. None of those conditions are met by a bare item.
     const item = { content_type_slug: 'song', content_metadata: {} };
     const behavior = defaultBehavior();
-    const sceneRule = LAYER_RULES.find((r) => r.layer === 'scene');
-    const overlayRule = LAYER_RULES.find((r) => r.layer === 'overlay');
-    const narrationRule = LAYER_RULES.find((r) => r.layer === 'narration');
-    expect(sceneRule.when(item, behavior)).toBe(false);
-    expect(overlayRule.when(item, behavior)).toBe(false);
-    expect(narrationRule.when(item, behavior)).toBe(false);
+    const sceneRules = LAYER_RULES.filter((r) => r.layer === 'scene');
+    const overlayRules = LAYER_RULES.filter((r) => r.layer === 'overlay');
+    const narrationRules = LAYER_RULES.filter((r) => r.layer === 'narration');
+    for (const r of sceneRules) expect(r.when(item, behavior)).toBe(false);
+    for (const r of overlayRules) expect(r.when(item, behavior)).toBe(false);
+    for (const r of narrationRules) expect(r.when(item, behavior)).toBe(false);
+  });
+
+  test('audio item + cinematic behavior activates the visualizer scene rule', () => {
+    const item = { content_type_slug: 'song' };
+    const behavior = mergeBehavior(defaultBehavior(), {
+      prominence: 'hero',
+      sizing: 'fullscreen',
+    });
+    const sceneRules = LAYER_RULES.filter((r) => r.layer === 'scene');
+    const visualizerRule = sceneRules.find((r) => r.renderer === 'visualizer-canvas');
+    expect(visualizerRule.when(item, behavior)).toBe(true);
+    // Banner rules require visual_scene URLs; should NOT activate here.
+    const bannerStatic = sceneRules.find((r) => r.renderer === 'banner-static');
+    expect(bannerStatic.when(item, behavior)).toBe(false);
+  });
+
+  test('item with visual_scene.banner1_url activates banner-static (not visualizer)', () => {
+    const item = {
+      content_type_slug: 'song',
+      content_metadata: { visual_scene: { banner1_url: 'https://example.com/b.jpg' } },
+    };
+    const sceneRules = LAYER_RULES.filter((r) => r.layer === 'scene');
+    const bannerStatic = sceneRules.find((r) => r.renderer === 'banner-static');
+    expect(bannerStatic.when(item, defaultBehavior())).toBe(true);
+  });
+
+  test('item with both banner URLs activates banner-animated', () => {
+    const item = {
+      content_type_slug: 'song',
+      content_metadata: {
+        visual_scene: { banner1_url: 'a.jpg', banner2_url: 'b.jpg' },
+      },
+    };
+    const sceneRules = LAYER_RULES.filter((r) => r.layer === 'scene');
+    const bannerAnimated = sceneRules.find((r) => r.renderer === 'banner-animated');
+    expect(bannerAnimated.when(item, defaultBehavior())).toBe(true);
+  });
+
+  test('lyrics_display + lrc_lyrics activates the matching overlay rule', () => {
+    const item = {
+      content_type_slug: 'song',
+      content_metadata: { lrc_lyrics: '[00:00.00]hello' },
+    };
+    const overlayRules = LAYER_RULES.filter((r) => r.layer === 'overlay');
+    const scrolling = overlayRules.find((r) => r.renderer === 'lyrics-scrolling');
+    const spotlight = overlayRules.find((r) => r.renderer === 'lyrics-spotlight');
+    const typewriter = overlayRules.find((r) => r.renderer === 'lyrics-typewriter');
+
+    expect(
+      scrolling.when(item, mergeBehavior(defaultBehavior(), { lyrics_display: 'scroll_synced' })),
+    ).toBe(true);
+    expect(
+      spotlight.when(item, mergeBehavior(defaultBehavior(), { lyrics_display: 'spotlight_line' })),
+    ).toBe(true);
+    expect(
+      typewriter.when(item, mergeBehavior(defaultBehavior(), { lyrics_display: 'typewriter' })),
+    ).toBe(true);
+
+    // Without lrc_lyrics, all three return false.
+    const itemNoLrc = { content_type_slug: 'song', content_metadata: {} };
+    expect(
+      scrolling.when(
+        itemNoLrc,
+        mergeBehavior(defaultBehavior(), { lyrics_display: 'scroll_synced' }),
+      ),
+    ).toBe(false);
   });
 
   test('content rule always activates regardless of behavior', () => {

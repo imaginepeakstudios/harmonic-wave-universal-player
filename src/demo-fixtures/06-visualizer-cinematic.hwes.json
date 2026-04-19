@@ -1,0 +1,20 @@
+{
+  "_comment": "Browser-demo fixture for Step 7 — audio item in cinematic_fullscreen mode triggers the visualizer canvas as the scene layer. Visualizer renders particles + harmonic waves + central orb + pulsing ring against a palette extracted from the cover art (POC-derived). The amplitude provider defaults to silence (Step 9 wires the real AnalyserNode), so the visualizer renders calm — verify particle drift + palette match cover.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 1006,
+  "slug": "demo-visualizer-cinematic",
+  "name": "Demo — Visualizer Cinematic",
+  "description": "Visualizer canvas + audio in cinematic mode.",
+  "items": [
+    {
+      "item_id": 1,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "T-Rex Roar (cinematic visualizer)",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen"]
+    }
+  ]
+}

@@ -587,18 +587,23 @@ The modular structure allows incremental shipping. Each step produces a working 
 - 234 tests (was 196), 13 snapshots across all 5 content renderers + chrome shell + controls
 - Browser smoke: `?fixture=05-mixed-content` cycles image → audio → document → sound-effect with auto-advance
 
-### Step 7: Visualizer (preserves POC)
-- `visualizer/canvas.js`
-- `visualizer/palette-extractor.js`
-- `visualizer/waveform-bars.js`
+### Step 7: Visualizer (preserves POC) ✅
+- `visualizer/canvas.js` — 200 particles + 5 harmonic waves + central orb + pulsing ring (POC subsystems preserved). Palette hot-swappable via `setPalette()` with smooth lerp.
+- `visualizer/palette-extractor.js` — 80×80 canvas → highest-saturation×brightness pixel → primary; hue-shifted secondary; primary@50% glow. CORS-safe via crossorigin.
+- `visualizer/waveform-bars.js` — 40 mirror-paired FFT-driven bars (consumes amplitude provider).
+- `visualizer/amplitude-provider.js` — abstract source. Default silence provider; mock sweep provider for dev. Step 9 swaps in AnalyserNode-backed provider.
+- Activated via the `visualizer-canvas` scene-layer rule when content is audio AND `behavior.prominence === 'hero'` AND `behavior.sizing === 'fullscreen'` (POC's cinematic backdrop).
 
-### Step 8: Overlay + scene renderers
-- `renderers/overlay/lyrics-scrolling.js` (preserves POC's "never auto-time" rule)
-- `renderers/overlay/lyrics-spotlight.js`
-- `renderers/overlay/lyrics-typewriter.js`
-- `renderers/overlay/doc-excerpt.js`
-- `renderers/scene/banner-static.js`
-- `renderers/scene/banner-animated.js`
+### Step 8: Overlay + scene renderers ✅
+- `renderers/overlay/lrc-parser.js` — POC LRC parser (timed lyrics; multi-timestamp, header lines, malformed brackets all handled per IMPLEMENTATION-GUIDE §3.2).
+- `renderers/overlay/lyrics-scrolling.js` — sweep-in/hold/sweep-out per LRC entry. NEVER auto-times when LRC missing (POC hard rule).
+- `renderers/overlay/lyrics-spotlight.js` — 5-line vertical column with active line highlighted.
+- `renderers/overlay/lyrics-typewriter.js` — per-character reveal across the active line's duration.
+- `renderers/overlay/doc-excerpt.js` — 200-word truncation overlay (rare; standalone documents use the content-layer renderer).
+- `renderers/scene/banner-static.js` — single image backdrop with blur(40px) brightness(0.4); fade-in on load.
+- `renderers/scene/banner-animated.js` — Ken Burns (slow zoom) + cross-fade between banner1_url and banner2_url every 8s.
+- All overlays drive off `audio.currentTime` via `requestAnimationFrame` (NOT timeupdate — too coarse on mobile per IMPLEMENTATION-GUIDE §3.5).
+- Activated via `lyrics-scrolling`, `lyrics-spotlight`, `lyrics-typewriter` overlay-layer rules when `behavior.lyrics_display` matches AND `content_metadata.lrc_lyrics` is present.
 
 ### Step 9: Playback state + audio pipeline
 - `playback/state-machine.js`

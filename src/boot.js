@@ -55,6 +55,14 @@ import { createVideoRenderer } from './renderers/content/video.js';
 import { createImageRenderer } from './renderers/content/image.js';
 import { createDocumentRenderer } from './renderers/content/document.js';
 import { createSoundEffectRenderer } from './renderers/content/sound-effect.js';
+import { createBannerStaticRenderer } from './renderers/scene/banner-static.js';
+import { createBannerAnimatedRenderer } from './renderers/scene/banner-animated.js';
+import { createLyricsScrollingRenderer } from './renderers/overlay/lyrics-scrolling.js';
+import { createLyricsSpotlightRenderer } from './renderers/overlay/lyrics-spotlight.js';
+import { createLyricsTypewriterRenderer } from './renderers/overlay/lyrics-typewriter.js';
+import { createDocExcerptOverlayRenderer } from './renderers/overlay/doc-excerpt.js';
+import { createVisualizer } from './visualizer/canvas.js';
+import { extractPalette } from './visualizer/palette-extractor.js';
 
 const config = readConfig();
 const mcp = createMcpClient(config);
@@ -80,6 +88,60 @@ const RENDERERS = {
   'sound-effect': createSoundEffectRenderer,
   unsupported: createUnsupportedRenderer,
 };
+
+/**
+ * Scene-layer renderer factories. Same factory shape but signature is
+ * `({ item, behavior, mount }) → { root, teardown }` (no done Promise,
+ * no channel — scene layers are decorative, not playback-driven).
+ * 'visualizer-canvas' is a special factory that wraps the visualizer
+ * + palette extraction for audio items in cinematic mode.
+ */
+const SCENE_RENDERERS = {
+  'banner-static': createBannerStaticRenderer,
+  'banner-animated': createBannerAnimatedRenderer,
+  'visualizer-canvas': createVisualizerSceneRenderer,
+};
+
+/**
+ * Overlay-layer renderer factories. Signature: `({ item, behavior,
+ * audioElement, mount }) → { root, teardown }`. Lyrics overlays need
+ * the audio element's currentTime to drive their tick loop; doc-excerpt
+ * is purely textual and ignores audioElement.
+ */
+const OVERLAY_RENDERERS = {
+  'lyrics-scrolling': createLyricsScrollingRenderer,
+  'lyrics-spotlight': createLyricsSpotlightRenderer,
+  'lyrics-typewriter': createLyricsTypewriterRenderer,
+  'doc-excerpt': createDocExcerptOverlayRenderer,
+};
+
+/**
+ * Visualizer scene wrapper — extracts palette from cover art, mounts
+ * the canvas, returns a SceneRenderer-shaped object. Step 9 will wire
+ * the AmplitudeProvider to the audio pipeline's AnalyserNode; today
+ * the default silence provider keeps the visualizer calm.
+ *
+ * @param {{ item: import('./schema/interpreter.js').ItemView, mount: HTMLElement }} opts
+ */
+function createVisualizerSceneRenderer({ item, mount }) {
+  const viz = createVisualizer({ mount });
+  // Async palette load — viz starts with the default palette + lerps
+  // when the extracted palette arrives. Cover failure → visualizer
+  // keeps rendering with the default palette (gracefully degraded).
+  const coverUrl =
+    item?.cover_art_url ??
+    /** @type {{ content_cover_art_url?: string }} */ (item)?.content_cover_art_url ??
+    item?.content_metadata?.cover_art_url ??
+    null;
+  if (coverUrl) {
+    extractPalette(coverUrl).then((palette) => viz.setPalette(palette));
+  }
+  viz.start();
+  return {
+    root: viz.canvas,
+    teardown: () => viz.teardown(),
+  };
+}
 
 const app = /** @type {HTMLElement} */ (document.getElementById('app'));
 if (!app) {
@@ -156,12 +218,27 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     let activeIndex = 0;
     let activeRenderer = null;
     let activeShell = null;
+    /** @type {Array<{ teardown: () => void }>} */
+    let activeAuxRenderers = []; // scene + overlay layers (Step 7-8)
+
+    function disposeAux() {
+      for (const aux of activeAuxRenderers) {
+        try {
+          aux.teardown();
+        } catch {
+          /* defensive — tearing down a partially-mounted aux must
+             never block the next mount */
+        }
+      }
+      activeAuxRenderers = [];
+    }
 
     // Wire the module-scope dispose hook so __hwes.dispose() / pagehide
     // tears down the active item cleanly.
     teardownActive = () => {
       activeRenderer?.teardown();
       activeShell?.teardown();
+      disposeAux();
       activeRenderer = null;
       activeShell = null;
     };
@@ -169,16 +246,32 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     function mountItem(index) {
       activeRenderer?.teardown();
       activeShell?.teardown();
+      disposeAux();
       app.replaceChildren();
+      // app needs to be a positioning context for absolute scene/overlay layers.
+      app.style.position = 'relative';
       const item = view.items[index];
       const { behavior } = resolveBehavior(view, item);
       const layers = composeItem(item, behavior);
 
-      // Mount in z-order. content goes first so chrome's content slot
-      // exists when the renderer attaches; chrome wraps content via
-      // createShell's mount target.
+      // Mount in z-order: scene (back) → content → overlay → chrome.
+      // Each scene/overlay rule that activated gets its own mount slot
+      // appended to the app element directly so it sits behind/in-front
+      // of content with absolute positioning.
+      const sceneLayers = layers.filter((l) => l.layer === 'scene');
+      const overlayLayers = layers.filter((l) => l.layer === 'overlay');
       const shellLayer = layers.find((l) => l.layer === 'chrome');
       const contentLayer = layers.find((l) => l.layer === 'content');
+
+      // SCENE layers — mount first so they sit at the bottom of the
+      // z-stack. Each scene renderer creates its own absolutely-
+      // positioned root that fills the app.
+      for (const sl of sceneLayers) {
+        const sceneFactory = SCENE_RENDERERS[sl.renderer];
+        if (!sceneFactory) continue;
+        const aux = sceneFactory({ item, behavior, mount: app });
+        activeAuxRenderers.push(aux);
+      }
 
       let contentMount = app;
       if (shellLayer) {
@@ -189,6 +282,10 @@ globalThis.addEventListener?.('pagehide', onPageHide);
           behavior,
         });
         contentMount = activeShell.getContentMount();
+        // Shell needs to sit ABOVE the absolutely-positioned scene
+        // layer; relative positioning with z-index does that.
+        activeShell.root.style.position = 'relative';
+        activeShell.root.style.zIndex = '1';
       }
 
       // composeItem ALWAYS returns a content layer (selector-side
@@ -197,6 +294,18 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       // crashing.
       const factory = RENDERERS[contentLayer?.renderer ?? 'unsupported'] ?? RENDERERS.unsupported;
       activeRenderer = factory({ item, behavior, mount: contentMount });
+
+      // OVERLAY layers — mount AFTER content so they overlay on top.
+      // Lyrics overlays need the audio element from the content
+      // renderer's channel for currentTime sync.
+      const audioEl = activeRenderer?.channel?.element ?? null;
+      const overlayMount = contentMount; // overlays mount inside chrome's content slot
+      for (const ol of overlayLayers) {
+        const overlayFactory = OVERLAY_RENDERERS[ol.renderer];
+        if (!overlayFactory) continue;
+        const aux = overlayFactory({ item, behavior, audioElement: audioEl, mount: overlayMount });
+        activeAuxRenderers.push(aux);
+      }
 
       // attachControls returns the Controls instance — drive setNowPlaying
       // / setPlayingState through its public API, not via DOM querySelector.
