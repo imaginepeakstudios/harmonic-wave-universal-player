@@ -629,11 +629,13 @@ The modular structure allows incremental shipping. Each step produces a working 
 - `narration_text` resolution: `item.intro_hint` → `item.content_metadata.intro_hint` → `item.tts_intro_text` → (with allowDefault) `"Up next: <title>"`.
 - `narration_audio_url` resolution: `item.tts_intro_audio_url` → `item.content_metadata.tts_intro_audio_url` → `item.tts_intro_url` (production wire).
 
-### Step 12: End-of-experience
-- `end-of-experience/completion-card.js`
-- `end-of-experience/share-cta.js`
-- `end-of-experience/try-another.js`
-- `end-of-experience/what-is-next.js`
+### Step 12: End-of-experience ✅
+- `end-of-experience/completion-card.js` — full-bleed dark card mounted by boot.js when state-machine fires `experience:ended`. Cover-art montage (up to 5 unique covers from played items, fanned overlap), hero title (experience name) + byline ("by {creator_name}"), tag line "Thanks for watching!", three retention CTAs.
+- `end-of-experience/share-cta.js` — Web Share API on mobile (`navigator.share({ title, url })` with iOS/Android share sheet), `navigator.clipboard.writeText` fallback on desktop with transient "Link copied" feedback, legacy execCommand fallback for very old browsers. User-cancelled shares (AbortError) are silent. Shares the current `/run/:token` URL.
+- `end-of-experience/try-another.js` — v1 stub that navigates to `/` (platform home). Same-origin per #31. Step 14 swaps in live `discover()` results + 3 inline thumbnails + analytics event.
+- `end-of-experience/what-is-next.js` — links to `/p/<creator_slug>` for same-creator retention. Returns null when no creator slug + no override (caller skips appendChild so the row stays centered with 2 CTAs). Step 14 swaps in inline `manage_experience({ list })` thumbnails.
+- Schema interpreter: added `creator_name` + `creator_slug` pass-through on the ExperienceView (production wire shape).
+- CSS: `.hwes-completion` z=80 (above content + chrome, below narration), 600ms opacity in/out, cover montage with overlapping rotated thumbnails, Orbitron hero title with cyan glow, pill-style CTAs with hover halo.
 
 ### Step 13: POC parity validation
 - Express Matthew's catalog as HWES (platform-side work)

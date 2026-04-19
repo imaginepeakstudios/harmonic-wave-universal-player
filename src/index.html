@@ -546,6 +546,147 @@
         }
       }
 
+      /* END-OF-EXPERIENCE COMPLETION CARD — Step 12. Mounted by boot
+         when the state machine fires experience:ended. The "you reached
+         the end" moment with cover-art montage + 3 retention CTAs
+         (Share / Try Another / What's Next from this creator). Same
+         broadcast-feel framing as the network bumper. */
+      .hwes-completion {
+        position: fixed;
+        inset: 0;
+        z-index: 80; /* above content + chrome, below narration overlay */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background:
+          radial-gradient(
+            ellipse at center,
+            rgba(11, 15, 20, 0.92) 0%,
+            rgba(0, 0, 0, 0.98) 80%
+          );
+        opacity: 0;
+        transition: opacity 600ms ease-in-out;
+        padding: clamp(24px, 4vh, 56px);
+        gap: clamp(16px, 3vh, 36px);
+        text-align: center;
+      }
+      .hwes-completion--in {
+        opacity: 1;
+      }
+      .hwes-completion--leaving {
+        opacity: 0;
+      }
+      .hwes-completion__montage {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: clamp(120px, 22vh, 200px);
+        gap: -16px; /* fan effect via negative margin overlap */
+      }
+      .hwes-completion__montage-img {
+        width: clamp(80px, 16vh, 160px);
+        height: clamp(80px, 16vh, 160px);
+        object-fit: cover;
+        border-radius: 14px;
+        box-shadow:
+          0 16px 48px rgba(0, 0, 0, 0.7),
+          0 0 32px rgba(109, 211, 255, 0.15);
+        border: 2px solid rgba(255, 255, 255, 0.06);
+        margin-left: -16px;
+      }
+      .hwes-completion__montage-img:first-child {
+        margin-left: 0;
+      }
+      .hwes-completion__montage-img:nth-child(odd) {
+        transform: rotate(-4deg) translateY(6px);
+      }
+      .hwes-completion__montage-img:nth-child(even) {
+        transform: rotate(3deg) translateY(-4px);
+      }
+      .hwes-completion__hero {
+        max-width: min(720px, 90vw);
+      }
+      .hwes-completion__title {
+        font-family: var(--player-font-display);
+        font-size: clamp(1.6rem, 4vw, 2.8rem);
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        margin: 0 0 8px 0;
+        text-shadow:
+          0 2px 12px rgba(0, 0, 0, 0.7),
+          0 0 36px var(--player-primary);
+      }
+      .hwes-completion__byline {
+        font-family: var(--player-font-family);
+        font-size: clamp(0.95rem, 1.6vw, 1.15rem);
+        color: var(--player-text-muted);
+        margin: 0 0 20px 0;
+        letter-spacing: 0.06em;
+      }
+      .hwes-completion__tag {
+        font-family: var(--player-font-display);
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.36em;
+        color: var(--player-primary);
+        opacity: 0.8;
+        margin: 0;
+      }
+      .hwes-completion__ctas {
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .hwes-completion__cta {
+        font-family: var(--player-font-display);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.22em;
+        padding: 14px 28px;
+        min-height: var(--player-touch-target);
+        min-width: 160px;
+        background: rgba(109, 211, 255, 0.08);
+        color: var(--player-text);
+        border: 1px solid rgba(109, 211, 255, 0.4);
+        border-radius: 999px;
+        cursor: pointer;
+        transition:
+          background 240ms ease,
+          border-color 240ms ease,
+          transform 240ms ease,
+          box-shadow 240ms ease;
+      }
+      .hwes-completion__cta:hover {
+        background: rgba(109, 211, 255, 0.18);
+        border-color: var(--player-primary);
+        box-shadow: 0 0 24px rgba(109, 211, 255, 0.35);
+        transform: translateY(-1px);
+      }
+      .hwes-completion__cta:focus-visible {
+        outline: 2px solid var(--player-primary);
+        outline-offset: 3px;
+      }
+      .hwes-completion__cta--success {
+        background: rgba(120, 220, 140, 0.18);
+        border-color: rgba(120, 220, 140, 0.6);
+      }
+      .hwes-completion__cta--error {
+        background: rgba(220, 120, 120, 0.18);
+        border-color: rgba(220, 120, 120, 0.6);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .hwes-completion {
+          transition: none;
+        }
+        .hwes-completion__cta {
+          transition: none;
+        }
+      }
+
       /* NARRATION OVERLAY — Step 11. Transient text overlay shown
          while the AI host speaks (TTS bridge per #33). Per-word
          highlight via __word--active class fired by the bridge's

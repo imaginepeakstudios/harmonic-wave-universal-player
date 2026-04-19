@@ -177,6 +177,13 @@ function normalizeItem(rawItem) {
  * @property {object | undefined} player_theme
  * @property {object | undefined} seo
  * @property {string[] | undefined} starter_prompts_resolved
+ * @property {string | undefined} creator_name
+ *   Display name of the experience's creator (Step 12 byline).
+ *   Production wire shape; cleaner fixtures may use nested
+ *   `creator: { display_name }` which the completion card resolves.
+ * @property {string | undefined} creator_slug
+ *   Creator profile slug for the "What's Next from this creator" CTA
+ *   (Step 12). Resolves to /p/<slug> by default.
  */
 
 /**
@@ -308,6 +315,13 @@ export function interpret(rawResponse, opts = {}) {
     player_theme: rawResponse.player_theme,
     seo: rawResponse.seo,
     starter_prompts_resolved: /** @type {string[] | undefined} */ (starterPrompts),
+    // Creator attribution — surfaced to Step 12's end-of-experience
+    // completion card ("by {creator_name}" + "/p/{creator_slug}" link
+    // for the What's Next CTA). Pass-through from the production wire
+    // shape; cleaner test fixtures may use nested `creator: { ... }`
+    // which the completion card's resolver also accepts.
+    creator_name: rawResponse.creator_name,
+    creator_slug: rawResponse.creator_slug,
   };
 
   /** @type {HwesView} */

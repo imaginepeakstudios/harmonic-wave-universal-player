@@ -72,6 +72,7 @@ import { createGestureInteractions } from './interactions/gestures.js';
 import { createSingleAudioGuard } from './interactions/single-audio-guard.js';
 import { createNetworkBumper } from './intro/network-bumper.js';
 import { createNarrationPipeline } from './composition/narration-pipeline.js';
+import { createCompletionCard } from './end-of-experience/completion-card.js';
 
 const config = readConfig();
 const mcp = createMcpClient(config);
@@ -683,11 +684,20 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       if (activeSet?.behavior?.content_advance !== 'auto') return;
       stateMachine.next();
     });
+    /** @type {{ teardown: () => void } | null} */
+    let completionCard = null;
     stateMachine.on('experience:ended', () => {
-      // Step 12 will mount the completion card here. For now log + leave
-      // the last layer-set on screen.
       // eslint-disable-next-line no-console
       console.info('[hwes/boot] experience:ended');
+      // Step 12: mount the completion card on top of the last layer-set
+      // (which stays underneath as the visual fade target). 3 retention
+      // CTAs: Share / Try Another / What's Next from this creator.
+      if (completionCard) completionCard.teardown();
+      completionCard = createCompletionCard({
+        mount: app,
+        experience: view.experience,
+        items: view.items,
+      });
     });
 
     // Wait for the bumper (started at boot top in parallel with the
@@ -713,7 +723,7 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     // see…" expectation.
     // eslint-disable-next-line no-console
     console.info(
-      '[Harmonic Wave Universal Player] Steps 1-11 mounted.\n' +
+      '[Harmonic Wave Universal Player] Steps 1-12 mounted.\n' +
         `  Audio:      ${audioPipeline.kind} pipeline${stateMachine.isAudioUnlocked() ? ' (unlocked)' : ' (locked — first Play unlocks)'}\n` +
         `  Source:     ${describeSource({ fixtureName })}\n` +
         `  Experience: ${view.experience?.name ?? '(unnamed)'} (${view.items.length} item${view.items.length === 1 ? '' : 's'})\n` +

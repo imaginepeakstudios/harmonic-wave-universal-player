@@ -1,0 +1,31 @@
+{
+  "_comment": "Browser-demo fixture for Step 12 — end-of-experience completion card. Two short audio items so the card mounts within seconds. Includes creator_name + creator_slug so all three CTAs render (Share + Try Another + What's Next). Load with ?fixture=14-completion-card&debug. Audio is autoplay='muted' for fast playback through both items so the experience:ended event fires + the completion card mounts. Add &bumper=off to skip the network bumper for faster iteration.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 1014,
+  "slug": "demo-completion-card",
+  "name": "Demo \u2014 Completion Card",
+  "description": "Two short audio items \u2014 watch the end-of-experience card mount.",
+  "creator_name": "Matthew Hartley",
+  "creator_slug": "matthew-hartley",
+  "items": [
+    {
+      "item_id": 1,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Holding On",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen", "cross_fade_transitions"]
+    },
+    {
+      "item_id": 2,
+      "content_id": 101,
+      "content_type_slug": "song",
+      "content_title": "Without You",
+      "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
+      "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/without-you-cover-scaled.jpg",
+      "display_directives": ["cinematic_fullscreen", "cross_fade_transitions"]
+    }
+  ]
+}
