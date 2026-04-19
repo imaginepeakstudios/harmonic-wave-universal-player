@@ -120,9 +120,11 @@ export const LAYER_RULES = [
     when: () => true,
   },
 
-  // OVERLAY — three lyric variants based on behavior.lyrics_display.
-  // All require content_metadata.lrc_lyrics (precondition checker
-  // already enforces; defense in depth here too).
+  // OVERLAY — three lyric variants (LRC-synced, audio.currentTime-driven)
+  // + generic text-overlay (any text/MD content reference) + waveform-bars
+  // (FFT visualizer overlay activated when behavior.waveform_overlay is set —
+  // typically by a future display recipe; the rule is here so Step 9's
+  // AnalyserNode wiring activates it without further composition surgery).
   {
     layer: 'overlay',
     renderer: 'lyrics-scrolling',
@@ -149,6 +151,30 @@ export const LAYER_RULES = [
       typeof (/** @type {{ lrc_lyrics?: string }} */ (item?.content_metadata)?.lrc_lyrics) ===
         'string' &&
       /** @type {{ lrc_lyrics?: string }} */ (item?.content_metadata).lrc_lyrics.length > 0,
+  },
+  // Generic text overlay — activates when item carries
+  // content_metadata.overlay_text (plain text or simple markdown).
+  // Works on any content type: title cards over video, captions over
+  // audio, descriptions over images, etc. Per user spec 2026-04-19:
+  // "any text/MD that is referenced as content to overlay."
+  {
+    layer: 'overlay',
+    renderer: 'text-overlay',
+    when: (item, _behavior) => {
+      const ot = /** @type {{ overlay_text?: string }} */ (item?.content_metadata)?.overlay_text;
+      return typeof ot === 'string' && ot.length > 0;
+    },
+  },
+  // Waveform-bars FFT overlay — activates when a future recipe sets
+  // behavior.waveform_overlay (a primitive that doesn't exist in
+  // primitives.json today; reserved for Step 9's audio-pipeline wiring
+  // when the AnalyserNode actually feeds the bars). Today the rule is
+  // present so the renderer registry is reachable + the activation
+  // criterion is documented in version control.
+  {
+    layer: 'overlay',
+    renderer: 'waveform-bars',
+    when: (_item, behavior) => /** @type {any} */ (behavior).waveform_overlay === true,
   },
 
   // CHROME — render unless behavior says hide it entirely. 'minimal' and

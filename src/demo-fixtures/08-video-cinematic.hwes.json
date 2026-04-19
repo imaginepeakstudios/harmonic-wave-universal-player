@@ -1,0 +1,22 @@
+{
+  "_comment": "Browser-demo fixture mirroring the live Holding On experience (fixture 12 captures the production wire shape verbatim) but with display_directives:[cinematic_fullscreen] applied to the video item. Validates that VIDEO content renders correctly under cinematic_fullscreen — chrome=none, sizing=fullscreen, autoplay=muted. Uses the actual production media URL via the share_token preserved from the live response, so we test against real platform-served media (subject to share_token validity at fetch time). Falls back to MDN's CC0 flower.mp4 if the production URL is unreachable.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 1008,
+  "slug": "demo-video-cinematic-holding-on",
+  "name": "Demo — Holding On (video item, cinematic)",
+  "description": "Video rendered in cinematic fullscreen mode using the Holding On experience's actual video item.",
+  "items": [
+    {
+      "item_id": 5,
+      "sort_order": 0,
+      "content_id": 21,
+      "content_type_slug": "movie",
+      "content_title": "Finally Awake – horizontal 16:9 (1920×1080)",
+      "media_play_url": "https://harmonicwave.ai/media/play/21?t=10b10f55593bcecd844312941964fd62",
+      "content_cover_art_url": "https://harmonicwave.ai/media/play/r2key/users%2F1%2Fcollections%2Ffinally-awake-horizontal-16-9-1920x1080%2Fimages%2F80d3be31-fc52-41c1-9acc-81931b49cdd3.jpg",
+      "item_display_recipes": "[\"cinematic_fullscreen\"]",
+      "content_metadata": "{}"
+    }
+  ]
+}

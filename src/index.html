@@ -11,7 +11,28 @@
     <meta name="theme-color" content="#0B0F14" />
     <meta name="robots" content="index, follow" />
 
-    <!-- Theme injector overrides these at runtime from `player_theme`. -->
+    <!--
+      TV-feel design language (locked 2026-04-19 per user direction):
+        "needs to feel like you're watching and hearing something
+         not just going to some website"
+        "needs to support both desktop/tablet/mobile"
+        "critical it's responsive"
+
+      Translation to CSS:
+        - Player fills the entire viewport. No max-width card framing.
+        - Chrome (header + controls) overlays the content with translucent
+          backing and AUTO-HIDES after inactivity (3s). User wakes them
+          by moving the mouse, tapping the screen, or pressing a key.
+        - Content cards (audio/video/image) are full-bleed, no card
+          borders, no padding when they own the screen.
+        - Touch-friendly hit targets (44px+) on tablet/mobile.
+        - Safe-area insets for notched phones (`env(safe-area-inset-*)`).
+        - 100svh + 100dvh fallback chain for mobile address-bar reality.
+        - Visualizer + scene layers fill behind the content as designed.
+
+      Theme custom properties below get overridden at runtime by the
+      theme injector when player_theme is present.
+    -->
     <style id="player-theme-defaults">
       :root {
         --player-font-family: 'Inter', sans-serif;
@@ -22,15 +43,24 @@
         --player-text: #eaf2f8;
         --player-text-muted: #9ba6b2;
         --player-border: rgba(255, 255, 255, 0.08);
+
+        /* TV-feel constants */
+        --player-chrome-fade-ms: 380ms;
+        --player-touch-target: 44px;
       }
       html,
       body {
         margin: 0;
         padding: 0;
-        min-height: 100%;
+        height: 100%;
         background: var(--player-background);
         color: var(--player-text);
         font-family: var(--player-font-family);
+        /* Lock the page — no scroll. The player IS the viewport. */
+        overflow: hidden;
+        /* Mobile: prevent rubber-band scroll + pull-to-refresh. */
+        overscroll-behavior: none;
+        -webkit-tap-highlight-color: transparent;
       }
       *,
       *::before,
@@ -38,12 +68,19 @@
         box-sizing: border-box;
       }
       #app {
-        min-height: 100vh;
+        position: relative;
+        width: 100%;
+        /* Use small viewport unit (svh) where supported — accounts for
+           the iOS Safari address bar. Fall back to vh for older browsers. */
+        height: 100vh;
+        height: 100svh;
+        height: 100dvh;
         display: flex;
         flex-direction: column;
+        overflow: hidden;
       }
 
-      /* Boot states */
+      /* Boot states — centered, full-bleed. */
       .boot-loading,
       .boot-error,
       .boot-empty {
@@ -54,13 +91,13 @@
         justify-content: center;
         text-align: center;
         padding: 24px;
-        opacity: 0.6;
+        opacity: 0.8;
       }
       .boot-loading h1,
       .boot-error h1,
       .boot-empty h1 {
         font-family: var(--player-font-display);
-        font-size: 1.4rem;
+        font-size: clamp(1.1rem, 3.5vw, 1.6rem);
         letter-spacing: 0.3em;
         text-transform: uppercase;
         color: var(--player-primary);
@@ -69,9 +106,10 @@
       .boot-loading p,
       .boot-error p,
       .boot-empty p {
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         letter-spacing: 0.05em;
         max-width: 60ch;
+        line-height: 1.5;
       }
       .boot-error {
         opacity: 1;
@@ -80,193 +118,164 @@
         color: #ff6f6f;
       }
 
-      /* Shell */
+      /* SHELL — full viewport, no card framing. Chrome overlays content. */
       .hwes-shell {
         flex: 1;
         display: flex;
         flex-direction: column;
-        max-width: 920px;
+        position: relative;
         width: 100%;
-        margin: 0 auto;
-        padding: 32px 24px 24px;
-      }
-      .hwes-shell--minimal {
-        padding-top: 16px;
+        height: 100%;
+        overflow: hidden;
       }
       .hwes-shell--none {
-        padding: 0;
-        max-width: none;
+        /* No header, no controls — content owns the screen. */
       }
+
+      /* HEADER — translucent overlay at the top, fades with chrome. */
       .hwes-shell__header {
-        margin-bottom: 24px;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: calc(env(safe-area-inset-top, 0) + 16px) clamp(16px, 4vw, 32px) 24px;
+        background: linear-gradient(180deg, rgba(11, 15, 20, 0.75) 0%, rgba(11, 15, 20, 0) 100%);
+        z-index: 10;
+        pointer-events: none; /* don't block taps on content underneath */
+        transition: opacity var(--player-chrome-fade-ms) ease;
       }
       .hwes-shell__title {
         font-family: var(--player-font-display);
-        font-size: 1.6rem;
-        letter-spacing: 0.15em;
+        font-size: clamp(1rem, 2.5vw, 1.4rem);
+        letter-spacing: 0.2em;
         text-transform: uppercase;
         color: var(--player-primary);
         margin: 0 0 4px;
       }
       .hwes-shell__byline {
         margin: 0;
-        font-size: 0.85rem;
+        font-size: clamp(0.75rem, 1.5vw, 0.9rem);
         color: var(--player-text-muted);
       }
+      /* CONTENT — fills the screen behind chrome overlays. */
       .hwes-shell__content {
         flex: 1;
         display: flex;
         flex-direction: column;
+        position: relative;
+        overflow: hidden;
       }
+      /* CONTROLS — translucent overlay at the bottom, fades with chrome. */
       .hwes-shell__controls {
-        margin-top: 24px;
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 24px clamp(16px, 4vw, 32px) calc(env(safe-area-inset-bottom, 0) + 16px);
+        background: linear-gradient(0deg, rgba(11, 15, 20, 0.75) 0%, rgba(11, 15, 20, 0) 100%);
+        z-index: 10;
+        transition: opacity var(--player-chrome-fade-ms) ease;
       }
 
-      /* Card base — shared by audio/video/image/document/sfx */
+      /* CHROME AUTO-HIDE — JS adds .hwes-shell--idle after 3s of no
+         user input. Header + controls fade out; tap/move/key wakes. */
+      .hwes-shell--idle .hwes-shell__header,
+      .hwes-shell--idle .hwes-shell__controls {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      /* CARD BASE — content cards live inside the content slot. */
       .hwes-audio,
       .hwes-video,
       .hwes-image,
       .hwes-document,
       .hwes-sfx {
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid var(--player-border);
-        border-radius: 16px;
-        padding: 24px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: clamp(16px, 4vw, 48px);
+        gap: clamp(16px, 3vw, 32px);
       }
 
-      /* Audio renderer */
-      .hwes-audio {
-        display: flex;
-        gap: 24px;
-        align-items: center;
-      }
-      .hwes-audio--hero {
-        flex-direction: column;
-        text-align: center;
-        padding: 48px 32px;
-      }
-      .hwes-audio--fullscreen {
-        flex: 1;
-        border: none;
-        border-radius: 0;
-        background: transparent;
-      }
+      /* AUDIO — cover-art-forward by default; controls drive playback. */
       .hwes-audio__cover {
-        width: 96px;
-        height: 96px;
+        width: clamp(180px, 40vmin, 360px);
+        height: clamp(180px, 40vmin, 360px);
         object-fit: cover;
-        border-radius: 12px;
+        border-radius: 16px;
         background: rgba(255, 255, 255, 0.04);
-      }
-      .hwes-audio--hero .hwes-audio__cover {
-        width: 280px;
-        height: 280px;
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
       }
       .hwes-audio__title {
         font-family: var(--player-font-display);
-        font-size: 1.2rem;
-        margin: 0;
+        font-size: clamp(1.2rem, 3vw, 1.8rem);
         letter-spacing: 0.05em;
+        margin: 0;
+        text-align: center;
       }
       .hwes-audio__element {
         display: none;
       }
 
-      /* Video renderer */
+      /* VIDEO — fills available space, letterboxed via object-fit. */
       .hwes-video {
         padding: 0;
-        overflow: hidden;
-        position: relative;
-      }
-      .hwes-video--hero,
-      .hwes-video--fullscreen {
-        flex: 1;
-      }
-      .hwes-video--fullscreen {
-        border-radius: 0;
-        border: none;
       }
       .hwes-video__element {
         display: block;
         width: 100%;
-        height: auto;
-        max-height: 70vh;
+        height: 100%;
         background: #000;
+        object-fit: contain;
       }
       .hwes-video--cover .hwes-video__element {
         object-fit: cover;
       }
-      .hwes-video--fullscreen .hwes-video__element {
-        max-height: none;
-        height: 80vh;
-      }
       .hwes-video__meta {
-        padding: 16px 24px;
-      }
-      .hwes-video__title {
-        font-family: var(--player-font-display);
-        font-size: 1.2rem;
-        margin: 0;
-        letter-spacing: 0.05em;
+        display: none; /* TV mode: title lives in the chrome header */
       }
 
-      /* Image renderer */
+      /* IMAGE — same layout as video. */
       .hwes-image {
         padding: 0;
-        overflow: hidden;
-      }
-      .hwes-image--hero,
-      .hwes-image--fullscreen {
-        flex: 1;
-      }
-      .hwes-image--fullscreen {
-        border-radius: 0;
-        border: none;
       }
       .hwes-image__element {
         display: block;
         width: 100%;
-        height: auto;
-        max-height: 70vh;
+        height: 100%;
         background: rgba(255, 255, 255, 0.04);
+        object-fit: contain;
       }
       .hwes-image--cover .hwes-image__element {
         object-fit: cover;
       }
-      .hwes-image--contain .hwes-image__element {
-        object-fit: contain;
-      }
-      .hwes-image--fullscreen .hwes-image__element {
-        max-height: none;
-        height: 80vh;
-        object-fit: contain;
-      }
       .hwes-image__meta {
-        padding: 16px 24px;
-      }
-      .hwes-image__title {
-        font-family: var(--player-font-display);
-        font-size: 1.2rem;
-        margin: 0;
-        letter-spacing: 0.05em;
+        display: none;
       }
 
-      /* Document renderer */
-      .hwes-document--fullscreen_reader {
+      /* DOCUMENT — readable column, fills the screen. */
+      .hwes-document {
+        padding: clamp(24px, 6vw, 64px);
         max-width: 72ch;
-        padding: 48px 32px;
+        margin: 0 auto;
+        align-items: stretch;
+        justify-content: flex-start;
+        overflow-y: auto;
       }
       .hwes-document__title {
         font-family: var(--player-font-display);
-        font-size: 1.6rem;
-        margin: 0 0 16px;
+        font-size: clamp(1.4rem, 3.5vw, 2rem);
         letter-spacing: 0.05em;
         color: var(--player-primary);
+        margin: 0 0 24px;
       }
       .hwes-document__body {
         white-space: pre-wrap;
-        line-height: 1.6;
-        font-size: 1rem;
+        line-height: 1.7;
+        font-size: clamp(0.95rem, 1.8vw, 1.1rem);
       }
       .hwes-document__expand {
         appearance: none;
@@ -274,25 +283,23 @@
         color: var(--player-primary);
         border: 1px solid var(--player-border);
         border-radius: 999px;
-        padding: 6px 14px;
+        padding: 10px 20px;
         font-family: var(--player-font-family);
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         cursor: pointer;
-        margin-top: 16px;
+        margin-top: 24px;
+        min-height: var(--player-touch-target);
       }
       .hwes-document__expand:hover {
         background: rgba(255, 255, 255, 0.05);
       }
 
-      /* Sound effect renderer */
+      /* SOUND-EFFECT — minimal, transient. */
       .hwes-sfx {
-        padding: 12px 16px;
-        display: flex;
-        align-items: center;
         opacity: 0.7;
       }
       .hwes-sfx__label {
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         color: var(--player-text-muted);
         letter-spacing: 0.05em;
       }
@@ -300,7 +307,7 @@
         display: none;
       }
 
-      /* Scene layers — visualizer + banner backdrops sit behind content. */
+      /* SCENE layers — visualizer + banner backdrops. Behind everything. */
       .hwes-scene,
       .hwes-visualizer {
         position: absolute;
@@ -309,7 +316,7 @@
         pointer-events: none;
       }
 
-      /* Lyric overlays */
+      /* LYRIC OVERLAYS — text floats over content. */
       .hwes-lyrics {
         position: absolute;
         left: 50%;
@@ -318,15 +325,15 @@
         width: 90%;
         max-width: 720px;
         text-align: center;
-        z-index: 2;
+        z-index: 5;
         pointer-events: none;
       }
       .hwes-lyrics--scrolling .hwes-lyrics__line {
         font-family: var(--player-font-display);
-        font-size: 1.6rem;
+        font-size: clamp(1.2rem, 3vw, 1.8rem);
         color: var(--player-text);
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
         opacity: 0;
-        transform: translateX(0);
       }
       .hwes-lyrics--scrolling .hwes-lyrics__line--sweep {
         animation: hwes-lyric-sweep 2.6s cubic-bezier(0.2, 0.8, 0.4, 1);
@@ -346,22 +353,24 @@
       }
       .hwes-lyrics__slot {
         font-family: var(--player-font-display);
-        font-size: 1.05rem;
+        font-size: clamp(0.9rem, 1.8vw, 1.05rem);
         color: var(--player-text-muted);
         opacity: 0.4;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
         transition: all 240ms ease-out;
       }
       .hwes-lyrics__slot--active {
-        font-size: 1.6rem;
+        font-size: clamp(1.2rem, 3vw, 1.8rem);
         color: var(--player-text);
         opacity: 1;
       }
 
       .hwes-lyrics--typewriter .hwes-lyrics__line {
         font-family: var(--player-font-display);
-        font-size: 1.6rem;
+        font-size: clamp(1.2rem, 3vw, 1.8rem);
         color: var(--player-text);
         display: inline;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
       }
       .hwes-lyrics__cursor {
         animation: hwes-lyric-cursor 1s steps(2) infinite;
@@ -373,34 +382,66 @@
         100% { opacity: 1; }
       }
 
-      /* Doc excerpt overlay (rare; standalone document content uses
-         the content-layer renderer instead). */
-      .hwes-doc-excerpt {
+      /* GENERIC TEXT OVERLAY — title cards, captions, short notes
+         layered on top of any content. */
+      .hwes-text-overlay {
         position: absolute;
-        right: 24px;
-        bottom: 24px;
-        max-width: 360px;
-        padding: 16px;
-        background: rgba(0, 0, 0, 0.65);
-        border: 1px solid var(--player-border);
-        border-radius: 8px;
-        font-size: 0.85rem;
+        left: 50%;
+        bottom: 18%;
+        transform: translateX(-50%);
+        width: min(92%, 720px);
+        text-align: center;
+        z-index: 5;
+        pointer-events: none;
+        text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85);
+      }
+      .hwes-text-overlay__h1 {
+        font-family: var(--player-font-display);
+        font-size: clamp(1.6rem, 4vw, 2.4rem);
+        letter-spacing: 0.05em;
+        margin: 0 0 12px;
+        color: var(--player-text);
+      }
+      .hwes-text-overlay__h2 {
+        font-family: var(--player-font-display);
+        font-size: clamp(1.2rem, 3vw, 1.8rem);
+        margin: 0 0 8px;
+        color: var(--player-text);
+      }
+      .hwes-text-overlay__p {
+        font-size: clamp(1rem, 2vw, 1.2rem);
         line-height: 1.5;
-        z-index: 2;
+        margin: 0 0 8px;
+        color: var(--player-text);
+      }
+      .hwes-text-overlay__p:last-child {
+        margin-bottom: 0;
       }
 
-      /* Controls */
+      /* WAVEFORM BARS overlay — bottom strip, behind text overlays. */
+      .hwes-waveform-bars {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 80px;
+        z-index: 3;
+        pointer-events: none;
+        opacity: 0.6;
+      }
+
+      /* CONTROLS — translucent pill row inside the bottom overlay. */
       .hwes-controls {
         display: flex;
         align-items: center;
         gap: 16px;
-        padding: 16px 0;
-        border-top: 1px solid var(--player-border);
+        max-width: 920px;
+        margin: 0 auto;
       }
       .hwes-controls__now-playing {
         flex: 1;
-        font-size: 0.85rem;
-        color: var(--player-text-muted);
+        font-size: clamp(0.85rem, 1.8vw, 0.95rem);
+        color: var(--player-text);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -411,18 +452,20 @@
       }
       .hwes-controls__btn {
         appearance: none;
-        background: transparent;
+        background: rgba(255, 255, 255, 0.08);
         color: var(--player-text);
-        border: 1px solid var(--player-border);
+        border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 999px;
-        padding: 8px 18px;
+        padding: 12px 24px;
         font-family: var(--player-font-family);
-        font-size: 0.85rem;
+        font-size: 0.9rem;
         cursor: pointer;
+        min-height: var(--player-touch-target);
+        min-width: var(--player-touch-target);
         transition: background 120ms;
       }
       .hwes-controls__btn:hover {
-        background: rgba(255, 255, 255, 0.05);
+        background: rgba(255, 255, 255, 0.16);
       }
       .hwes-controls__btn--primary {
         background: var(--player-primary);
@@ -438,17 +481,34 @@
         outline: 2px solid var(--player-primary);
         outline-offset: 2px;
       }
+
+      /* RESPONSIVE — extra tweaks for narrow phones. */
+      @media (max-width: 480px) {
+        .hwes-controls__now-playing {
+          /* On tiny screens, hide the now-playing label so the
+             buttons get full width. The chrome header carries
+             the title anyway. */
+          display: none;
+        }
+        .hwes-shell__header {
+          padding-bottom: 16px;
+        }
+      }
+
+      /* REDUCED MOTION — respect the user's preference. The Ken Burns
+         + lyric sweep + cursor blink + palette lerp are all "non-essential
+         decorative animation" per WCAG 2.3.3. */
+      @media (prefers-reduced-motion: reduce) {
+        .hwes-lyrics--scrolling .hwes-lyrics__line--sweep,
+        .hwes-lyrics__cursor,
+        .hwes-lyrics__slot {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
     </style>
   </head>
   <body>
-    <!--
-      Bootstrap shell. boot.js orchestrates:
-        1. Read backend URL + experience identifier (or fixture name) from URL params
-        2. Load HWES JSON (fixture / MCP / DOM-injected)
-        3. Hand to schema/interpreter → engine/recipe-engine → composition
-        4. Mount renderers into the chrome shell
-        5. Wire chrome controls to renderer methods (state machine arrives Step 9)
-    -->
     <main id="app">
       <div class="boot-loading">
         <h1>Harmonic Wave</h1>

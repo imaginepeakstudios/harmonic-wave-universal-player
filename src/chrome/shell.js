@@ -103,6 +103,34 @@ export function createShell(opts) {
 
   mount.appendChild(root);
 
+  // TV-feel chrome auto-hide. After 3s of no user input (mouse move,
+  // touch, keypress), header + controls fade out via the
+  // `.hwes-shell--idle` class (CSS handles the transition). Any input
+  // wakes them. Per the user direction 2026-04-19: "needs to feel like
+  // you're watching and hearing something, not just going to some website."
+  // Auto-hide is disabled when chrome=none (no chrome to hide) or in
+  // headless test envs (no document event registry of value).
+  const IDLE_MS = 3_000;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let idleTimer = null;
+  function scheduleIdle() {
+    if (behavior.chrome === 'none') return;
+    root.classList.remove('hwes-shell--idle');
+    if (idleTimer != null) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => root.classList.add('hwes-shell--idle'), IDLE_MS);
+  }
+  /** @type {Array<[string, EventListener]>} */
+  const wakeListeners = [
+    ['pointermove', scheduleIdle],
+    ['pointerdown', scheduleIdle],
+    ['touchstart', scheduleIdle],
+    ['keydown', scheduleIdle],
+  ];
+  for (const [type, handler] of wakeListeners) {
+    document.addEventListener(type, handler, { passive: true });
+  }
+  scheduleIdle(); // start the timer immediately
+
   /** @type {import('./controls.js').Controls | null} */
   let controls = null;
   return {
@@ -116,6 +144,10 @@ export function createShell(opts) {
     getControls: () => controls,
     teardown() {
       controls?.teardown();
+      if (idleTimer != null) clearTimeout(idleTimer);
+      for (const [type, handler] of wakeListeners) {
+        document.removeEventListener(type, handler);
+      }
       root.remove();
     },
   };

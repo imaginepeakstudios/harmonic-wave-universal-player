@@ -60,8 +60,9 @@ import { createBannerAnimatedRenderer } from './renderers/scene/banner-animated.
 import { createLyricsScrollingRenderer } from './renderers/overlay/lyrics-scrolling.js';
 import { createLyricsSpotlightRenderer } from './renderers/overlay/lyrics-spotlight.js';
 import { createLyricsTypewriterRenderer } from './renderers/overlay/lyrics-typewriter.js';
-import { createDocExcerptOverlayRenderer } from './renderers/overlay/doc-excerpt.js';
+import { createTextOverlayRenderer } from './renderers/overlay/text-overlay.js';
 import { createVisualizer } from './visualizer/canvas.js';
+import { createWaveformBars } from './visualizer/waveform-bars.js';
 import { extractPalette } from './visualizer/palette-extractor.js';
 
 const config = readConfig();
@@ -112,8 +113,27 @@ const OVERLAY_RENDERERS = {
   'lyrics-scrolling': createLyricsScrollingRenderer,
   'lyrics-spotlight': createLyricsSpotlightRenderer,
   'lyrics-typewriter': createLyricsTypewriterRenderer,
-  'doc-excerpt': createDocExcerptOverlayRenderer,
+  'text-overlay': createTextOverlayRenderer,
+  'waveform-bars': createWaveformBarsOverlayRenderer,
 };
+
+/**
+ * Waveform-bars overlay wrapper — adapts the visualizer/waveform-bars
+ * factory (which returns a Visualizer-shaped { canvas, start, stop, ... })
+ * into the OverlayRenderer shape ({ root, teardown }) that boot.js
+ * expects. Step 9's audio pipeline will call setAmplitudeProvider on
+ * the underlying instance to wire the AnalyserNode.
+ *
+ * @param {{ item: import('./schema/interpreter.js').ItemView, mount: HTMLElement }} opts
+ */
+function createWaveformBarsOverlayRenderer({ mount }) {
+  const bars = createWaveformBars({ mount });
+  bars.start();
+  return {
+    root: bars.canvas,
+    teardown: () => bars.teardown(),
+  };
+}
 
 /**
  * Visualizer scene wrapper — extracts palette from cover art, mounts

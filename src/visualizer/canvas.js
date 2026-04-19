@@ -119,8 +119,26 @@ export function createVisualizer(opts) {
     const amp = amplitudeProvider.amplitude();
     amplitudeProvider.fillFrequencyBins(freqBins);
 
-    // Lerp palette toward target.
-    const activePalette = paletteLerp ? interpolatePalette(paletteLerp) : palette;
+    // Lerp palette toward target. Once the lerp completes (t>=1),
+    // null it out so we stop computing interpolations every frame.
+    let activePalette;
+    if (paletteLerp) {
+      activePalette = interpolatePalette(paletteLerp);
+      const t = (Date.now() - paletteLerp.startTs) / PALETTE_LERP_MS;
+      if (t >= 1) paletteLerp = null;
+    } else {
+      activePalette = palette;
+    }
+
+    // Drive orb pulse from low-frequency bin energy too, not just the
+    // overall amplitude — gives the orb a richer audio response (low
+    // bass = pulse, mid = ring expand, high = particle accent). Reads
+    // bin 0..3 for "low frequency" energy. Per FE arch review P1 #4
+    // (the freqBins buffer was previously allocated but unused).
+    let lowEnergy = 0;
+    for (let i = 0; i < 4; i++) lowEnergy += freqBins[i];
+    lowEnergy /= 4 * 255; // normalize to 0..1
+    const orbPulse = Math.max(amp, lowEnergy * 0.7);
 
     // Clear with a slight alpha so trails don't fade to pure black —
     // gives the visualizer the "smoke" feel from the POC.
@@ -128,7 +146,7 @@ export function createVisualizer(opts) {
     ctx.fillRect(0, 0, w, h);
 
     drawHarmonicWaves(ctx, w, h, amp, activePalette);
-    drawCentralOrb(ctx, w, h, amp, activePalette);
+    drawCentralOrb(ctx, w, h, orbPulse, activePalette);
     drawParticles(ctx, particles, w, h, amp, activePalette);
   }
 
@@ -145,8 +163,12 @@ export function createVisualizer(opts) {
       }
     },
     setPalette(next) {
-      paletteLerp = { from: palette, to: next, startTs: Date.now() };
-      palette = next; // commit at the end-state; lerp interpolates from snapshot
+      // Snapshot the CURRENT visible color (mid-lerp if a previous lerp
+      // is still in flight) as `from`, so rapid back-to-back setPalette
+      // calls never hard-snap. Per FE arch review of 2aaf5a3 (P1 #3).
+      const fromColor = paletteLerp ? interpolatePalette(paletteLerp) : palette;
+      paletteLerp = { from: fromColor, to: next, startTs: Date.now() };
+      palette = next;
     },
     setAmplitudeProvider(provider) {
       amplitudeProvider = provider;

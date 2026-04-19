@@ -2,9 +2,9 @@ import { describe, test, expect, beforeEach } from 'vitest';
 import { createLyricsScrollingRenderer } from '../../src/renderers/overlay/lyrics-scrolling.js';
 import { createLyricsSpotlightRenderer } from '../../src/renderers/overlay/lyrics-spotlight.js';
 import { createLyricsTypewriterRenderer } from '../../src/renderers/overlay/lyrics-typewriter.js';
-import { createDocExcerptOverlayRenderer } from '../../src/renderers/overlay/doc-excerpt.js';
+import { createTextOverlayRenderer } from '../../src/renderers/overlay/text-overlay.js';
 
-describe('renderers/overlay — lyrics + doc variants', () => {
+describe('renderers/overlay — lyrics + text-overlay variants', () => {
   /** @type {HTMLElement} */
   let mount;
   beforeEach(() => {
@@ -56,27 +56,60 @@ describe('renderers/overlay — lyrics + doc variants', () => {
     expect(mount.querySelector('.hwes-lyrics')).toBeNull();
   });
 
-  test('doc-excerpt overlay truncates body to 200 words with ellipsis', () => {
-    const longBody = Array(250).fill('word').join(' ');
-    createDocExcerptOverlayRenderer({
-      item: { content_metadata: { body: longBody } },
+  test('text-overlay renders plain text from content_metadata.overlay_text', () => {
+    createTextOverlayRenderer({
+      item: { content_metadata: { overlay_text: 'A simple title card.' } },
       mount,
     });
-    const text = mount.querySelector('.hwes-doc-excerpt__body').textContent;
-    expect(text.endsWith('…')).toBe(true);
+    expect(mount.querySelector('.hwes-text-overlay__p').textContent).toBe('A simple title card.');
   });
 
-  test('doc-excerpt overlay reads doc_excerpt OR body OR text in order', () => {
-    createDocExcerptOverlayRenderer({
+  test('text-overlay parses # / ## headings into h2/h3 elements', () => {
+    createTextOverlayRenderer({
       item: {
         content_metadata: {
-          doc_excerpt: 'Excerpt wins',
-          body: 'Body loses',
-          text: 'Text loses',
+          overlay_text: '# Big Title\n\n## Subhead\n\nA paragraph.',
         },
       },
       mount,
     });
-    expect(mount.querySelector('.hwes-doc-excerpt__body').textContent).toBe('Excerpt wins');
+    expect(mount.querySelector('.hwes-text-overlay__h1').textContent).toBe('Big Title');
+    expect(mount.querySelector('.hwes-text-overlay__h2').textContent).toBe('Subhead');
+    expect(mount.querySelector('.hwes-text-overlay__p').textContent).toBe('A paragraph.');
+  });
+
+  test('text-overlay parses **bold** and *italic* inline emphasis', () => {
+    createTextOverlayRenderer({
+      item: { content_metadata: { overlay_text: 'Plain **bold** and *italic* together.' } },
+      mount,
+    });
+    const p = mount.querySelector('.hwes-text-overlay__p');
+    expect(p.querySelector('strong').textContent).toBe('bold');
+    expect(p.querySelector('em').textContent).toBe('italic');
+  });
+
+  test('text-overlay NEVER uses innerHTML — hostile content stays inert', () => {
+    // Per the renderer's security note: textContent + createElement
+    // only. A would-be XSS payload renders as literal text.
+    createTextOverlayRenderer({
+      item: {
+        content_metadata: { overlay_text: '<script>alert("xss")</script>' },
+      },
+      mount,
+    });
+    // No <script> tag injected.
+    expect(mount.querySelector('script')).toBeNull();
+    // The literal text is rendered.
+    expect(mount.textContent).toContain('<script>');
+  });
+
+  test('text-overlay no-ops gracefully when overlay_text is empty', () => {
+    const r = createTextOverlayRenderer({
+      item: { content_metadata: {} },
+      mount,
+    });
+    expect(mount.querySelector('.hwes-text-overlay')).toBeTruthy();
+    expect(mount.querySelector('.hwes-text-overlay').children.length).toBe(0);
+    r.teardown();
   });
 });
