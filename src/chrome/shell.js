@@ -31,6 +31,9 @@ import { createControls } from './controls.js';
  *   level is 'none' (composition skips this layer; controls aren't mounted).
  * @property {() => import('./controls.js').Controls | null} getControls
  *   Accessor for the currently-attached controls instance, or null.
+ * @property {() => void} flashChrome
+ *   Wake the chrome from idle and reset the auto-hide timer. Step 10's
+ *   gesture-tap calls this so a tap on touch summons the controls.
  * @property {() => void} teardown
  */
 
@@ -67,6 +70,7 @@ export function createShell(opts) {
       getContentMount: () => contentMount,
       attachControls: () => null,
       getControls: () => null,
+      flashChrome: () => {}, // chrome=none has nothing to flash
       teardown: () => bare.remove(),
     };
   }
@@ -159,6 +163,13 @@ export function createShell(opts) {
       return controls;
     },
     getControls: () => controls,
+    /**
+     * Wake the chrome from idle and reset the auto-hide timer. Called
+     * by Step 10's gesture-tap handler so a screen tap on a touch
+     * device summons the controls (the TV-feel pattern: chrome hides
+     * during immersive playback, surfaces on demand).
+     */
+    flashChrome: scheduleIdle,
     teardown() {
       controls?.teardown();
       if (idleTimer != null) clearTimeout(idleTimer);

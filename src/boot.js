@@ -67,6 +67,10 @@ import { isMobile, readMobileOverride } from './playback/audio-pipeline/detect.j
 import { createDesktopAudioPipeline } from './playback/audio-pipeline/desktop.js';
 import { createMobileAudioPipeline } from './playback/audio-pipeline/mobile.js';
 import { createAnalyserAmplitudeProvider } from './playback/audio-pipeline/analyser-amplitude-provider.js';
+import { createKeyboardInteractions } from './interactions/keyboard.js';
+import { createGestureInteractions } from './interactions/gestures.js';
+import { createSingleAudioGuard } from './interactions/single-audio-guard.js';
+import { createNetworkBumper } from './intro/network-bumper.js';
 
 const config = readConfig();
 const mcp = createMcpClient(config);
@@ -189,7 +193,30 @@ globalThis.addEventListener?.('pagehide', onPageHide);
 // (registry counts, debug global) ordered before the awaits.
 (async () => {
   try {
-    setLoading('Loading experience…');
+    // Network Station ID Bumper IS the loading state — no separate
+    // "Loading experience…" placeholder. The bumper plays for ~7s
+    // (HW wordmark + waveform + SFX), and we load the experience data
+    // in parallel so by the time the bumper finishes the experience
+    // is ready to mount immediately. Mobile pipeline gives null ctx
+    // → bumper is silent visual; desktop ctx attempts SFX (may be
+    // silent on first-visit-without-engagement per browser policy).
+    const bumperDisabled = params.get('bumper') === 'off';
+    const useMobileForBumper = readMobileOverride(params) ?? isMobile() ?? false;
+    const bumperPipeline = useMobileForBumper
+      ? createMobileAudioPipeline()
+      : createDesktopAudioPipeline();
+    /** @type {Promise<void>} */
+    const bumperDone = (async () => {
+      if (bumperDisabled) return;
+      bumperPipeline.ensureAudioContext?.();
+      const bumper = createNetworkBumper({ mount: app, audioPipeline: bumperPipeline });
+      // bumper.play() resolves the moment the bumper enters its leaving
+      // state — boot.js mounts the experience underneath WHILE the
+      // bumper continues to fade out (CSS opacity transition + auto-
+      // teardown when the fade completes). No explicit teardown here.
+      await bumper.play();
+    })();
+
     const raw = await loadHwesResponse({ fixtureName });
     const view = interpret(raw, { warn: true });
 
@@ -234,8 +261,9 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     // SPEC §13 #34); behavior.narration_music_bed gates whether a bed
     // starts at all.
     const stateMachine = createStateMachine();
-    const useMobile = readMobileOverride(params) ?? isMobile() ?? false;
-    const audioPipeline = useMobile ? createMobileAudioPipeline() : createDesktopAudioPipeline();
+    // Reuse the pipeline we already created for the bumper so the
+    // AudioContext (if it got created) carries over to the experience.
+    const audioPipeline = bumperPipeline;
 
     // Layer-set handle is just an inline-shape object: { wrap, renderer,
     // shell, aux, teardown, behavior }. Each item in the experience gets
@@ -245,9 +273,76 @@ globalThis.addEventListener?.('pagehide', onPageHide);
     let activeSet = null;
     let activeIndex = 0;
 
+    // Module-scope playing flag — kept in lockstep with whatever the
+    // currently-mounted controls show. Read by the keyboard space-bar
+    // toggle, the single-audio-guard's "another tab took over" handler,
+    // and the gesture tap (which currently just summons chrome but
+    // could one day toggle play/pause too). Set by every control path
+    // that changes playback (chrome button, keyboard, gesture, guard).
+    let isPlaying = false;
+
+    /**
+     * Centralized play action. All entry points (chrome Play button,
+     * keyboard space, gesture, single-audio-guard auto-resume — none
+     * yet, but reserved) funnel through here so playing-state, audio
+     * unlock, and cross-tab announcement all happen exactly once.
+     */
+    function doPlay() {
+      if (!activeSet) return;
+      stateMachine.unlockAudio();
+      activeSet.renderer?.start?.();
+      isPlaying = true;
+      activeSet.controls?.setPlayingState(true);
+      audioGuard.announcePlay();
+    }
+    function doPause() {
+      if (!activeSet) return;
+      activeSet.renderer?.pause?.();
+      isPlaying = false;
+      activeSet.controls?.setPlayingState(false);
+      audioGuard.announcePause();
+    }
+    function doToggle() {
+      if (isPlaying) doPause();
+      else doPlay();
+    }
+
+    // Step 10 interactions — keyboard + gestures + single-audio-guard.
+    // Created at boot scope so they survive across mountItem (one
+    // listener per page, not per item — avoids the "listener pile-up
+    // on every transition" anti-pattern).
+    const audioGuard = createSingleAudioGuard({
+      onAnotherTabTookOver: () => {
+        // Another player on another tab started; we yield. Don't
+        // auto-resume on their later "paused" — user must click Play.
+        if (isPlaying) doPause();
+      },
+    });
+    const keyboard = createKeyboardInteractions({
+      onPlayPauseToggle: doToggle,
+      onPrevious: () => stateMachine.previous(),
+      onNext: () => stateMachine.next(),
+      onSkipNarration: () => stateMachine.requestSkipNarration(),
+    });
+    const gestures = createGestureInteractions({
+      root: app,
+      callbacks: {
+        onPrevious: () => stateMachine.previous(),
+        onNext: () => stateMachine.next(),
+        onTap: () => {
+          // TV-feel: tap summons chrome briefly. The chrome shell
+          // (Step 5) owns auto-hide; we just signal "user is here."
+          activeSet?.shell?.flashChrome?.();
+        },
+      },
+    });
+
     teardownActive = () => {
       activeSet?.teardown();
       activeSet = null;
+      keyboard.teardown();
+      gestures.teardown();
+      audioGuard.teardown();
       // dispose() (full-unmount) closes the AudioContext irreversibly;
       // teardown() keeps it alive for a re-mount. Boot's teardownActive
       // is the SPA-unmount entry, so dispose is correct here.
@@ -359,22 +454,13 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       }
 
       const controls = shell?.attachControls({
-        onPlay: () => {
-          // First Play wakes the audio context (iOS gesture gate). The
-          // SM's audio:unlocked subscriber (above) starts the music bed
-          // for the currently-mounted item — we don't need to start it
-          // here too. P1 #5 from the FE review of 2218bd3.
-          stateMachine.unlockAudio();
-          renderer.start?.();
-          controls?.setPlayingState(true);
-        },
-        onPause: () => {
-          renderer.pause?.();
-          controls?.setPlayingState(false);
-        },
-        onSkip: () => {
-          stateMachine.next();
-        },
+        // All play/pause paths funnel through doPlay/doPause at boot
+        // scope (Step 10) so audio-unlock + single-audio-guard
+        // announcement + isPlaying flag all stay in sync regardless of
+        // which surface (chrome button, keyboard, gesture) triggered.
+        onPlay: doPlay,
+        onPause: doPause,
+        onSkip: () => stateMachine.next(),
       });
       controls?.setNowPlaying(item?.content_title ?? `Item ${index + 1} of ${view.items.length}`);
 
@@ -398,19 +484,20 @@ globalThis.addEventListener?.('pagehide', onPageHide);
           console.error('[hwes/boot] renderer.done handler threw:', err);
         });
 
-      // Honor autoplay directive.
-      if (behavior.autoplay !== 'off') {
-        renderer.start?.();
-        controls?.setPlayingState(true);
-      } else {
-        controls?.setPlayingState(false);
-      }
+      // Autoplay is honored at the mountItem level (after activeSet is
+      // current) so the boot-scope doPlay() sees the right set. Here
+      // we just initialize the controls' visual state.
+      controls?.setPlayingState(false);
 
       return {
         wrap,
         renderer,
         shell,
         aux,
+        // Controls handle exposed so the keyboard + gesture interactions
+        // (Step 10) can update the play/pause label when they trigger
+        // playback changes from outside the chrome buttons.
+        controls,
         // Channel handle from the audio pipeline (desktop: { analyser,
         // gain }; mobile: { analyser: null, gain: null }). Exposed so
         // mountItem's crossfade branch can ramp the GainNode in lockstep
@@ -479,6 +566,11 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       }
       const newSet = buildLayerSet(index);
       activeSet = newSet;
+
+      // Honor autoplay AFTER activeSet is current so doPlay sees the
+      // right set + the single-audio-guard announces correctly. autoplay
+      // ='off' leaves isPlaying = false (controls already showed Play).
+      if (newSet.behavior.autoplay !== 'off') doPlay();
 
       if (!oldSet || oldSet === newSet) return; // first mount or self
       if (oldSet.pendingTeardown != null) return; // already cleared above
@@ -562,6 +654,11 @@ globalThis.addEventListener?.('pagehide', onPageHide);
       console.info('[hwes/boot] experience:ended');
     });
 
+    // Wait for the bumper (started at boot top in parallel with the
+    // fixture load) before starting the experience. Transitions
+    // immediately into item:started — the bumper's CSS fade-out
+    // overlaps with the first item mounting underneath.
+    await bumperDone;
     stateMachine.start({ items: view.items });
     // If audio is locked (no user gesture yet), the SM holds the first
     // item:started event until unlockAudio() fires. To bootstrap the
@@ -650,18 +747,6 @@ function describeSource({ fixtureName }) {
   }
   if (fixtureName) return `fixture "${fixtureName}"`;
   return `MCP ${config.endpoint}`;
-}
-
-function setLoading(message) {
-  app.replaceChildren();
-  const wrap = document.createElement('div');
-  wrap.className = 'boot-loading';
-  const h1 = document.createElement('h1');
-  h1.textContent = 'Harmonic Wave';
-  const p = document.createElement('p');
-  p.textContent = message;
-  wrap.append(h1, p);
-  app.appendChild(wrap);
 }
 
 function setEmpty(message) {

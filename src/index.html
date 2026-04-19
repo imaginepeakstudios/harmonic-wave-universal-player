@@ -232,12 +232,14 @@
         background: rgba(255, 255, 255, 0.04);
         box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
       }
-      /* CINEMATIC mode (prominence=hero + sizing=fullscreen): visualizer
-         IS the primary visual — cover art is a secondary element, sized
-         smaller so it doesn't compete. */
-      .hwes-audio--hero.hwes-audio--fullscreen .hwes-audio__cover {
-        width: min(35vh, 35vmin, 280px);
-        height: min(35vh, 35vmin, 280px);
+      /* CINEMATIC mode (prominence=hero + sizing=fullscreen): the
+         visualizer scene IS the visual. Hide the audio card's cover
+         + title entirely so they don't flash on mount before the
+         visualizer takes over. The audio element itself stays
+         (display:none) so playback works. */
+      .hwes-audio--hero.hwes-audio--fullscreen .hwes-audio__cover,
+      .hwes-audio--hero.hwes-audio--fullscreen .hwes-audio__meta {
+        display: none;
       }
       .hwes-audio__title {
         font-family: var(--player-font-display);
@@ -543,14 +545,197 @@
           transition: none !important;
         }
       }
+
+      /* NETWORK STATION ID BUMPER — Step 10. Plays before any
+         experience. The HW wordmark + a synthesized digital-wave SFX
+         (network-bumper-sfx.js). Reinforces the broadcast-TV-program
+         framing: every experience is presented BY Harmonic Wave (the
+         network). */
+      .hwes-network-bumper {
+        position: fixed;
+        inset: 0;
+        z-index: 1000; /* over everything: chrome, scenes, content */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* Pure TV black — per user direction 2026-04-19. Like the black
+           a TV shows before a program starts (the Harmonic Wave "black"
+           is the primary background of the network ident). */
+        background: #000;
+        opacity: 0;
+        /* Smooth fade-out into the experience. Longer than the entry
+           ramp so the network-to-program transition reads as a graceful
+           reveal — not an abrupt cut. */
+        transition: opacity 1200ms cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+      }
+      .hwes-network-bumper--in {
+        opacity: 1;
+      }
+      .hwes-network-bumper--leaving {
+        opacity: 0;
+      }
+      /* On leave, gently scale + fade the logo so the bumper recedes
+         instead of just dropping. Reads like the network ident dissolving
+         into the program. */
+      .hwes-network-bumper--leaving .hwes-network-bumper__logo {
+        transition:
+          transform 1200ms cubic-bezier(0.4, 0, 0.2, 1),
+          filter 1200ms cubic-bezier(0.4, 0, 0.2, 1);
+        transform: scale(1.08);
+        filter: drop-shadow(0 0 80px rgba(109, 211, 255, 0.5)) blur(2px);
+      }
+      .hwes-network-bumper__logo {
+        position: relative;
+        z-index: 2;
+        /* Logo is intentionally small — the wave bars are wider than
+           the logo on both sides so they frame it. Per user direction:
+           "logo should be small so you can see the wave bars." */
+        width: clamp(140px, 22vw, 260px);
+        height: auto;
+        user-select: none;
+        pointer-events: none;
+        opacity: 0;
+        /* Start small + invisible, grow into final size as the SFX
+           crescendos. The "network ident emerging" motion. */
+        transform: scale(0.5);
+        animation: hwes-bumper-logo 9000ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        filter: drop-shadow(0 0 32px rgba(109, 211, 255, 0.18));
+      }
+      @keyframes hwes-bumper-logo {
+        /* Sync points (matches network-bumper-sfx.js timeline):
+           0%   = invisible, scaled down to 0.5
+           50%  = nearly full size + opacity, just before bell sting
+           58%  = bell sting at SFX t=3.5s — peak glow + scale 1.05
+           100% = sustain at full size + sustained glow */
+        0% {
+          opacity: 0;
+          transform: scale(0.5);
+          filter: drop-shadow(0 0 0 rgba(109, 211, 255, 0));
+        }
+        50% {
+          opacity: 1;
+          transform: scale(0.98);
+          filter: drop-shadow(0 0 28px rgba(109, 211, 255, 0.3));
+        }
+        58% {
+          opacity: 1;
+          transform: scale(1.05);
+          filter: drop-shadow(0 0 64px rgba(109, 211, 255, 0.65));
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1);
+          filter: drop-shadow(0 0 36px rgba(109, 211, 255, 0.4));
+        }
+      }
+      .hwes-network-bumper__pulse {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 40vmin;
+        height: 40vmin;
+        border-radius: 50%;
+        border: 2px solid rgba(109, 211, 255, 0.5);
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
+        /* Pulse swells outward in sync with the SFX crescendo. Three
+           runs spread across the 9s SFX so there's always a pulse in
+           flight as the wave crests. */
+        animation: hwes-bumper-pulse 3000ms ease-out 500ms 3 forwards;
+      }
+      /* 120-bar centered waveform behind the logo — direct port of the
+         POC's #logo-waveform pattern. Each bar is 2px wide with a
+         per-bar height set inline; CSS handles the staggered
+         intro+pulse sweep. */
+      .hwes-network-bumper__waveform {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, calc(-50% + 14px));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        width: min(72vw, 720px);
+        z-index: 1; /* behind logo (z=2), above background */
+        pointer-events: none;
+      }
+      .hwes-network-bumper__wf-bar {
+        width: 2px;
+        border-radius: 2px;
+        opacity: 0.1;
+        transform: scaleY(0.1);
+        animation:
+          hwes-bumper-wf-intro 1.5s ease-out forwards,
+          hwes-bumper-wf-pulse 2s ease-in-out 1.5s infinite;
+      }
+      @keyframes hwes-bumper-wf-intro {
+        0% {
+          transform: scaleY(0.1);
+          opacity: 0.1;
+        }
+        100% {
+          transform: scaleY(0.3);
+          opacity: 0.25;
+        }
+      }
+      @keyframes hwes-bumper-wf-pulse {
+        0%,
+        100% {
+          transform: scaleY(0.3);
+          opacity: 0.3;
+        }
+        50% {
+          transform: scaleY(0.8);
+          opacity: 0.85;
+        }
+      }
+      @media (max-width: 600px) {
+        .hwes-network-bumper__wf-bar {
+          width: 1px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .hwes-network-bumper__wf-bar {
+          animation: none;
+          opacity: 0.4;
+          transform: scaleY(0.5);
+        }
+      }
+      @keyframes hwes-bumper-pulse {
+        0% {
+          opacity: 0.6;
+          transform: translate(-50%, -50%) scale(0);
+        }
+        80% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(2.4);
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(2.6);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .hwes-network-bumper__logo {
+          animation: none;
+          opacity: 1;
+          transform: none;
+        }
+        .hwes-network-bumper__pulse {
+          animation: none;
+          opacity: 0;
+        }
+      }
     </style>
   </head>
   <body>
     <main id="app">
-      <div class="boot-loading">
-        <h1>Harmonic Wave</h1>
-        <p>Loading the player engine…</p>
-      </div>
+      <!-- Empty by default — boot.js immediately mounts the Network
+           Station ID Bumper which IS the loading state (the bumper
+           is an opaque overlay; the experience renders behind it as
+           the bumper fades). -->
     </main>
 
     <!-- Optional server-side schema injection. Platform's /run/:token

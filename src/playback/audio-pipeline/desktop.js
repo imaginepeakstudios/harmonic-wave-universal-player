@@ -42,11 +42,13 @@ import { selectMusicBedProvider } from './music-bed/index.js';
  * @property {() => void} killMusicBedInstantly
  * @property {() => (AudioContext | null)} getAudioContext
  *   Returns the singleton AudioContext if it's been created (i.e., if
- *   attachContent has been called at least once). Returns null otherwise.
- *   Does NOT lazily create — that would be a brittle contract on iOS,
- *   where AudioContext must be created from a user gesture. Callers that
- *   need the context during a transition should already have it via a
- *   stored channel handle.
+ *   attachContent or ensureAudioContext has been called). Returns null
+ *   otherwise. Does NOT lazily create — call ensureAudioContext() if
+ *   you need the context BEFORE the first attach (e.g., bumper SFX).
+ * @property {() => (AudioContext | null)} ensureAudioContext
+ *   Eagerly create the AudioContext. Used by the bumper SFX path that
+ *   plays before any content is attached. Returns null only if Web
+ *   Audio is unavailable in the environment.
  * @property {() => void} dispose
  *   Full-player-unmount path: closes the AudioContext (irreversible).
  *   Use teardown() for per-item cleanup that should keep the ctx alive.
@@ -157,6 +159,24 @@ export function createDesktopAudioPipeline(opts = {}) {
     },
     getAudioContext() {
       return ctx;
+    },
+    /**
+     * Eagerly create the AudioContext if it doesn't exist yet. Used by
+     * the network bumper (Step 10) which wants to play SFX BEFORE any
+     * content is attached. On iOS without prior gesture the context
+     * will start in 'suspended' state and the bumper SFX will be
+     * inaudible — that's the documented degraded path. On desktop +
+     * iOS post-gesture, the context starts running and the bumper
+     * plays normally.
+     * @returns {AudioContext | null}  null only if Web Audio is
+     *   completely unavailable in this environment.
+     */
+    ensureAudioContext() {
+      try {
+        return ensureContext();
+      } catch {
+        return null;
+      }
     },
     dispose() {
       activeBed?.teardown();

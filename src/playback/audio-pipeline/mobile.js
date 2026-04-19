@@ -38,6 +38,8 @@
  * @property {() => void} killMusicBedInstantly
  * @property {() => null} getAudioContext
  *   Mobile shim never creates a context — always null.
+ * @property {() => null} ensureAudioContext
+ *   Mobile shim — always null. Bumper goes silent on this path.
  * @property {() => void} dispose
  * @property {() => void} teardown
  * @property {'mobile'} kind
@@ -63,6 +65,9 @@ export function createMobileAudioPipeline() {
     duckMusicBed() {},
     killMusicBedInstantly() {},
     getAudioContext() {
+      return null;
+    },
+    ensureAudioContext() {
       return null;
     },
     dispose() {},
