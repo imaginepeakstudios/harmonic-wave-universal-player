@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Harmonic Wave Universal Player</title>
+  <meta name="description" content="Open-source HWES v1 reference implementation. Composes any creator's content into a directed, immersive experience.">
+  <meta name="theme-color" content="#0B0F14">
+  <meta name="robots" content="index, follow">
+
+  <!-- Theme injector will replace these defaults at runtime when the
+       experience response carries a player_theme. See src/theme/injector.js. -->
+  <style id="player-theme-defaults">
+    :root {
+      --player-font-family: 'Inter', sans-serif;
+      --player-font-display: 'Orbitron', sans-serif;
+      --player-primary: #6DD3FF;
+      --player-secondary: #a07adc;
+      --player-background: #0B0F14;
+      --player-text: #EAF2F8;
+      --player-text-muted: #9BA6B2;
+      --player-border: rgba(255, 255, 255, 0.08);
+    }
+    html, body { margin: 0; padding: 0; height: 100%; background: var(--player-background); color: var(--player-text); font-family: var(--player-font-family); }
+    #app { min-height: 100%; display: flex; align-items: center; justify-content: center; }
+    .boot-loading { text-align: center; opacity: 0.6; }
+    .boot-loading h1 { font-family: var(--player-font-display); font-size: 1.4rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--player-primary); margin: 0 0 12px; }
+    .boot-loading p { font-size: 0.85rem; letter-spacing: 0.05em; }
+  </style>
+</head>
+<body>
+  <!--
+    Stub bootstrap shell. boot.js will:
+      1. Read backend URL + experience identifier from URL params
+      2. Call mcp-client.getExperience()
+      3. Hand the response to schema/interpreter
+      4. Run recipe-engine + composition
+      5. Mount renderers into #app
+      6. Wire interactions + state machine
+
+    See SPEC.md §11 build sequence for the full step list, and
+    IMPLEMENTATION-GUIDE.md §4 for Step 2 (current scaffolding) +
+    Step 3 onward.
+  -->
+  <main id="app">
+    <div class="boot-loading">
+      <h1>Harmonic Wave</h1>
+      <p>Universal Player engine — Step 2 scaffolding. boot.js lands in Step 3.</p>
+    </div>
+  </main>
+
+  <!-- ES module entry. Vanilla JS — no build step. -->
+  <script type="module" src="./boot.js"></script>
+</body>
+</html>

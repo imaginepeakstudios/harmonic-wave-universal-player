@@ -1,0 +1,22 @@
+{
+  "name": "@harmonic-wave/universal-player",
+  "version": "0.0.1",
+  "description": "Open-source HWES v1 reference implementation. Modular, recipe-driven, theme-aware player.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "sync-registry": "scripts/sync-registry.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "python3 -m http.server 8080 --directory src",
+    "ci:registry-drift": "vitest run test/ci/registry-sync.test.js"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4"
+  },
+  "engines": {
+    "bun": ">=1.0",
+    "node": ">=20"
+  }
+}
