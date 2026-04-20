@@ -657,8 +657,11 @@ The modular structure allows incremental shipping. Each step produces a working 
 - DNS swap: point `experience.matthewhartleymusic.com` at `harmonicwave.ai/run/:token`. Old POC stays at `harmonic-wave.pages.dev` as the parity benchmark.
 
 ### Step 15: Public open source release
-- Push to public visibility
-- Public README + announcement
+- ✅ GitHub repo is already public (`https://github.com/imaginepeakstudios/harmonic-wave-universal-player`).
+- ✅ Public README + CONTRIBUTING + LICENSE + CODE_OF_CONDUCT in place.
+- ⏳ **Tag `v0.9.0`** once Steps 13b + 14b complete (per `project_player_versioning_plan.md` — engineering-complete checkpoint).
+- ⏳ **Announcement post** — write + publish on the platform blog / X / LinkedIn / HN. Should reference: TV-feel framing, HWES v1 conformance suite for forks, fully self-contained defaults (browser TTS + synthesized music bed) so anyone can run it without API keys.
+- ⏳ **v0.9.0 → v1.0.0 testing phase** per `project_player_versioning_plan.md` — explicit cross-browser / cross-device / POC parity / creator UAT / a11y / perf / Layer 2 analytics validation pass before the production-stable v1.0.0 tag.
 
 Each step is a deployable increment. v2 doesn't ship in one big-bang.
 
