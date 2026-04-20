@@ -36,6 +36,10 @@ import { renderWhatsNextCta } from './what-is-next.js';
  * @property {() => void} [onShare]    Override the default Web Share / clipboard.
  * @property {() => void} [onTryAnother]
  * @property {() => void} [onWhatsNext]
+ * @property {(cta: 'share' | 'try_another' | 'whats_next') => void} [track]
+ *   Fires alongside the default behavior (analytics hook). Unlike the
+ *   on{CTA} callbacks above, `track` does NOT replace the default —
+ *   it runs first, then the default share/navigation continues.
  */
 
 /**
@@ -52,7 +56,7 @@ import { renderWhatsNextCta } from './what-is-next.js';
  * @returns {CompletionCard}
  */
 export function createCompletionCard(opts) {
-  const { mount, experience, items, shareUrl, onShare, onTryAnother, onWhatsNext } = opts;
+  const { mount, experience, items, shareUrl, onShare, onTryAnother, onWhatsNext, track } = opts;
 
   const root = document.createElement('div');
   root.className = 'hwes-completion';
@@ -112,11 +116,13 @@ export function createCompletionCard(opts) {
       shareUrl: shareUrl ?? globalThis.location?.href ?? '',
       experienceName: /** @type {string} */ (experience?.name ?? ''),
       onShare,
+      onClick: () => track?.('share'),
     }),
   );
   ctas.appendChild(
     renderTryAnotherCta({
       onActivate: onTryAnother,
+      onClick: () => track?.('try_another'),
       // Pass-through from experience.discover_url — forks running the
       // player on a non-platform domain set this on the experience
       // response so Try Another lands users on a working discover
@@ -126,7 +132,11 @@ export function createCompletionCard(opts) {
   );
   // What's Next renders null when there's no creator slug + no override
   // — skip the appendChild so the row stays centered with 2 buttons.
-  const whatsNext = renderWhatsNextCta({ experience, onActivate: onWhatsNext });
+  const whatsNext = renderWhatsNextCta({
+    experience,
+    onActivate: onWhatsNext,
+    onClick: () => track?.('whats_next'),
+  });
   if (whatsNext) ctas.appendChild(whatsNext);
   root.appendChild(ctas);
 

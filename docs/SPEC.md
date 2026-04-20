@@ -642,7 +642,19 @@ The modular structure allows incremental shipping. Each step produces a working 
 - Side-by-side comparison
 - Iterate until fidelity holds
 
-### Step 14: Cut over Matthew's deployment
+### Step 14: Cut over Matthew's deployment + Layer 2 analytics
+**Step 14a (player-side, complete) — Layer 2 analytics emitter:**
+- `src/analytics/event-stream.js` — uniform `{ emit, flush, teardown }` interface; batches via `navigator.sendBeacon` (fallback to `fetch({keepalive:true})`); sync-flushes on `pagehide`. Per-page-load session UUID groups events.
+- v1 MVP vocabulary (6 events): `experience.completed`, `item.completed`, `item.skipped`, `cta.share`, `cta.try_another`, `cta.whats_next`. Intentionally narrow per "ship simple, expand after v0.9.0 testing reveals what creators actually want."
+- Wired into boot.js: `stateMachine.on('item:ended')` → `item.completed`; user-driven skip paths (controls' Skip + keyboard ArrowRight + gesture swipe-left) all funnel through new `doSkipNext()` helper that emits `item.skipped` BEFORE calling `stateMachine.next()` (so the natural-end vs user-skip distinction is preserved per #32).
+- Completion card CTAs (`Step 12`) extended with a non-replacing `onClick` callback alongside the existing override pattern; boot wires a `track(cta)` callback that emits the right `cta.*` event before the default behavior runs.
+- `?analytics=off` URL override disables emission; `?analytics=debug` echoes events to `console.info` instead of POSTing (useful before the platform endpoint exists).
+
+**Step 14b (platform-side, cross-repo) — endpoint + cutover:**
+- New Hono route `POST /api/player-events` on `harmonic-wave-api-platform`; D1 migration for `player_events` table; daily aggregation cron rolls into `experience_usage` (existing) + new `experience_event_summary`.
+- Tag player `v0.9.0` and copy `harmonic-wave-universal-player/src/` into `harmonic-wave-api-platform/public/player/` per #31 bundled-deploy.
+- Platform `/run/:token` route renders HTML loading the player from same-origin + inlines the resolved HWES JSON via `<script type="application/json" id="hwes-data">{...}</script>`.
+- DNS swap: point `experience.matthewhartleymusic.com` at `harmonicwave.ai/run/:token`. Old POC stays at `harmonic-wave.pages.dev` as the parity benchmark.
 
 ### Step 15: Public open source release
 - Push to public visibility

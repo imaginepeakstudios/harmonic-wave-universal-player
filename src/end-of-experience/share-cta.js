@@ -25,6 +25,8 @@ const COPIED_FEEDBACK_MS = 2400;
  * @property {string} shareUrl
  * @property {string} [experienceName]   Used as the share-sheet title.
  * @property {() => void} [onShare]      Override the default share flow.
+ * @property {() => void} [onClick]      Fires alongside the click for
+ *   analytics; runs BEFORE onShare/default. Doesn't replace behavior.
  */
 
 /**
@@ -32,7 +34,7 @@ const COPIED_FEEDBACK_MS = 2400;
  * @returns {HTMLButtonElement}
  */
 export function renderShareCta(opts) {
-  const { shareUrl, experienceName, onShare } = opts;
+  const { shareUrl, experienceName, onShare, onClick } = opts;
 
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -41,6 +43,7 @@ export function renderShareCta(opts) {
   setLabel(btn, 'Share');
 
   btn.addEventListener('click', async () => {
+    onClick?.();
     if (onShare) {
       onShare();
       return;

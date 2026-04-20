@@ -27,6 +27,8 @@
 /**
  * @typedef {object} TryAnotherCtaOpts
  * @property {() => void} [onActivate]   Override the default navigation.
+ * @property {() => void} [onClick]      Fires alongside the click for
+ *   analytics; runs BEFORE onActivate/default. Doesn't replace behavior.
  * @property {string} [href]             Explicit destination override.
  * @property {string} [discoverUrl]      Pass-through from `view.experience.
  *   discover_url` — the platform sets this so forks running the player on
@@ -50,7 +52,7 @@
  * @returns {HTMLButtonElement}
  */
 export function renderTryAnotherCta(opts = {}) {
-  const { onActivate, href, discoverUrl } = opts;
+  const { onActivate, onClick, href, discoverUrl } = opts;
   const target = href ?? discoverUrl ?? '/';
 
   const btn = document.createElement('button');
@@ -60,6 +62,7 @@ export function renderTryAnotherCta(opts = {}) {
   btn.setAttribute('aria-label', 'Try another experience');
 
   btn.addEventListener('click', () => {
+    onClick?.();
     if (onActivate) {
       onActivate();
       return;

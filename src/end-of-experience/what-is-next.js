@@ -27,6 +27,8 @@
  * @typedef {object} WhatsNextCtaOpts
  * @property {object} experience
  * @property {() => void} [onActivate]   Override the default navigation.
+ * @property {() => void} [onClick]      Fires alongside the click for
+ *   analytics; runs BEFORE onActivate/default. Doesn't replace behavior.
  * @property {string} [hrefBase]         URL base for creator pages. Defaults to "/p/".
  */
 
@@ -37,7 +39,7 @@
  *   should skip appending so the CTA row stays centered with 2 buttons).
  */
 export function renderWhatsNextCta(opts) {
-  const { experience, onActivate, hrefBase = '/p/' } = opts;
+  const { experience, onActivate, onClick, hrefBase = '/p/' } = opts;
 
   const slug = resolveCreatorSlug(experience);
   if (!slug && !onActivate) return null;
@@ -49,6 +51,7 @@ export function renderWhatsNextCta(opts) {
   btn.setAttribute('aria-label', "What's next from this creator");
 
   btn.addEventListener('click', () => {
+    onClick?.();
     if (onActivate) {
       onActivate();
       return;

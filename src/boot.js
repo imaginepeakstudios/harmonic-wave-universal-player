@@ -73,6 +73,7 @@ import { createSingleAudioGuard } from './interactions/single-audio-guard.js';
 import { createNetworkBumper } from './intro/network-bumper.js';
 import { createNarrationPipeline } from './composition/narration-pipeline.js';
 import { createCompletionCard } from './end-of-experience/completion-card.js';
+import { createEventStream, PLAYER_EVENTS } from './analytics/event-stream.js';
 
 const config = readConfig();
 const mcp = createMcpClient(config);
@@ -293,6 +294,19 @@ let activeBumper = null;
     // intro_hint / tts_intro_text get narration.
     const narrateAuto = params.get('narrate') === 'auto';
 
+    // Step 14a — Layer 2 analytics. v1 MVP vocabulary (6 events).
+    // ?analytics=off disables; ?analytics=debug echoes to console
+    // instead of POSTing (useful before the platform endpoint exists).
+    // The event stream is same-origin per #31 — POST /api/player-events.
+    const analyticsParam = params.get('analytics');
+    const analytics = createEventStream({
+      enabled: analyticsParam !== 'off',
+      debug: analyticsParam === 'debug',
+      // Slug is the most reliable cross-fixture identifier; production
+      // platform may add `share_token` later via interpreter pass-through.
+      experienceToken: view.experience?.slug,
+    });
+
     // Hoisted bindings — `teardownActive` (assigned below) is an arrow
     // that captures these in its closure. If pagehide / `__hwes.dispose`
     // fires DURING the await window between this point and the later
@@ -336,6 +350,26 @@ let activeBumper = null;
       if (isPlaying) doPause();
       else doPlay();
     }
+    /**
+     * Centralized "user skipped to next item" path. Emits item.skipped
+     * for the CURRENT item (so analytics can distinguish user-driven
+     * skip from natural end + auto-advance) BEFORE asking the state
+     * machine to advance. Wire from controls' Skip button + keyboard
+     * ArrowRight + gesture swipe-left. The auto-advance path (item:
+     * ended → next) bypasses this so item.completed is recorded
+     * instead. P14a from Layer 2 analytics design (decision #32).
+     */
+    function doSkipNext() {
+      const currentItem = view.items[activeIndex];
+      analytics.emit(PLAYER_EVENTS.ITEM_SKIPPED, {
+        index: activeIndex,
+        item_id: currentItem?.item_id,
+      });
+      stateMachine.next();
+    }
+    function doPrevious() {
+      stateMachine.previous();
+    }
 
     // Step 10 interactions — keyboard + gestures + single-audio-guard.
     // Created at boot scope so they survive across mountItem (one
@@ -350,15 +384,15 @@ let activeBumper = null;
     });
     const keyboard = createKeyboardInteractions({
       onPlayPauseToggle: doToggle,
-      onPrevious: () => stateMachine.previous(),
-      onNext: () => stateMachine.next(),
+      onPrevious: doPrevious,
+      onNext: doSkipNext, // user-driven skip → analytics emits item.skipped
       onSkipNarration: () => stateMachine.requestSkipNarration(),
     });
     const gestures = createGestureInteractions({
       root: app,
       callbacks: {
-        onPrevious: () => stateMachine.previous(),
-        onNext: () => stateMachine.next(),
+        onPrevious: doPrevious,
+        onNext: doSkipNext, // user-driven skip → analytics emits item.skipped
         onTap: () => {
           // TV-feel: tap summons chrome briefly. The chrome shell
           // (Step 5) owns auto-hide; we just signal "user is here."
@@ -374,6 +408,10 @@ let activeBumper = null;
       gestures.teardown();
       audioGuard.teardown();
       narration?.teardown();
+      // Analytics teardown sync-flushes any queued events before
+      // detaching the pagehide listener. SPA-unmount loses any not-
+      // yet-batched events otherwise.
+      analytics.teardown();
       // dispose() (full-unmount) closes the AudioContext irreversibly;
       // teardown() keeps it alive for a re-mount. Boot's teardownActive
       // is the SPA-unmount entry, so dispose is correct here.
@@ -491,7 +529,7 @@ let activeBumper = null;
         // which surface (chrome button, keyboard, gesture) triggered.
         onPlay: doPlay,
         onPause: doPause,
-        onSkip: () => stateMachine.next(),
+        onSkip: doSkipNext, // user-driven skip → analytics emits item.skipped
       });
       controls?.setNowPlaying(item?.content_title ?? `Item ${index + 1} of ${view.items.length}`);
 
@@ -699,7 +737,15 @@ let activeBumper = null;
       const item = view.items[activeIndex];
       audioPipeline.startMusicBed({ experience: view.experience, item, behavior: b });
     });
-    stateMachine.on('item:ended', () => {
+    stateMachine.on('item:ended', ({ index }) => {
+      // Natural end (renderer.done resolved without user skip) →
+      // emit item.completed for analytics. User-driven skip goes
+      // through doSkipNext → emits item.skipped instead.
+      const endedItem = view.items[index];
+      analytics.emit(PLAYER_EVENTS.ITEM_COMPLETED, {
+        index,
+        item_id: endedItem?.item_id,
+      });
       // Auto-advance when the current item's behavior says so. The
       // SM stays content-agnostic; we read the active behavior here.
       if (activeSet?.behavior?.content_advance !== 'auto') return;
@@ -710,6 +756,11 @@ let activeBumper = null;
     stateMachine.on('experience:ended', async () => {
       // eslint-disable-next-line no-console
       console.info('[hwes/boot] experience:ended');
+      // Step 14a — Layer 2 analytics. Headline metric: did the
+      // listener finish the whole experience?
+      analytics.emit(PLAYER_EVENTS.EXPERIENCE_COMPLETED, {
+        item_count: view.items.length,
+      });
       // Step 12: mount the completion card on top of the last layer-set
       // (which stays underneath as the visual fade target). 3 retention
       // CTAs: Share / Try Another / What's Next from this creator.
@@ -724,6 +775,16 @@ let activeBumper = null;
         mount: app,
         experience: view.experience,
         items: view.items,
+        // Step 14a — `track` fires alongside the click for analytics
+        // BEFORE the default behavior (Web Share / navigation) runs.
+        // Doesn't replace it. (For replacing, supply onShare /
+        // onTryAnother / onWhatsNext — used by forks that want to
+        // hook the click entirely into their own flow.)
+        track: (cta) => {
+          if (cta === 'share') analytics.emit(PLAYER_EVENTS.CTA_SHARE);
+          else if (cta === 'try_another') analytics.emit(PLAYER_EVENTS.CTA_TRY_ANOTHER);
+          else if (cta === 'whats_next') analytics.emit(PLAYER_EVENTS.CTA_WHATS_NEXT);
+        },
       });
     });
 
@@ -750,7 +811,7 @@ let activeBumper = null;
     // see…" expectation.
     // eslint-disable-next-line no-console
     console.info(
-      '[Harmonic Wave Universal Player] Steps 1-12 mounted.\n' +
+      '[Harmonic Wave Universal Player] Steps 1-14a mounted.\n' +
         `  Audio:      ${audioPipeline.kind} pipeline${stateMachine.isAudioUnlocked() ? ' (unlocked)' : ' (locked — first Play unlocks)'}\n` +
         `  Source:     ${describeSource({ fixtureName })}\n` +
         `  Experience: ${view.experience?.name ?? '(unnamed)'} (${view.items.length} item${view.items.length === 1 ? '' : 's'})\n` +
