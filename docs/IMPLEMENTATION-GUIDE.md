@@ -1,8 +1,9 @@
 # Implementation Guide — Universal Player Engine
 
-**Status:** Phase 2 (engine implementation) — shovel-ready as of 2026-04-19.
+> **Status (2026-04-19, mid-Step 13):** This guide was authored at project bootstrap as the "how to extract POC knowledge into the new engine" reference. **Steps 1-12 of the build sequence are complete** — the architectural sections below (audio pipeline iOS traps, visualizer-canvas POC line refs, mobile vs desktop audio paths, brown-noise generation, palette extraction) remain useful reference material. The "Step 1: Repo setup" and "Step 2: Registry sync + bootstrap" sections at the bottom are HISTORICAL — that work shipped long ago. For current build status see [`SPEC.md` §9 Build Sequence](./SPEC.md). For per-step implementation detail see the README status block.
+
 **Companion:** [`SPEC.md`](./SPEC.md) for architecture; this doc for the per-module *how*.
-**Source of truth (POC):** `~/Projects/harmonic-wave-player/index.html` (~2,250 lines, vanilla HTML/CSS/JS, single file). Keep it open as you build. The POC is the **parity target** — every module here exists to extract one of its responsibilities into a typed, testable, substitutable shape.
+**Source of truth (POC):** `~/Projects/harmonic-wave-player/index.html` (~2,250 lines, vanilla HTML/CSS/JS, single file). Keep it open as a parity reference. POC parity validation is Step 13b — see [`STEP-13B-PARITY-PLAYBOOK.md`](./STEP-13B-PARITY-PLAYBOOK.md).
 
 ---
 
@@ -526,7 +527,9 @@ The POC draws the current item's cover art at full viewport size, blurred + dimm
 
 ---
 
-## 4. Build sequence — Step 1 + Step 2 (start here)
+## 4. Build sequence — Step 1 + Step 2 (HISTORICAL — already shipped)
+
+> The following sections describe the bootstrap work that landed at the start of the project. They're preserved for archaeology and to help readers understand the directory shape that emerged. **Do not act on these instructions** — Steps 1-12 are complete; see [`SPEC.md` §9](./SPEC.md) for current status and [`STEP-13B-PARITY-PLAYBOOK.md`](./STEP-13B-PARITY-PLAYBOOK.md) for the POC parity workflow.
 
 The 15-step build sequence in [`SPEC.md`](./SPEC.md) §9 is the manifest. This section narrates the first two steps so the next contributor (human or AI) can sit down and start writing code.
 
@@ -623,4 +626,4 @@ The 15-step build sequence in [`SPEC.md`](./SPEC.md) §9 is the manifest. This s
 
 ---
 
-*End of guide. Step 2 is the next concrete deliverable.*
+*End of guide. The "next concrete deliverable" line above is from project bootstrap — the project is now mid-Step-13 of 15. Current status: README status block + [`SPEC.md` §9](./SPEC.md).*

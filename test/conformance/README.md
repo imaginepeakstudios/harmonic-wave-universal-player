@@ -26,26 +26,22 @@ When the platform adds an additive HWES v1 extension, a new conformance fixture 
 
 ```
 test/conformance/
-├── README.md                   ← this file
+├── README.md                   ← this file (high-level docs)
+├── COVERAGE-MATRIX.md          ← canonical per-primitive / per-recipe index
 ├── conformance.test.js         ← the harness (vitest)
-├── fixtures/                   ← input HWES v1 payloads
-│   ├── 01-bare-audio.hwes.json
-│   ├── 02-cinematic-fullscreen.hwes.json
-│   ├── 03-actor-cascade.hwes.json
-│   ├── 04-display-cascade-override.hwes.json
-│   ├── 05-lyrics-karaoke.hwes.json
-│   ├── 06-player-theme-pro.hwes.json
-│   ├── 07-player-theme-stripped-free.hwes.json
-│   ├── 08-graceful-unknown-recipe.hwes.json
-│   ├── 09-music-bed-narration.hwes.json
-│   └── 10-end-of-experience.hwes.json
+├── fixtures/                   ← input HWES v1 payloads (38+ fixtures)
+│   ├── 01-bare-audio.hwes.json           ← defaults floor
+│   ├── 02-cinematic-fullscreen.hwes.json ← display recipe
+│   ├── ...
+│   ├── 12-production-holding-on.hwes.json ← golden production wire shape
+│   ├── 18-29 — one fixture per delivery recipe
+│   ├── 30-32 — cascade conflict + multi-recipe stack
+│   └── 33-38 — production-wire + graceful-degradation edge cases
 └── expected/                   ← expected resolved behavior per fixture
-    ├── 01-bare-audio.expected.json
-    ├── 02-cinematic-fullscreen.expected.json
-    └── ...
+    └── <NN>-<slug>.expected.json
 ```
 
-Each fixture is paired with an `expected/{n}-{name}.expected.json` describing the resolved per-item `BehaviorConfig` and the layered render plan that any conformant engine must produce.
+Each fixture is paired with an `expected/{n}-{name}.expected.json` describing the resolved per-item `BehaviorConfig` + layered render plan that any conformant engine must produce. **For the canonical index of which fixture covers which contract surface (every primitive, every recipe, every cascade rule, every extension, every edge case), see [`COVERAGE-MATRIX.md`](COVERAGE-MATRIX.md).**
 
 ---
 
@@ -147,43 +143,52 @@ Forks / third-party players: copy this directory into your repo, port `conforman
 
 ## Conformance cases covered
 
-Two categories: **synthetic** (hand-authored, designed to exercise one
-specific contract per fixture) and **golden** (verbatim production
-responses from `harmonicwave.ai/mcp/v1/message get_experience`,
-captured to lock the wire shape the engine must handle correctly).
+Three categories — see [`COVERAGE-MATRIX.md`](COVERAGE-MATRIX.md) for the full per-fixture index mapped against every primitive, recipe, cascade rule, extension, and edge case in the spec.
 
-### Synthetic — built-in recipes (10/10 covered)
+### Synthetic — display + delivery recipes (22/22 covered)
 
-| Fixture | Exercises |
-|---|---|
-| `01-bare-audio` | Single audio item, no recipes, default behavior |
-| `02-cinematic-fullscreen` | `cinematic_fullscreen` display recipe → BehaviorConfig |
-| `03-album-art-forward` | `album_art_forward` display recipe |
-| `04-performance-mode` | `performance_mode` display recipe (chrome=none, manual advance) |
-| `05-background-visual` | `background_visual` display recipe (autoplay muted, loop) |
-| `06-letterbox-21-9` | `letterbox_21_9` display recipe for video content |
-| `07-lyrics-karaoke` | `lyrics_karaoke` + `lrc_lyrics` metadata precondition |
-| `08-document-excerpt` | `document_excerpt` + content_type=document precondition |
-| `09-image-sequence` | `image_sequence` + content_type=photo precondition |
-| `10-cross-fade-transitions` | `cross_fade_transitions` (transition primitive only) |
+All 10 display recipes + all 12 delivery recipes have dedicated fixtures. Display: `01-10` cover the original 10. Delivery: `18-29` cover all 12 (added in Step 13a; previously only `story_then_play` was exercised via cascade fixture 11).
 
-### Synthetic — cascade interactions
+### Synthetic — cascade + multi-recipe interactions
 
 | Fixture | Exercises |
 |---|---|
-| `11-cascade-display-and-delivery` | Display + delivery recipe stack on one item; both arrays walked, both merged in SPEC §13 #30 order |
-| `13-broken-media-mid-sequence` | Working item → broken URL → working item; auto-advance must reach the third item via the renderer's error path |
+| `11-cascade-display-and-delivery` | Display + delivery on one item; both arrays walked, both merged in SPEC §13 #30 order. NO conflict on any primitive — both fully apply. |
+| `30-cascade-conflict-delivery-wins` | Conflict case: display says `chrome=none`, delivery says `chrome=minimal` → resolved `minimal` (delivery wins per SPEC #30). |
+| `31-multi-display-stack` | Two display recipes; later array entry wins on conflict. |
+| `32-multi-delivery-stack` | Same for delivery. |
+| `13-broken-media-mid-sequence` | Working item → broken URL → working item; auto-advance via renderer's error path. |
+
+### Synthetic — actor cascade + extensions
+
+| Fixture | Exercises |
+|---|---|
+| `15-actor-cascade-experience-level` | Experience-level actor; all items inherit. |
+| `16-actor-cascade-item-override` | Per-item actor wins; `source: 'item'` on resolved_actor. |
+| `17-player-theme-extension` | `player_theme_v1` → CSS custom properties applied. |
+| `33-profile-attribution-production-wire` | Production wire shape `profile_name` + `profile_slug` (joined from `users.name`/`users.slug` per platform `user-tools.ts`). Locked here so the post-Step-12 P0 fix can never silently regress. |
+
+### Synthetic — graceful degradation (SPEC §5.4)
+
+| Fixture | Exercises |
+|---|---|
+| `34-unknown-extension-graceful` | Mix of known + unknown extensions; known honored, unknown surfaces in `unknownExtensions` for diagnostics. |
+| `35-unknown-recipe-graceful` | Built-in slug + unknown slug; engine applies the known + silently skips the unknown. |
+| `36-custom-recipe-ignored` | Free-text creator-authored slug per SPEC #12 — engine ignores; defaults applied. |
+| `37-empty-experience` | Zero items; state-machine fires `experience:ended` on start. |
+| `38-precondition-fail-graceful` | `lyrics_karaoke` recipe without `lrc_lyrics` metadata; engine skips with `reason='precondition'`. |
 
 ### Golden — production wire shape
 
 | Fixture | Captured | Exercises |
 |---|---|---|
-| `12-production-holding-on` | 2026-04-19 from `harmonicwave.ai/mcp/v1/message` for slug `my-test` | Stringified-JSON content_metadata + item_display_recipes + content_recipes + recipes; flattened actor_* fields; content_cover_art_url alias; custom recipe slug (skipped silently); `seo_metadata_v1` extension honored |
+| `12-production-holding-on` | 2026-04-19 from `harmonicwave.ai/mcp/v1/message` for slug `my-test` | Stringified-JSON `content_metadata` + `item_display_recipes` + `content_recipes` + `recipes`; flattened actor_* fields; `content_cover_art_url` alias; custom recipe slug (skipped silently); `seo_metadata_v1` extension honored. |
+| `14-production-shape-builtin-recipe` | Synthesized | Built-in recipe slug carried in production's stringified-JSON wire shape. |
 
-**`12-production-holding-on` is the floor of production coverage, not the ceiling.** It's a basic 2-item experience (1 song + 1 video, no actor configured, single custom recipe at experience level). It does NOT exercise:
+**`12-production-holding-on` is the floor of production coverage, not the ceiling.** It's a 2-item experience (1 song + 1 video, no actor configured, single custom recipe at experience level). Surfaces NOT yet exercised by golden fixtures (track in `COVERAGE-MATRIX.md`):
+
 - A nested `player_theme_v1` extension payload with branding tokens
-- A built-in recipe (`cinematic_fullscreen`, `lyrics_karaoke`, etc.) appearing in production stringified-JSON form
-- A non-null actor with `actor_visual_directives` array
+- A non-null actor with `actor_visual_directives` array (synthetic 15/16 cover the cascade; production-shape capture pending)
 - Items inside a collection (`collection_id` set + `collection_*` fields populated)
 - `item_override_enabled: 1` cascade behavior
 - `delivery_override_instruction` per-item overrides
@@ -191,18 +196,4 @@ captured to lock the wire shape the engine must handle correctly).
 - Premium experiences with `access_type: 'premium'`
 - Multi-actor experiences with cascade resolution
 
-**Process for adding new golden fixtures:** Each time a richer experience is published on the platform, capture its `get_experience` response verbatim, sanitize timing/state fields (`stream_count`, `play_count`, `last_played`, `share_token`), drop into `fixtures/`, author the corresponding `expected/` for the engine's projection, run the suite. Production schema drift surfaces immediately.
-
-### Planned (land alongside future build steps)
-
-| Fixture | Exercises | Lands in build step |
-|---|---|---|
-| `14-actor-cascade` | Actor cascade resolves across experience → collection → item; `resolved_actor.source` reflects the level | Step 5 polish (when actor renderer ships) |
-| `15-display-cascade-override` | Display cascade: item-level override only fires when `override_enabled=1`; otherwise inherits | Step 5 polish |
-| `16-player-theme-pro` | `player_theme_v1` extension → CSS custom properties applied; brand assets proxied | Step 5 polish |
-| `17-music-bed-narration-{desktop,mobile}` | Platform discriminator: desktop activates music bed, mobile no-ops | Step 9 + Step 10 |
-| `18-end-of-experience` | After last item, `experience:ended` fires; completion card renders | Step 12 |
-| `19-collection-cascade` | Items inside a collection inherit `actor_profile_id` + recipes from the collection | Future |
-| `20-premium-access-denied` | `access_type=premium` without verification → 403 path | Future |
-
-Add more as conformance edge cases surface.
+**Process for adding new golden fixtures:** Each time a richer experience is published on the platform, capture its `get_experience` response verbatim, sanitize timing/state fields (`stream_count`, `play_count`, `last_played`, `share_token`), drop into `fixtures/`, author the corresponding `expected/` for the engine's projection, run the suite. Production schema drift surfaces immediately. Step 13b (POC parity validation — see [`docs/STEP-13B-PARITY-PLAYBOOK.md`](../../docs/STEP-13B-PARITY-PLAYBOOK.md)) lays out the per-song golden-fixture capture once Matthew's catalog migrates to the platform.

@@ -1,13 +1,14 @@
 # Sequence — Narration + Audio + State Machine
 
+> **Status (2026-04-19):** Steps 9 + 11 SHIPPED. State machine + audio pipeline + narration pipeline are all wired per this protocol. The implementer-checklist at the bottom of this doc is now historical (the work landed); the SEQUENCE DIAGRAM and TIMING contracts above remain canonical reference for understanding how the three modules interact at runtime. See `src/playback/state-machine.js`, `src/playback/audio-pipeline/desktop.js`, and `src/composition/narration-pipeline.js` for the implementations.
+
 The single most error-prone region of the engine is the interaction between
 **state machine** (pure logic, owns "what item are we on?"), **audio pipeline**
 (owns AudioContext + GainNodes + actual `<audio>` elements), and **narration
 pipeline** (orchestrates DJ phases + music bed + content fade-in). The POC
 collapsed all three into one file with a single shared `djSpeaking` flag; in
 the modular cut this is no longer one flag — it's a **protocol** between three
-modules. This document makes the protocol explicit before any of the three is
-written.
+modules. This document makes the protocol explicit.
 
 Read this before touching `src/playback/`, `src/composition/narration-pipeline.js`,
 or any audio-touching renderer. Per IMPLEMENTATION-GUIDE.md §3.3 and §3.6.
@@ -184,7 +185,9 @@ These are the bugs the POC took weeks to discover and fix. Don't re-discover the
 
 ---
 
-## Implementer checklist (Step 8-11)
+## Implementer checklist (Step 8-11) — HISTORICAL
+
+> The work below shipped in Steps 9 + 11. Preserved for archaeology — useful to verify whether each commitment was actually honored in the final code. Use as a code-review checklist during the v0.9.0 → v1.0.0 testing phase.
 
 Before you write `state-machine.js`:
 - [ ] This protocol is the contract. If you change it, update this doc first.
