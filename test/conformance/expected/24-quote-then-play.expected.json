@@ -1,0 +1,17 @@
+{
+  "experience": {
+    "id": 24,
+    "slug": "quote-then-play",
+    "name": "Quote Then Play Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 2401,
+      "resolved_behavior": {
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 2
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

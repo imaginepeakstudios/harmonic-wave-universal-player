@@ -1,0 +1,21 @@
+{
+  "_comment": "Conformance fixture 24 — quote_then_play delivery recipe. Has a precondition `requires_metadata: ['primary_quote']`. Item supplies primary_quote in content_metadata so the precondition passes. Tests the precondition-checker happy path.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 24,
+  "slug": "quote-then-play",
+  "name": "Quote Then Play Conformance Fixture",
+  "items": [
+    {
+      "item_id": 2401,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Quote Then Play Test",
+      "media_play_url": "/media/play/test.mp3",
+      "content_metadata": {
+        "primary_quote": "What if the silence is the loudest thing you've ever heard?"
+      },
+      "delivery_instructions": ["quote_then_play"]
+    }
+  ]
+}

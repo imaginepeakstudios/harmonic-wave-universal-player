@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 26 — compare_and_contrast delivery recipe. Sets narration_position=between_items, pause_after_narration_seconds=2.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 26,
+  "slug": "compare-and-contrast",
+  "name": "Compare And Contrast Conformance Fixture",
+  "items": [
+    {
+      "item_id": 2601,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Compare And Contrast Test",
+      "media_play_url": "/media/play/test.mp3",
+      "delivery_instructions": ["compare_and_contrast"]
+    }
+  ]
+}

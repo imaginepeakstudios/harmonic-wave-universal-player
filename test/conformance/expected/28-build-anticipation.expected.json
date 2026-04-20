@@ -1,0 +1,18 @@
+{
+  "experience": {
+    "id": 28,
+    "slug": "build-anticipation",
+    "name": "Build Anticipation Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 2801,
+      "resolved_behavior": {
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 2,
+        "transition": "fade_through_black"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

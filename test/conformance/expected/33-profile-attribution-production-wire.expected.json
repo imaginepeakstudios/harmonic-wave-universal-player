@@ -1,0 +1,20 @@
+{
+  "experience": {
+    "id": 33,
+    "slug": "profile-attribution-production-wire",
+    "name": "Profile Attribution (Production Wire) Conformance Fixture",
+    "profile_name": "Matthew Hartley",
+    "profile_slug": "matthew-hartley"
+  },
+  "items": [
+    {
+      "item_id": 3301,
+      "resolved_actor": null,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "chrome": "full"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

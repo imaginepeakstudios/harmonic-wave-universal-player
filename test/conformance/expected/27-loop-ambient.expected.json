@@ -1,0 +1,19 @@
+{
+  "experience": {
+    "id": 27,
+    "slug": "loop-ambient",
+    "name": "Loop Ambient Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 2701,
+      "resolved_behavior": {
+        "loop": true,
+        "chrome": "none",
+        "autoplay": "on",
+        "narration_position": "before_content"
+      },
+      "layers": ["content"]
+    }
+  ]
+}

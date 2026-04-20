@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 27 — loop_ambient delivery recipe. Sets loop=true, chrome=none, autoplay=on, narration_position=before_content (default). The only built-in recipe that sets autoplay=on (the rest use 'muted' or 'off').",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 27,
+  "slug": "loop-ambient",
+  "name": "Loop Ambient Conformance Fixture",
+  "items": [
+    {
+      "item_id": 2701,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Loop Ambient Test",
+      "media_play_url": "/media/play/test.mp3",
+      "delivery_instructions": ["loop_ambient"]
+    }
+  ]
+}

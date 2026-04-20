@@ -1,0 +1,17 @@
+{
+  "_comment": "Conformance fixture 20 — chapter_sequence delivery recipe. Sets content_advance=auto (default), pause_between_items_seconds=2. The 2s pause is the test surface — only late_night_reflection (3s) and chapter_sequence (2s) set non-zero values for this primitive across the recipe registry.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 20,
+  "slug": "chapter-sequence",
+  "name": "Chapter Sequence Conformance Fixture",
+  "items": [
+    {
+      "item_id": 2001,
+      "content_id": 100,
+      "content_type_slug": "document",
+      "content_title": "Chapter Sequence Test",
+      "delivery_instructions": ["chapter_sequence"]
+    }
+  ]
+}

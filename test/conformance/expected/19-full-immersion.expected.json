@@ -1,0 +1,18 @@
+{
+  "experience": {
+    "id": 19,
+    "slug": "full-immersion",
+    "name": "Full Immersion Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 1901,
+      "resolved_behavior": {
+        "chrome": "minimal",
+        "narration_position": "before_content",
+        "pause_between_items_seconds": 0
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

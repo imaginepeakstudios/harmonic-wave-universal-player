@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 32 — multi-delivery recipe stack within array order. `late_night_reflection` (audio_ducking_db=-9) FIRST + `story_then_play` (audio_ducking_db=-6) SECOND. Per the cascade rule, later array entries override → resolved audio_ducking_db=-6. Locks the within-delivery ordering behavior, complementing fixture 31 for the display side.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 32,
+  "slug": "multi-delivery-stack",
+  "name": "Multi-Delivery Recipe Stack Conformance Fixture",
+  "items": [
+    {
+      "item_id": 3201,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Multi-Delivery Stack Test",
+      "media_play_url": "/media/play/test.mp3",
+      "delivery_instructions": ["late_night_reflection", "story_then_play"]
+    }
+  ]
+}

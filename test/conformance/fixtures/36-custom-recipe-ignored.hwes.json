@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 36 — custom (creator-authored) recipe slug ignored by the deterministic engine. Per SPEC §5.1 + decision #12, custom recipes are AI-only — the engine ignores them silently. Item carries `make_it_groovy_creator_custom` (free-text creator-authored slug, NOT in the built-in registry). Engine renders as if no recipe present (defaults).",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 36,
+  "slug": "custom-recipe-ignored",
+  "name": "Custom Recipe Ignored Conformance Fixture",
+  "items": [
+    {
+      "item_id": 3601,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Custom Recipe Test",
+      "media_play_url": "/media/play/test.mp3",
+      "delivery_instructions": ["make_it_groovy_creator_custom"]
+    }
+  ]
+}

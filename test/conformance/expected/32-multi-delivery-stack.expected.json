@@ -1,0 +1,19 @@
+{
+  "experience": {
+    "id": 32,
+    "slug": "multi-delivery-stack",
+    "name": "Multi-Delivery Recipe Stack Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 3201,
+      "resolved_behavior": {
+        "pause_between_items_seconds": 3,
+        "pause_after_narration_seconds": 1,
+        "audio_ducking_db": -6,
+        "narration_position": "before_content"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

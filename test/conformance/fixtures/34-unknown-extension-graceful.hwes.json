@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 34 — graceful degradation on unknown extension. Lists `display_recipes_v1` (known) AND `time_travel_recipes_v99` (unknown). Player must accept the experience, surface the unknown extension via `unknownExtensions` for diagnostics, and still render the item using the known parts. Tests SPEC §5.4 graceful-degradation contract.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1", "time_travel_recipes_v99"],
+  "id": 34,
+  "slug": "unknown-extension-graceful",
+  "name": "Unknown Extension Graceful Conformance Fixture",
+  "items": [
+    {
+      "item_id": 3401,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Unknown Extension Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["cinematic_fullscreen"]
+    }
+  ]
+}

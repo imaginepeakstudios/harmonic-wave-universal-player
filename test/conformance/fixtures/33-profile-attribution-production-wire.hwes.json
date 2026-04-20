@@ -1,0 +1,19 @@
+{
+  "_comment": "Conformance fixture 33 — production-wire profile attribution. Production get_experience joins users.name AS profile_name + users.slug AS profile_slug per harmonic-wave-api-platform user-tools.ts:60-63 (NOT creator_name/creator_slug). Step 12's completion card byline + What's Next CTA must resolve from these production fields. Without this fixture, the player passed unit tests via the demo-fixture-only `creator_name` alias but silently lost the byline + CTA on every real production response.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 33,
+  "slug": "profile-attribution-production-wire",
+  "name": "Profile Attribution (Production Wire) Conformance Fixture",
+  "profile_name": "Matthew Hartley",
+  "profile_slug": "matthew-hartley",
+  "items": [
+    {
+      "item_id": 3301,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Profile Attribution Test",
+      "media_play_url": "/media/play/test.mp3"
+    }
+  ]
+}

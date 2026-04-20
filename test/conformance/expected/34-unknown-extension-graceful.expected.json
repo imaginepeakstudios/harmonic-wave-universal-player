@@ -1,0 +1,21 @@
+{
+  "experience": {
+    "id": 34,
+    "slug": "unknown-extension-graceful",
+    "name": "Unknown Extension Graceful Conformance Fixture"
+  },
+  "hwes_extensions_honored": ["display_recipes_v1"],
+  "hwes_extensions_ignored": ["time_travel_recipes_v99"],
+  "items": [
+    {
+      "item_id": 3401,
+      "resolved_behavior": {
+        "prominence": "hero",
+        "sizing": "fullscreen",
+        "chrome": "none",
+        "autoplay": "muted"
+      },
+      "layers": ["scene", "content"]
+    }
+  ]
+}

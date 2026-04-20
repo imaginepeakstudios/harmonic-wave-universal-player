@@ -1,0 +1,17 @@
+{
+  "experience": {
+    "id": 23,
+    "slug": "emotional-opening",
+    "name": "Emotional Opening Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 2301,
+      "resolved_behavior": {
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 2
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "experience": {
+    "id": 30,
+    "slug": "cascade-conflict-delivery-wins",
+    "name": "Cascade Conflict — Delivery Wins Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 3001,
+      "resolved_behavior": {
+        "prominence": "hero",
+        "sizing": "fullscreen",
+        "chrome": "minimal",
+        "autoplay": "muted",
+        "narration_position": "before_content",
+        "pause_between_items_seconds": 0
+      },
+      "layers": ["scene", "content", "chrome"]
+    }
+  ]
+}

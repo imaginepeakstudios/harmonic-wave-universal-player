@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 25 — guided_walkthrough delivery recipe. Sets narration_position=between_items, pause_after_narration_seconds=1, audio_ducking_db=-6 (default). The first of two recipes that uses between_items (the other is compare_and_contrast).",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 25,
+  "slug": "guided-walkthrough",
+  "name": "Guided Walkthrough Conformance Fixture",
+  "items": [
+    {
+      "item_id": 2501,
+      "content_id": 100,
+      "content_type_slug": "narration",
+      "content_title": "Guided Walkthrough Test",
+      "media_play_url": "/media/play/test.mp3",
+      "delivery_instructions": ["guided_walkthrough"]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "experience": {
+    "id": 22,
+    "slug": "visual-first",
+    "name": "Visual First Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 2201,
+      "resolved_behavior": {
+        "prominence": "hero",
+        "sequence_dwell_seconds": 3,
+        "narration_position": "after_content"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

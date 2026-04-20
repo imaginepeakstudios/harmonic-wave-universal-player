@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 28 — build_anticipation delivery recipe. Sets narration_position=before_content (default), pause_after_narration_seconds=2, transition=fade_through_black. The only recipe that sets transition=fade_through_black; other transition values come from cross_fade_transitions (crossfade) or default (cut).",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 28,
+  "slug": "build-anticipation",
+  "name": "Build Anticipation Conformance Fixture",
+  "items": [
+    {
+      "item_id": 2801,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Build Anticipation Test",
+      "media_play_url": "/media/play/test.mp3",
+      "delivery_instructions": ["build_anticipation"]
+    }
+  ]
+}

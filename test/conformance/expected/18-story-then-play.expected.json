@@ -1,0 +1,18 @@
+{
+  "experience": {
+    "id": 18,
+    "slug": "story-then-play",
+    "name": "Story Then Play Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 1801,
+      "resolved_behavior": {
+        "narration_position": "before_content",
+        "pause_after_narration_seconds": 1,
+        "audio_ducking_db": -6
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

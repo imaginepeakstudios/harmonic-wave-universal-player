@@ -1,0 +1,17 @@
+{
+  "experience": {
+    "id": 20,
+    "slug": "chapter-sequence",
+    "name": "Chapter Sequence Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 2001,
+      "resolved_behavior": {
+        "content_advance": "auto",
+        "pause_between_items_seconds": 2
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

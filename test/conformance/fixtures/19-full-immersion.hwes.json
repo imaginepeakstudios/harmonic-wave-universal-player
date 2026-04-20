@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 19 — full_immersion delivery recipe. Sets chrome=minimal, narration_position=before_content (default), pause_between_items_seconds=0 (default). Tests minimal chrome via delivery (most chrome=none / minimal cases come from display recipes; this is the delivery path).",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 19,
+  "slug": "full-immersion",
+  "name": "Full Immersion Conformance Fixture",
+  "items": [
+    {
+      "item_id": 1901,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Full Immersion Test",
+      "media_play_url": "/media/play/test.mp3",
+      "delivery_instructions": ["full_immersion"]
+    }
+  ]
+}

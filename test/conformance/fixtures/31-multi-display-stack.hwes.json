@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 31 — multi-display recipe stack within array order. `inline_player` (chrome=full) FIRST + `cinematic_fullscreen` (chrome=none) SECOND. Per the cascade rule, later array entries override earlier ones — resolved chrome=none. Locks the within-display ordering behavior.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 31,
+  "slug": "multi-display-stack",
+  "name": "Multi-Display Recipe Stack Conformance Fixture",
+  "items": [
+    {
+      "item_id": 3101,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Multi-Display Stack Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["inline_player", "cinematic_fullscreen"]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 22 — visual_first delivery recipe. Sets prominence=hero, sequence_dwell_seconds=3, narration_position=after_content. The only built-in recipe that uses narration_position=after_content (everything else is before_content or between_items).",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 22,
+  "slug": "visual-first",
+  "name": "Visual First Conformance Fixture",
+  "items": [
+    {
+      "item_id": 2201,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Visual First Test",
+      "media_play_url": "/media/play/test.mp3",
+      "delivery_instructions": ["visual_first"]
+    }
+  ]
+}

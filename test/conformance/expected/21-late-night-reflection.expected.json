@@ -1,0 +1,18 @@
+{
+  "experience": {
+    "id": 21,
+    "slug": "late-night-reflection",
+    "name": "Late Night Reflection Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 2101,
+      "resolved_behavior": {
+        "pause_between_items_seconds": 3,
+        "pause_after_narration_seconds": 2,
+        "audio_ducking_db": -9
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

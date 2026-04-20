@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 35 — graceful degradation on unknown built-in recipe slug. Item carries `cinematic_fullscreen` (known) + `non_existent_recipe_v99` (unknown — possibly a snapshot drift / fork-side custom slug colliding with built-in namespace). Engine must apply the known one + silently skip the unknown without crashing. Tests SPEC §5.4 graceful-degradation contract.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 35,
+  "slug": "unknown-recipe-graceful",
+  "name": "Unknown Recipe Graceful Conformance Fixture",
+  "items": [
+    {
+      "item_id": 3501,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Unknown Recipe Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["cinematic_fullscreen", "non_existent_recipe_v99"]
+    }
+  ]
+}

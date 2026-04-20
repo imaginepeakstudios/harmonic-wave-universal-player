@@ -1,0 +1,19 @@
+{
+  "experience": {
+    "id": 31,
+    "slug": "multi-display-stack",
+    "name": "Multi-Display Recipe Stack Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 3101,
+      "resolved_behavior": {
+        "prominence": "hero",
+        "sizing": "fullscreen",
+        "chrome": "none",
+        "autoplay": "muted"
+      },
+      "layers": ["scene", "content"]
+    }
+  ]
+}

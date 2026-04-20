@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 38 — recipe precondition failure handled gracefully. Item carries `lyrics_karaoke` (display recipe with precondition: requires_metadata=['lrc_lyrics']). Item provides NO lrc_lyrics. Engine must skip the recipe (returning a SkippedRecipe with reason='precondition') and fall through to defaults. Tests the precondition-checker's reject path.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 38,
+  "slug": "precondition-fail-graceful",
+  "name": "Precondition Fail Graceful Conformance Fixture",
+  "items": [
+    {
+      "item_id": 3801,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Precondition Fail Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["lyrics_karaoke"]
+    }
+  ]
+}

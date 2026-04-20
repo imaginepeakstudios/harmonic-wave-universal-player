@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 21 — late_night_reflection delivery recipe. Sets pause_between_items_seconds=3, pause_after_narration_seconds=2, audio_ducking_db=-9. Tests the deepest ducking value (-9 dB) in the registry — only this recipe goes below the default -6.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 21,
+  "slug": "late-night-reflection",
+  "name": "Late Night Reflection Conformance Fixture",
+  "items": [
+    {
+      "item_id": 2101,
+      "content_id": 100,
+      "content_type_slug": "narration",
+      "content_title": "Late Night Reflection Test",
+      "media_play_url": "/media/play/test.mp3",
+      "delivery_instructions": ["late_night_reflection"]
+    }
+  ]
+}

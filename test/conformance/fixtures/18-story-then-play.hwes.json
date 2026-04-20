@@ -1,0 +1,18 @@
+{
+  "_comment": "Conformance fixture 18 — story_then_play delivery recipe (Step 13a coverage). Sets narration_position=before_content (default already), pause_after_narration_seconds=1, audio_ducking_db=-6 (already default). The locked recipe-level test that the engine merges these primitives in correctly even when some match defaults.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 18,
+  "slug": "story-then-play",
+  "name": "Story Then Play Conformance Fixture",
+  "items": [
+    {
+      "item_id": 1801,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Story Then Play Test",
+      "media_play_url": "/media/play/test.mp3",
+      "delivery_instructions": ["story_then_play"]
+    }
+  ]
+}

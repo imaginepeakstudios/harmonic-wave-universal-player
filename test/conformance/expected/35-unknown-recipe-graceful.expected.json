@@ -1,0 +1,19 @@
+{
+  "experience": {
+    "id": 35,
+    "slug": "unknown-recipe-graceful",
+    "name": "Unknown Recipe Graceful Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 3501,
+      "resolved_behavior": {
+        "prominence": "hero",
+        "sizing": "fullscreen",
+        "chrome": "none",
+        "autoplay": "muted"
+      },
+      "layers": ["scene", "content"]
+    }
+  ]
+}

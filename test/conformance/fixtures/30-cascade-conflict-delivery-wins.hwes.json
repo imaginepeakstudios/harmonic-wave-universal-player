@@ -1,0 +1,19 @@
+{
+  "_comment": "Conformance fixture 30 — cascade conflict resolution test (SPEC #30). Display recipe `cinematic_fullscreen` sets chrome=none. Delivery recipe `full_immersion` sets chrome=minimal. Per the locked cascade order (defaults → display → delivery, last wins), delivery must win → resolved chrome=minimal. The companion fixture to 11-cascade-display-and-delivery, which had no conflict.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 30,
+  "slug": "cascade-conflict-delivery-wins",
+  "name": "Cascade Conflict — Delivery Wins Conformance Fixture",
+  "items": [
+    {
+      "item_id": 3001,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "Cascade Conflict Test",
+      "media_play_url": "/media/play/test.mp3",
+      "display_directives": ["cinematic_fullscreen"],
+      "delivery_instructions": ["full_immersion"]
+    }
+  ]
+}

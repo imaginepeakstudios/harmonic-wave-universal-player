@@ -1,0 +1,17 @@
+{
+  "experience": {
+    "id": 38,
+    "slug": "precondition-fail-graceful",
+    "name": "Precondition Fail Graceful Conformance Fixture"
+  },
+  "items": [
+    {
+      "item_id": 3801,
+      "resolved_behavior": {
+        "lyrics_display": "none",
+        "expand_button": false
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

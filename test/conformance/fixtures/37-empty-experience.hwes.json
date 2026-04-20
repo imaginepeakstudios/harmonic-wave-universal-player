@@ -1,0 +1,9 @@
+{
+  "_comment": "Conformance fixture 37 — empty experience (zero items). Edge case: state machine immediately fires experience:ended on start; player must mount the end-of-experience completion card without crashing. Tests the items.length === 0 branch in state-machine.js + boot's experience:ended handler.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 37,
+  "slug": "empty-experience",
+  "name": "Empty Experience Conformance Fixture",
+  "items": []
+}
