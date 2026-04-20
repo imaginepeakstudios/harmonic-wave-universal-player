@@ -83,9 +83,24 @@ The POC has hard-coded behavior. The new player gets equivalent behavior via rec
 | DJ between every track in playlist mode | `chapter_sequence` (delivery) + `guided_walkthrough` (delivery) | Or compose via item-level scripts |
 | Crossfade between tracks | `cross_fade_transitions` (display) | Triggers Step 9's crossfade pipeline |
 
-**Mapping gaps the POC has but HWES doesn't yet:**
-- POC has a "Skip Intro" button. HWES has `narration:skip` event but no UI button on the chrome controls yet. Step 10's keyboard 'N' covers it; chrome-button parity is a player-side polish item (track as Step 13c if it surfaces during parity testing).
-- POC's chapter bar (chapter numeral + name + year range pinned to top). HWES has no first-class "chapter" concept yet; could be expressed as a `text-overlay` renderer reading `experience.chapters[]` metadata. Track as either an HWES extension (`chapter_bar_v1`) or a player-side rendering of `arc_role` data.
+**⚠️ Cascade order matters when stacking recipes** (P1 from FE arch review of 4299df4). Per [SPEC #30](./SPEC.md), merge order is `defaults → display → delivery (last in array wins)`. Real conflicts in this table:
+
+- **`album_art_forward` + `cinematic_fullscreen` (display + display) — DON'T STACK BOTH.** They conflict on `chrome` (none vs minimal) and `sizing` (fullscreen vs contain). Pick ONE per song based on the desired UX:
+  - `cinematic_fullscreen` → full-bleed visualizer is the hero
+  - `album_art_forward` → cover art is the hero with playback controls beneath
+- `chapter_sequence` + `guided_walkthrough` (delivery + delivery) — both set `narration_position` (auto + between_items). Per array-order rule, the LATER one wins. Order intentionally to get the position you want.
+- `story_then_play` + `late_night_reflection` (delivery + delivery) — both set `audio_ducking_db` (-6 vs -9). Later wins.
+
+**Mapping gaps the POC has but HWES doesn't yet** (P1 expansion from FE arch review of 4299df4 — full POC feature audit per `~/Projects/harmonic-wave-player/CLAUDE.md`):
+
+- **Skip Intro button** — POC has it as a chrome button; HWES has `narration:skip` event + Step 10's keyboard 'N' but no chrome button. Player-side polish (Step 13c).
+- **Chapter bar** (chapter numeral + name + year range pinned to top) — HWES has no first-class "chapter" concept. Track as either an HWES extension (`chapter_bar_v1`) or a player-side rendering of `arc_role` / `experience_metadata.chapters[]`.
+- **Volume slider** — POC has a chrome slider tied to `audio.volume`. New player's chrome controls (Play/Skip only per `src/chrome/controls.js`). Decide per the broadcast-TV-feel framing: a TV doesn't have a volume slider for the program (system-level OS control owns it). Likely intentionally NOT in v1; document in SPEC.
+- **Lyrics side panel toggle** — POC has a "Lyrics" button that opens a side panel with the full lyrics + scroll-sync. HWES has the overlay variants (`lyrics_karaoke` etc) but no side-panel pattern. Could be a player-side polish item OR an HWES extension (`lyrics_panel_v1`).
+- **Playlist drawer toggle** — POC has a "Playlist" button that opens a slide-out drawer with all tracks + jump-to. HWES has `experience.items` but no in-player listing UI. Would be a player feature on top of existing data; track as a future step (between Steps 13 and 14).
+- **Header bar with artist logo + link** — POC pins artist branding at top. HWES has `actor.visual_directives` but no first-class artist-link pattern. Maps to player_theme_v1 extension or to the existing chrome shell's `<h1>` slot.
+
+These gaps inform the v0.9.0 → v1.0.0 testing-phase scope: each gap needs a per-feature decision (player polish / HWES extension / intentionally-not-v1 with SPEC documentation).
 
 ---
 
@@ -143,6 +158,15 @@ For each of the 10 songs, compare these 24 surfaces:
 - [ ] "by Matthew Hartley" byline renders (resolves from `profile_name`)
 - [ ] "What's Next" CTA links to `/p/matthew-hartley`
 
+**Resilience + a11y** (P1 from FE arch review of 4299df4 — was missing):
+- [ ] `prefers-reduced-motion` honored — visualizer particles paused, bumper waveform animation disabled, crossfade reduced to a quick fade (per `@media (prefers-reduced-motion: reduce)` blocks in `src/index.html`)
+- [ ] Focus traps + `aria-live` for track changes — chrome controls' "now playing" updates announce; focus stays on Play button
+- [ ] Keyboard-only navigation through completion card — Tab moves between Share / Try Another / What's Next; Escape dismisses (per Step 12 polish)
+- [ ] Tab-switch behavior — single-audio-guard pauses local audio when another tab broadcasts `playing`; resumes on user gesture
+- [ ] Network-failure recovery — broken `media_play_url` triggers renderer error path → state machine advances to next item (fixture 13 covers parse-side; UX behavior comparison here)
+- [ ] Skip-during-bumper — bumper has no skip per design (network-ident behavior); confirm no race with the boot pipeline if user reloads or navigates away
+- [ ] Tab visibility change (`document.hidden`) — audio continues playing in backgrounded tab unless single-audio-guard fires (orthogonal — not currently implemented; future polish)
+
 ---
 
 ## Expected output (deliverables once parity testing happens)
@@ -152,11 +176,11 @@ Once Matthew uploads the catalog + the parity matrix gets walked:
 1. **`docs/STEP-13B-PARITY-REPORT.md`** — table of all 10 songs × 24 surfaces, ✅/⚠️/❌ per cell, with screenshot links + notes.
 2. **Open issues** for every ⚠️ / ❌ — track as Step 13c polish (or escalate to a new HWES extension if the gap is spec-level).
 3. **Updated coverage matrix** (`test/conformance/COVERAGE-MATRIX.md`) — fixture additions for any rendering surface the parity test surfaced as poorly covered.
-4. **Two new conformance fixtures per song** (Production-shape with the actual stringified-JSON wire shape from production `get_experience` for that song):
-   - `40-production-holding-on-full.hwes.json`
-   - `41-production-without-you-full.hwes.json`
-   - ... etc
-   - These verify the production wire shape parses cleanly per-song.
+4. **2-3 representative production-shape conformance fixtures** (P2 scope-down from FE review of 4299df4 — 20 per-song fixtures was 50% suite inflation for limited new coverage; every song shares the same wire shape). Pick:
+   - `40-production-with-lyrics.hwes.json` — a song with `lrc_lyrics` populated (covers the lyrics overlay engine path through the production stringified-JSON content_metadata)
+   - `41-production-without-lyrics.hwes.json` — a song with no LRC (covers the no-overlay path)
+   - `42-production-full-journey.hwes.json` — the multi-item experience with all 10 in chapter order (covers cross-item state-machine + actor-cascade + crossfade transitions through the production wire)
+   - These verify the production wire shape parses cleanly across the spectrum without bloating the suite.
 
 ---
 

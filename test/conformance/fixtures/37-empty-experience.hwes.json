@@ -1,5 +1,5 @@
 {
-  "_comment": "Conformance fixture 37 — empty experience (zero items). Edge case: state machine immediately fires experience:ended on start; player must mount the end-of-experience completion card without crashing. Tests the items.length === 0 branch in state-machine.js + boot's experience:ended handler.",
+  "_comment": "Conformance fixture 37 — empty experience (zero items). Schema interpreter must accept the experience + surface an empty items[]. Boot's contract for empty (src/boot.js:233-236) is to short-circuit with setEmpty('This experience has no items.') rather than mount the end-of-experience completion card — an empty experience never had a 'thanks for watching' moment to acknowledge. The state machine ALSO supports items.length === 0 (fires experience:ended immediately on start) for callers that want to drive empty through the SM, but boot intentionally takes the setEmpty path instead. (P0 fixed in FE arch review polish of 4299df4.)",
   "hwes_version": 1,
   "hwes_extensions": [],
   "id": 37,

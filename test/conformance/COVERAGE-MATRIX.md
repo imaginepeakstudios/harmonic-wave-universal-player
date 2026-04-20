@@ -33,7 +33,20 @@ This document maps every contract surface in the HWES v1 spec to the conformance
 | `audio_ducking_db` | `-6` | `21-late-night-reflection` (-9), `25-guided-walkthrough` (-6), `18-story-then-play` (-6) | number -24..0 |
 | `narration_music_bed` | `none` | `01-bare-audio` (default) | enum: none / auto |
 
-**Status:** all 16 primitives exercised at non-default values across the suite (with the exception of `narration_music_bed: 'auto'`, which has no built-in recipe that sets it — covered by demo fixture `12-music-bed-mood-driven` via the dev override).
+**Status:** all 16 primitive KEYS exercised at non-default values across the suite. **Enum-value coverage** is more nuanced — several declared enum values aren't reached by any built-in recipe AND the player's render path doesn't implement them yet (tracked for the v0.9.0 → v1.0.0 testing phase per memory note `project_player_versioning_plan.md`):
+
+| Primitive | Declared values | Reached by recipe + exercised | Not reached / not implemented |
+|---|---|---|---|
+| `narration_position` | before / during / after / between | ✅ before, after, between | ❌ `during_content` — narration-pipeline.js:177 explicitly no-ops on it (deferred per Step 11). Need narration overlay + content concurrent + a recipe to push the value. |
+| `transition` | cut / crossfade / fade_through_black / slide | ✅ cut, crossfade, fade_through_black | ❌ `slide` — boot.js mountItem branches on `cut`/`crossfade` only; no recipe sets `slide`. |
+| `lyrics_display` | none / scroll_synced / spotlight_line / typewriter | ✅ none, scroll_synced | ⚠️ `spotlight_line` + `typewriter` — overlay renderers exist (`renderers/overlay/lyrics-spotlight.js` + `lyrics-typewriter.js`) but no built-in recipe sets these values. Needs a registry-side push. |
+| `doc_display` | none / excerpt / fullscreen_reader | ✅ none, excerpt | ❌ `fullscreen_reader` — `renderers/content/document.js` doesn't implement the fullscreen reader path; no recipe sets it. |
+| `narration_music_bed` | none / auto | ✅ none | ⚠️ `auto` — covered by demo fixture `12-music-bed-mood-driven` via the dev `?music_bed=auto` override; no built-in recipe sets the value (acceptable per #34's synthesized-default architecture). |
+
+These value gaps are NOT contract bugs in the spec — the spec correctly declares the enums + the registry simply doesn't push every value via a recipe. The player's job is to NOT crash on any declared value + ideally render it sensibly. v0.9.0 → v1.0.0 testing-phase work:
+1. Decide whether `during_content`, `slide`, `fullscreen_reader` need implementation in the player or whether they're explicitly deferred to v2 (and document accordingly in SPEC).
+2. Add fixtures via `display_directives` / `delivery_instructions` (or a synthetic recipe) that exercise each value.
+3. Lock the resolved_behavior assertion so a future fork can claim "implements `transition: slide` correctly" against a conformance test.
 
 ---
 
@@ -82,7 +95,7 @@ This document maps every contract surface in the HWES v1 spec to the conformance
 | Rule | Covered by | Notes |
 |---|---|---|
 | Default → display → delivery (last wins) | `11-cascade-display-and-delivery` | Both apply (no conflict on any primitive) |
-| Delivery wins on conflict | `30-cascade-conflict-delivery-wins` | Display sets `chrome:none`, delivery sets `chrome:full` → result `full` |
+| Delivery wins on conflict | `30-cascade-conflict-delivery-wins` | Display (`cinematic_fullscreen`) sets `chrome:none`; delivery (`full_immersion`) sets `chrome:minimal` → result `minimal` (delivery wins per #30) |
 | Multiple display recipes stack in array order | `31-multi-display-stack` | Two display recipes; later wins on conflict |
 | Multiple delivery recipes stack in array order | `32-multi-delivery-stack` | Two delivery recipes; later wins on conflict |
 
@@ -130,7 +143,7 @@ This document maps every contract surface in the HWES v1 spec to the conformance
 | Unknown extension → ignored, listed in `hwes_extensions_ignored` | `34-unknown-extension-graceful` | Player still renders item-by-item |
 | Unknown recipe slug → silently skipped | `35-unknown-recipe-graceful` | Engine returns SkippedRecipe diagnostic |
 | Custom recipe (free-text instructions) → silently skipped | `36-custom-recipe-ignored` | AI-only field; engine skips |
-| Empty items array → renders end-of-experience moment immediately | `37-empty-experience` | state-machine fires experience:ended on start |
+| Empty items array → boot short-circuits with `setEmpty()` info screen (NOT the EOE completion card — empty never had a "thanks for watching" moment) | `37-empty-experience` | Boot path at `src/boot.js:233-236`. State machine ALSO supports `items.length === 0` (fires `experience:ended` on start) for non-boot callers; boot doesn't take that path |
 | Missing media_play_url → renderer.done resolves on error event | `13-broken-media-mid-sequence` | Auto-advance past broken items |
 | Recipe precondition fails (lyrics_karaoke without lrc_lyrics) | `38-precondition-fail-graceful` | Engine returns SkippedRecipe with reason: 'precondition' |
 
