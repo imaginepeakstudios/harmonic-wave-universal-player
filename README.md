@@ -76,7 +76,7 @@ The engine ships as vanilla ES modules — no bundler required. What works today
 git clone https://github.com/imaginepeakstudios/harmonic-wave-universal-player.git
 cd harmonic-wave-universal-player
 bun install         # installs vitest + happy-dom + prettier + typescript (devDeps only — engine has zero runtime deps)
-bun run test        # 539 tests — should be green
+bun run test        # 542 tests — should be green
 bun run typecheck   # tsc --checkJs --noEmit on src/
 bun run dev         # python3 -m http.server 8080 --directory src
 # Open http://localhost:8080/?fixture=01-bare-audio&debug=1

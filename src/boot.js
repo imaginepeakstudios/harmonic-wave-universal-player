@@ -302,9 +302,14 @@ let activeBumper = null;
     const analytics = createEventStream({
       enabled: analyticsParam !== 'off',
       debug: analyticsParam === 'debug',
-      // Slug is the most reliable cross-fixture identifier; production
-      // platform may add `share_token` later via interpreter pass-through.
-      experienceToken: view.experience?.slug,
+      // Layer 2 join key (Step 14a P0 from FE arch review of b9a6a4a):
+      // MUST match Layer 1's `/media/play` grouping which keys on
+      // share_token. Resolution order: production wire → URL path
+      // (/run/:token) → slug fallback (dev/fixture only).
+      experienceToken:
+        /** @type {string | undefined} */ (view.experience?.share_token) ??
+        extractShareTokenFromPath(globalThis.location?.pathname) ??
+        view.experience?.slug,
     });
 
     // Hoisted bindings — `teardownActive` (assigned below) is an arrow
@@ -887,6 +892,21 @@ class BootEmptyError extends Error {
     super(message);
     this.name = 'BootEmptyError';
   }
+}
+
+/**
+ * Extract the share-token segment from `/run/:token` URLs. Used by
+ * Step 14a analytics as a fallback when the platform's HWES response
+ * doesn't include `share_token` in the payload (production wire DOES;
+ * fixtures + dev sometimes don't). P0 from FE arch review of b9a6a4a.
+ *
+ * @param {string | undefined} pathname
+ * @returns {string | undefined}
+ */
+function extractShareTokenFromPath(pathname) {
+  if (typeof pathname !== 'string') return undefined;
+  const match = pathname.match(/\/run\/([^/?#]+)/);
+  return match ? match[1] : undefined;
 }
 
 function describeSource({ fixtureName }) {

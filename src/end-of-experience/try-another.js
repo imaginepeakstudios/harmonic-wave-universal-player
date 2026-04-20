@@ -62,7 +62,13 @@ export function renderTryAnotherCta(opts = {}) {
   btn.setAttribute('aria-label', 'Try another experience');
 
   btn.addEventListener('click', () => {
-    onClick?.();
+    // Analytics throw MUST NOT block navigation. P2 from FE review of b9a6a4a.
+    try {
+      onClick?.();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[hwes/try-another] onClick threw (non-fatal):', err);
+    }
     if (onActivate) {
       onActivate();
       return;

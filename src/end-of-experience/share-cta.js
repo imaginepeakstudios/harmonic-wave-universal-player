@@ -43,7 +43,16 @@ export function renderShareCta(opts) {
   setLabel(btn, 'Share');
 
   btn.addEventListener('click', async () => {
-    onClick?.();
+    // Wrap onClick (analytics) in try/catch so an analytics throw
+    // CAN'T break the share/navigation behavior the CTA exists for.
+    // P2 from FE review of b9a6a4a — analytics MUST NEVER block
+    // playback OR user-facing actions.
+    try {
+      onClick?.();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[hwes/share] onClick threw (non-fatal):', err);
+    }
     if (onShare) {
       onShare();
       return;

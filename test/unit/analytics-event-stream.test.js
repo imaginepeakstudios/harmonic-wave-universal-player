@@ -62,15 +62,53 @@ describe('analytics/event-stream — basic emit + flush', () => {
     bc.restore();
   });
 
-  test('emit() queues the event with type + ts + sessionId', () => {
+  test('emit() queues the event + flush sends the JSON body as a string', () => {
     stream = createEventStream({ batchSize: 100 });
     stream.emit(PLAYER_EVENTS.ITEM_COMPLETED, { item_id: 42 });
-    // Force flush to read the wire payload
     stream.flush();
     expect(bc.calls.length).toBe(1);
-    const blob = bc.calls[0].body;
-    // Blob.text() is async; simpler: assert via constructor
-    expect(blob.constructor.name).toBe('Blob');
+    // Body is sent as a string (P1 from FE review of b9a6a4a — Blob
+    // wrapping silently failed on older Safari/Firefox).
+    const body = bc.calls[0].body;
+    expect(typeof body).toBe('string');
+    const parsed = JSON.parse(body);
+    expect(parsed.events).toHaveLength(1);
+    expect(parsed.events[0]).toMatchObject({
+      type: 'item.completed',
+      payload: { item_id: 42 },
+    });
+    expect(parsed.events[0].sessionId).toBeTruthy();
+    expect(typeof parsed.events[0].ts).toBe('number');
+  });
+
+  test('events emit in order A, B, C → batch is [A, B, C]', () => {
+    stream = createEventStream({ batchSize: 100 });
+    stream.emit('a');
+    stream.emit('b');
+    stream.emit('c');
+    stream.flush();
+    const parsed = JSON.parse(bc.calls[0].body);
+    expect(parsed.events.map((e) => e.type)).toEqual(['a', 'b', 'c']);
+  });
+
+  test('two streams in the same page get distinct sessionIds', () => {
+    const s1 = createEventStream({ batchSize: 100 });
+    const s2 = createEventStream({ batchSize: 100 });
+    expect(s1.sessionId).not.toBe(s2.sessionId);
+    s1.teardown();
+    s2.teardown();
+  });
+
+  test('payload with circular reference does not throw out of emit/flush', () => {
+    stream = createEventStream({ batchSize: 100 });
+    const circular = { foo: 1 };
+    /** @type {any} */ (circular).self = circular;
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    stream.emit('event.with.circular', circular);
+    expect(() => stream.flush()).not.toThrow();
+    expect(warnSpy).toHaveBeenCalled();
+    expect(bc.beacon).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   test('flush triggers sendBeacon with the queue', () => {

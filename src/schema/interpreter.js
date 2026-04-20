@@ -200,6 +200,13 @@ function normalizeItem(rawItem) {
  *   Production wire passes through; forks running the player on a
  *   non-platform domain set this to point at their own discover surface
  *   instead of the local `/` fallback.
+ * @property {string | undefined} share_token
+ *   Production wire field — the share-token URL segment from `/run/:token`.
+ *   The Layer 1 platform analytics (`/media/play`) groups events by
+ *   `share_token`; the Layer 2 player-side analytics (Step 14a) MUST
+ *   match this join key so cross-layer aggregation works. Pass-through
+ *   from the platform's `get_experience` response when present, else
+ *   boot extracts it from `location.pathname` as a fallback.
  */
 
 /**
@@ -345,6 +352,10 @@ export function interpret(rawResponse, opts = {}) {
     profile_slug: rawResponse.profile_slug,
     // Optional discover surface — overrides Try Another default.
     discover_url: rawResponse.discover_url,
+    // Layer 2 analytics join key (Step 14a) — must match Layer 1's
+    // `/media/play` grouping per SPEC #32. Production wire passes
+    // through; boot extracts from /run/:token as a fallback.
+    share_token: rawResponse.share_token,
   };
 
   /** @type {HwesView} */

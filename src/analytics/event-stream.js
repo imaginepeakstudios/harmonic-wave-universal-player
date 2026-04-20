@@ -89,6 +89,11 @@ export function createEventStream(opts = {}) {
   let queue = [];
   /** @type {ReturnType<typeof setTimeout> | null} */
   let intervalTimer = null;
+  // Cheap insurance against double-flush when boot's pagehide handler
+  // fires teardown() AND the analytics module's own pagehide listener
+  // also fires (P1 from FE review of b9a6a4a — currently order-
+  // dependent + harmless, but explicit flag is clearer).
+  let isTorndown = false;
 
   function startIntervalTimer() {
     if (intervalTimer != null || batchInterval <= 0) return;
@@ -109,7 +114,7 @@ export function createEventStream(opts = {}) {
       clearTimeout(intervalTimer);
       intervalTimer = null;
     }
-    if (queue.length === 0) return;
+    if (isTorndown || queue.length === 0) return;
     const batch = queue;
     queue = [];
 
@@ -119,8 +124,12 @@ export function createEventStream(opts = {}) {
       return;
     }
 
-    const body = JSON.stringify({ events: batch });
+    // JSON.stringify is INSIDE the try (P1 from FE review of b9a6a4a)
+    // — a circular reference in payload would otherwise propagate up
+    // through emit() into the state-machine subscriber that called it,
+    // breaking auto-advance. Catch + warn + drop the batch.
     try {
+      const body = JSON.stringify({ events: batch });
       const sent = trySendBeacon(endpoint, body);
       if (!sent) tryFetchKeepalive(endpoint, body);
     } catch (err) {
@@ -164,11 +173,11 @@ export function createEventStream(opts = {}) {
     },
     flush,
     teardown() {
+      // Flush BEFORE setting isTorndown so the final flush sends.
+      // (flush() also clears the interval timer — the explicit clear
+      // below is redundant per P2 from FE review of b9a6a4a.)
       flush();
-      if (intervalTimer != null) {
-        clearTimeout(intervalTimer);
-        intervalTimer = null;
-      }
+      isTorndown = true;
       if (typeof globalThis.removeEventListener === 'function') {
         globalThis.removeEventListener('pagehide', onPageHide);
       }
@@ -177,6 +186,16 @@ export function createEventStream(opts = {}) {
 }
 
 /**
+ * Send the batch as a string body — Content-Type defaults to
+ * `text/plain;charset=UTF-8` per the sendBeacon spec, which the
+ * platform endpoint parses with JSON.parse(). P1 from FE review of
+ * b9a6a4a: previously we wrapped the body in `new Blob([body], {type:
+ * 'application/json'})`, but older Safari (<14.1) and several Firefox
+ * versions silently drop sendBeacon Blobs whose MIME isn't in the
+ * CORS-safelisted set (text/plain, application/x-www-form-urlencoded,
+ * multipart/form-data) — the call returned `true` but the batch
+ * never arrived. String body avoids that landmine.
+ *
  * @param {string} url
  * @param {string} body
  * @returns {boolean}  true if sendBeacon accepted the call
@@ -186,12 +205,7 @@ function trySendBeacon(url, body) {
   const nav = globalThis.navigator;
   if (!nav?.sendBeacon) return false;
   try {
-    // sendBeacon expects a Blob or string; spec says Content-Type for
-    // a string body is text/plain, which the platform accepts (we
-    // parse JSON on the server). For Content-Type:application/json
-    // explicitly, wrap as a Blob.
-    const blob = new Blob([body], { type: 'application/json' });
-    return nav.sendBeacon(url, blob) === true;
+    return nav.sendBeacon(url, body) === true;
   } catch {
     return false;
   }

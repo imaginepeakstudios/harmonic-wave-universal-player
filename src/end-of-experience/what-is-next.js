@@ -51,7 +51,13 @@ export function renderWhatsNextCta(opts) {
   btn.setAttribute('aria-label', "What's next from this creator");
 
   btn.addEventListener('click', () => {
-    onClick?.();
+    // Analytics throw MUST NOT block navigation. P2 from FE review of b9a6a4a.
+    try {
+      onClick?.();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[hwes/whats-next] onClick threw (non-fatal):', err);
+    }
     if (onActivate) {
       onActivate();
       return;
