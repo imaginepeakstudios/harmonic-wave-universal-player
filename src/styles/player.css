@@ -1023,6 +1023,94 @@ body {
   }
 }
 
+/* COLLECTION TITLE CARD — Phase 5 segment-title-card renderer.
+   Activated when an `item:started` carries kind='collection-ref'
+   (broadcast_show recipe — chapter wrappers). Holds 2.4s, voices
+   Tier 2 collection.intro_hint via narration pipeline, then fades
+   into the first nested child item. Lives at z=80 — below cold-
+   open (z=90) since cold-open is the cinematic peak; above content
+   (z<50) since this is a framing-tier moment. */
+.hwes-collection-card {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(10, 18, 28, 0.92) 0%,
+    rgba(2, 5, 9, 0.98) 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 500ms ease-in-out;
+}
+.hwes-collection-card--visible {
+  opacity: 1;
+}
+.hwes-collection-card__inner {
+  max-width: min(64vw, 720px);
+  text-align: center;
+  padding: 2rem;
+  transform: translateY(12px);
+  transition: transform 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hwes-collection-card--visible .hwes-collection-card__inner {
+  transform: translateY(0);
+}
+.hwes-collection-card__cover {
+  width: clamp(140px, 22vw, 240px);
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 1.4rem;
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(109, 211, 255, 0.18);
+}
+.hwes-collection-card__eyebrow {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--player-primary, rgba(109, 211, 255, 0.8));
+  margin: 0 0 0.6rem 0;
+}
+.hwes-collection-card__title {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: clamp(1.4rem, 3.4vw, 2.2rem);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0 0 0.9rem 0;
+  color: var(--player-text, #e8e6d8);
+  text-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.75),
+    0 0 24px var(--player-primary, rgba(109, 211, 255, 0.4));
+}
+.hwes-collection-card__subtitle {
+  font-family: var(--player-font-body, 'Rajdhani', sans-serif);
+  font-size: clamp(0.95rem, 1.7vw, 1.1rem);
+  font-weight: 300;
+  line-height: 1.45;
+  color: rgba(232, 230, 216, 0.8);
+  margin: 0;
+  max-width: 50ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hwes-collection-card {
+    transition: none;
+  }
+  .hwes-collection-card__inner {
+    transition: none;
+    transform: none;
+  }
+}
+
 /* CINEMATIC MOMENTS — Phase 3 + FE-arch P1-5 (2026-05-03).
    Single-source list of chrome elements that hide during the
    bumper, cold-open card, or any other "cinematic moment."

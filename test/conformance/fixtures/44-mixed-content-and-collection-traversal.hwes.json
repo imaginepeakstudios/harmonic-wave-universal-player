@@ -1,0 +1,80 @@
+{
+  "_comment": "Phase 5 — recursive traversal fixture. Mixes a top-level standalone content item (acting as an ouverture) with two collection-references each containing nested collection_content[]. Validates: (a) buildTraversal() depth-first walk emits wrapper nodes between sibling content nodes; (b) the segment title card path triggers on collection-ref item:started; (c) parentCollection cascades to nested children for the chrome chapter-bar. Also exercises raw production column-name aliasing inside collection_content[] (id→content_id, title→content_title, etc.) per the harmonicwave.ai 'the-time-is-now' wire shape.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1", "delivery_recipes_v1"],
+  "id": 44,
+  "slug": "mixed-content-and-collection-traversal",
+  "name": "Mixed Content and Collection Traversal",
+  "items": [
+    {
+      "item_id": 4401,
+      "content_id": 300,
+      "collection_id": null,
+      "content_type_slug": "narration",
+      "content_title": "Opening monologue",
+      "intro_hint": "Welcome — let's set the stage.",
+      "media_play_url": "/media/play/intro.mp3"
+    },
+    {
+      "item_id": 4402,
+      "collection_id": 60,
+      "content_id": null,
+      "collection_name": "Chapter One: Beginnings",
+      "collection_slug": "chapter-one-beginnings",
+      "collection_type": "album",
+      "collection_numeral": "I",
+      "collection_metadata": { "intro_hint": "The journey starts here." },
+      "collection_recipes": ["story_then_play"],
+      "collection_visual_scene": { "color_palette": "#00d2eb" },
+      "collection_content": [
+        {
+          "id": 400,
+          "title": "First step",
+          "slug": "first-step",
+          "status": "released",
+          "metadata": { "story_text": "It begins with a single note." },
+          "recipes": ["story_then_play"],
+          "cc_override_enabled": false,
+          "cc_display_recipes": [],
+          "content_type_slug": "song",
+          "media_play_url": "/media/play/c1-first.mp3"
+        },
+        {
+          "id": 401,
+          "title": "Second step",
+          "slug": "second-step",
+          "status": "released",
+          "content_type_slug": "song",
+          "media_play_url": "/media/play/c1-second.mp3"
+        }
+      ]
+    },
+    {
+      "item_id": 4403,
+      "collection_id": 61,
+      "content_id": null,
+      "collection_name": "Chapter Two: Rising",
+      "collection_slug": "chapter-two-rising",
+      "collection_type": "album",
+      "collection_numeral": "II",
+      "collection_metadata": { "intro_hint": "The pulse quickens." },
+      "collection_recipes": ["cinematic_fullscreen"],
+      "collection_content": [
+        {
+          "content_id": 500,
+          "content_title": "Crescendo",
+          "content_type_slug": "song",
+          "media_play_url": "/media/play/c2-crescendo.mp3",
+          "content_status": "released"
+        },
+        {
+          "content_id": 501,
+          "content_title": "Forthcoming dawn",
+          "content_type_slug": "song",
+          "content_status": "coming_soon",
+          "media_play_url": "/media/play/c2-dawn.mp3"
+        }
+      ]
+    }
+  ]
+}

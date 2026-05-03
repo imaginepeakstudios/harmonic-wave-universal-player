@@ -170,10 +170,71 @@ function normalizeItem(rawItem) {
     normalized.collection_recipes = parseJsonField(rawItem.collection_recipes, []);
     normalized.collection_visual_scene = parseJsonField(rawItem.collection_visual_scene, undefined);
     if (Array.isArray(rawItem.collection_content)) {
-      normalized.collection_content = rawItem.collection_content.map(normalizeItem);
+      normalized.collection_content = rawItem.collection_content.map(
+        normalizeCollectionContentEntry,
+      );
     }
   }
   return /** @type {any} */ (normalized);
+}
+
+/**
+ * Normalize a `collection_content[]` entry from production wire shape.
+ * The platform emits these with RAW column names — `id`, `title`, `slug`,
+ * `status`, `recipes`, `metadata`, `tts_fields` — not the normalized
+ * `content_*` aliases used at the top level. This helper mirrors
+ * normalizeItem's contract but adds the alias chain.
+ *
+ * Production fields confirmed via `get_experience` MCP fetch on
+ * 2026-05-03 (the-time-is-now):
+ *   id → content_id
+ *   title → content_title
+ *   slug → content_slug
+ *   status → content_status
+ *   recipes → delivery_instructions (via existing alias chain)
+ *   metadata → content_metadata
+ *   cc_display_recipes → display_directives (cascade-resolved by platform)
+ *   cc_override_enabled → override_enabled
+ *
+ * Per FE-arch sweep P2 #3 (V1-COMPLIANCE-SWEEP-2026-05-03.md). Without
+ * this aliasing, item.content_title is undefined for every nested song
+ * → renders as "Untitled" in chrome controls.
+ *
+ * @param {Record<string, unknown>} rawEntry
+ * @returns {ItemView}
+ */
+function normalizeCollectionContentEntry(rawEntry) {
+  if (!rawEntry || typeof rawEntry !== 'object') return /** @type {any} */ (rawEntry);
+  const aliased = { ...rawEntry };
+  // Field-name aliases. Top-level (if explicitly set) wins.
+  if (aliased.content_id == null && rawEntry.id != null) aliased.content_id = rawEntry.id;
+  if (aliased.content_title == null && rawEntry.title != null) {
+    aliased.content_title = rawEntry.title;
+  }
+  if (aliased.content_slug == null && rawEntry.slug != null) aliased.content_slug = rawEntry.slug;
+  if (aliased.content_status == null && rawEntry.status != null) {
+    aliased.content_status = rawEntry.status;
+  }
+  if (aliased.content_metadata == null && rawEntry.metadata != null) {
+    aliased.content_metadata = rawEntry.metadata;
+  }
+  if (aliased.content_recipes == null && rawEntry.recipes != null) {
+    aliased.content_recipes = rawEntry.recipes;
+  }
+  if (aliased.tts_fields == null && rawEntry.cc_tts_fields != null) {
+    aliased.tts_fields = rawEntry.cc_tts_fields;
+  }
+  // cc_override_enabled / cc_display_recipes are the override-leaf
+  // fields per HWES v1 spec content_collections junction. Surface
+  // under the canonical names.
+  if (aliased.override_enabled == null && rawEntry.cc_override_enabled != null) {
+    aliased.override_enabled = rawEntry.cc_override_enabled;
+  }
+  if (aliased.display_directives == null && rawEntry.cc_display_recipes != null) {
+    aliased.display_directives = parseJsonField(rawEntry.cc_display_recipes, []);
+  }
+  // Now run the standard normalization on the aliased object.
+  return normalizeItem(aliased);
 }
 
 /**

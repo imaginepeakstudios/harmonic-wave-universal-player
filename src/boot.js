@@ -78,7 +78,7 @@ import { createSingleAudioGuard } from './interactions/single-audio-guard.js';
 import { createNetworkBumper } from './intro/network-bumper.js';
 import { createNarrationPipeline } from './composition/narration-pipeline.js';
 import { createColdOpenCard } from './renderers/framing/cold-open-card.js';
-import { findCollectionForItem } from './chrome/chapter-bar.js';
+import { createCollectionTitleCard } from './renderers/scene/collection-title-card.js';
 import { createChromeBars } from './boot/chrome-bars.js';
 import { createWebPageShell } from './renderers/framing/page-shell-web.js';
 import { createCompletionCard } from './end-of-experience/completion-card.js';
@@ -493,10 +493,10 @@ let activeBumper = null;
      * instead. P14a from Layer 2 analytics design (decision #32).
      */
     function doSkipNext() {
-      const currentItem = view.items[activeIndex];
+      const currentItem = stateMachine.getCurrentNode()?.item;
       analytics.emit(PLAYER_EVENTS.ITEM_SKIPPED, {
         index: activeIndex,
-        item_id: currentItem?.item_id,
+        item_id: /** @type {any} */ (currentItem)?.item_id,
       });
       stateMachine.next();
     }
@@ -562,7 +562,11 @@ let activeBumper = null;
      * wrapper is the unit of opacity-cross-fade between items.
      */
     function buildLayerSet(index) {
-      const item = view.items[index];
+      // Prefer the state machine's traversal node — the playback engine
+      // is the single source of truth for "what's currently playing."
+      // Falls back to view.items[index] for the pre-start bootstrap
+      // (covers the case where mountItem is invoked before SM.start).
+      const item = stateMachine.getNodeAt(index)?.item ?? /** @type {any} */ (view.items[index]);
       const resolved = resolveBehavior(view, item);
       // Dev-only URL override: `?music_bed=auto` forces the bed on so you
       // can hear the synthesized provider without needing a recipe that
@@ -910,11 +914,73 @@ let activeBumper = null;
     });
 
     let lastMountedIndex = -1;
-    stateMachine.on('item:started', async ({ index, item }) => {
+    stateMachine.on('item:started', async ({ index, item, kind, parentCollection }) => {
       activeIndex = index;
+
+      // Recursive-traversal branch — Phase 5. Collection-references emit
+      // their own item:started so the broadcast_show recipe's "segment
+      // title card" moment maps 1:1 to a renderer. Tier 2 narration is
+      // handled inside the card's play(). After teardown, auto-advance
+      // into the first child (which is a content node).
+      if (kind === 'collection-ref') {
+        // Actor cascade: a collection-ref item may carry a resolved_actor
+        // override (junction.cc_resolved_actor); otherwise fall back to
+        // the experience-level actor. Reuse getItemActor — it already
+        // implements the item.resolved_actor || exp.actor cascade and
+        // works fine for collection-refs (they're just items with
+        // content_id null).
+        const collActor = view.getItemActor(/** @type {any} */ (item));
+        // Eyebrow ("Chapter N") — count how many collection-refs precede
+        // this one in the raw items[]. Works regardless of whether the
+        // ExperienceView exposes a separate getCollections() helper.
+        let collectionIndex = -1;
+        let seen = 0;
+        for (const raw of view.items) {
+          if (raw?.collection_id != null && raw?.content_id == null) {
+            if (raw === item) {
+              collectionIndex = seen;
+              break;
+            }
+            seen++;
+          }
+        }
+        // Hide chrome bars during the segment title card — it's a
+        // cinematic moment, same body class the cold-open card uses.
+        document.body?.classList?.add('hwes-cinematic');
+        const card = createCollectionTitleCard({
+          mount: app,
+          collection: item,
+          collectionIndex: collectionIndex >= 0 ? collectionIndex : undefined,
+          actor: collActor ?? null,
+          narrationPipeline: narration,
+          stateMachine,
+        });
+        try {
+          await card.play();
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('[hwes/boot] collection title card.play threw; advancing:', err);
+        } finally {
+          document.body?.classList?.remove('hwes-cinematic');
+        }
+        // Don't await teardown — overlap card fade-out with the first
+        // child item mount, same pattern as cold-open → item 0.
+        card.teardown();
+        // Auto-advance into the first nested child. content_advance
+        // policy doesn't apply to wrappers (they're presentation moments,
+        // not content); the spec treats segment title cards as transient.
+        stateMachine.next();
+        return;
+      }
+
       // FE-arch P1-3 — single-call per-item chrome refresh (chapter
       // bar + playlist drawer highlight + lyrics panel contents).
-      const itemCollection = findCollectionForItem(view, index);
+      // The SM emits `parentCollection` directly when the content node
+      // is nested inside a collection-ref; standalone (top-level) items
+      // get null. Recursive traversal is the source of truth — no need
+      // to walk view.items[] looking for the nearest preceding
+      // collection-ref the way the flat-list POC did.
+      const itemCollection = parentCollection ?? null;
       chromeBars?.updateOnItemStart({ item, index, collection: itemCollection });
       if (index === lastMountedIndex && activeSet) {
         // Bootstrap-then-unlock path: the visible card is already the
@@ -950,9 +1016,11 @@ let activeBumper = null;
         // playedReleasedCollection precondition itself, so cold
         // deep-links into a coming_soon item don't misfire.
         const isComingSoon = /** @type {any} */ (item)?.content_status === 'coming_soon';
+        const prevNode = stateMachine.getNodeAt(activeIndex - 1);
         const prevWasReleased =
           activeIndex > 0 &&
-          /** @type {any} */ (view.items[activeIndex - 1])?.content_status !== 'coming_soon';
+          prevNode?.kind === 'content' &&
+          /** @type {any} */ (prevNode.item)?.content_status !== 'coming_soon';
         if (isComingSoon && prevWasReleased && narration.willPlayDJ('boundary')) {
           const collName = itemCollection?.collection_name;
           const boundaryText = collName
@@ -1050,7 +1118,7 @@ let activeBumper = null;
       if (!activeSet || audioPipeline.kind !== 'desktop') return;
       const b = activeSet.behavior;
       if (b?.narration_music_bed === 'none') return;
-      const item = view.items[activeIndex];
+      const item = stateMachine.getCurrentNode()?.item;
       audioPipeline.startMusicBed({
         experience: view.experience,
         item,
@@ -1058,15 +1126,18 @@ let activeBumper = null;
         pickRandomBedUrl: makeRandomBedPicker(view, activeIndex),
       });
     });
-    stateMachine.on('item:ended', ({ index }) => {
+    stateMachine.on('item:ended', ({ index, item: endedItem, kind }) => {
       // Natural end (renderer.done resolved without user skip) →
       // emit item.completed for analytics. User-driven skip goes
       // through doSkipNext → emits item.skipped instead.
-      const endedItem = view.items[index];
-      analytics.emit(PLAYER_EVENTS.ITEM_COMPLETED, {
-        index,
-        item_id: endedItem?.item_id,
-      });
+      // Collection-ref endings are presentation-only (no analytics
+      // ITEM_COMPLETED — there's no content to "complete").
+      if (kind !== 'collection-ref') {
+        analytics.emit(PLAYER_EVENTS.ITEM_COMPLETED, {
+          index,
+          item_id: /** @type {any} */ (endedItem)?.item_id,
+        });
+      }
       // Auto-advance when the current item's behavior says so. The
       // SM stays content-agnostic; we read the active behavior here.
       if (activeSet?.behavior?.content_advance !== 'auto') return;
@@ -1178,9 +1249,16 @@ let activeBumper = null;
     // item:started subscriber above is idempotent vs. lastMountedIndex
     // so the post-unlock emit doesn't double-mount.
     if (!stateMachine.isAudioUnlocked() && view.items.length > 0) {
-      activeIndex = 0;
-      lastMountedIndex = 0;
-      mountItem(0);
+      // Only bootstrap-mount when the first traversal node is a content
+      // item. If it's a collection-ref (chapter wrapper), the segment
+      // title card path will fire on unlock — no pre-unlock placeholder
+      // needed. The cold-open card (when present) covers the wait.
+      const firstNode = stateMachine.getCurrentNode();
+      if (!firstNode || firstNode.kind === 'content') {
+        activeIndex = 0;
+        lastMountedIndex = 0;
+        mountItem(0);
+      }
     }
 
     // Console banner: confirms the engine + composition + renderers

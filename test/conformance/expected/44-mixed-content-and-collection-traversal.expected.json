@@ -1,0 +1,32 @@
+{
+  "_comment": "Phase 5 — recursive traversal expected projection. The schema interpreter normalizes the standalone song (item 0), the two collection-ref wrappers (items 1 + 2), and recursively normalizes their collection_content[] children. Aliasing rule: production wires sometimes emit raw column names (id/title/slug/status/metadata/recipes) on collection_content entries; the interpreter aliases these to the canonical content_* fields. The wrappers themselves don't pin a layer plan — their rendering is owned by the boot.js segment-title-card path (Phase 5), not the per-item layer-selector. We assert (a) standalone item 0 layers correctly, (b) wrappers preserve their collection metadata, (c) nested children are reachable + normalized.",
+  "experience": {
+    "id": 44,
+    "slug": "mixed-content-and-collection-traversal",
+    "name": "Mixed Content and Collection Traversal"
+  },
+  "hwes_extensions_honored": ["display_recipes_v1", "delivery_recipes_v1"],
+  "items": [
+    {
+      "item_id": 4401,
+      "content_id": 300,
+      "content_type_slug": "narration",
+      "resolved_behavior": {
+        "chrome": "full"
+      },
+      "layers": ["content", "chrome"]
+    },
+    {
+      "item_id": 4402,
+      "collection_id": 60,
+      "content_id": null,
+      "collection_name": "Chapter One: Beginnings"
+    },
+    {
+      "item_id": 4403,
+      "collection_id": 61,
+      "content_id": null,
+      "collection_name": "Chapter Two: Rising"
+    }
+  ]
+}

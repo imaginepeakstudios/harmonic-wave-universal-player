@@ -18,6 +18,10 @@ When adding a new layer, **pick the lowest z value that satisfies the
   90  Cold-open card                             (cinematic moment; default for opening:'cold_open')
 
   80  End-of-experience completion card          (above content + chrome, below narration overlay)
+  80  Collection (segment) title card            (cinematic moment; fires on item:started kind='collection-ref')
+        ⚠ Two cinematic surfaces share z=80 — they never coexist (completion
+           card fires only after `experience:ended`; segment title cards fire
+           mid-experience between chapters).
 
   70  Header bar (.hwes-header-bar)              (persistent chrome; faded during cinematic moments)
   70  Show-ident bug (.hwes-show-ident)          (persistent chrome; faded during cinematic moments)

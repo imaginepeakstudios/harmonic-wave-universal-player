@@ -4,7 +4,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-> **Status:** Pre-1.0 / engine implementation in progress (**Steps 1-14a of 15 complete + Phase 0–4 spec-alignment work shipped 2026-05-02/03**). Phase 0a/0b/0c brought the local registry snapshot in line with live HWES v1 + wired the framing system end-to-end + completed schema interpreter coverage. Phase 1 hardened iOS / mobile audio. Phase 2 implemented the four-tier narration architecture per skill 1.5.8. Phase 3 shipped POC visual + interaction parity (header bar, chapter bar, playlist drawer, lyrics side panel, music bed = random song, coming-soon renderer, cover-art darken). Phase 4 added UX polish (three-channel concurrent audio, lyric supersession, prefers-reduced-motion, color tokens, UI swap deferral). The engine boots, fetches an HWES response from one of three sources (server-injected `<script id="hwes-data">`, local fixture file, live MCP), resolves per-experience FramingConfig + per-item BehaviorConfig + per-collection cascade, picks layers in z-order (scene → content → overlay → chrome → narration), and mounts the right renderers. **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.10.29, 2026-05-03) — the data contract this engine builds against is stable, and the MCP endpoint is reachable cross-origin from any host. Repo is already public; v0.9.0 release tag lands when Step 13b POC parity + Step 14b platform cutover + Step 15 v0.9.0 announcement complete. v0.9.0 → v1.0.0 needs an explicit testing phase. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
+> **Status:** Pre-1.0 / engine implementation in progress (**Steps 1-14a of 15 complete + Phase 0–4 spec-alignment work shipped 2026-05-02/03**). Phase 0a/0b/0c brought the local registry snapshot in line with live HWES v1 + wired the framing system end-to-end + completed schema interpreter coverage. Phase 1 hardened iOS / mobile audio. Phase 2 implemented the four-tier narration architecture per skill 1.5.8. Phase 3 shipped POC visual + interaction parity (header bar, chapter bar, playlist drawer, lyrics side panel, music bed = random song, coming-soon renderer, cover-art darken). Phase 4 added UX polish (three-channel concurrent audio, lyric supersession, prefers-reduced-motion, color tokens, UI swap deferral). The engine boots, fetches an HWES response from one of three sources (server-injected `<script id="hwes-data">`, local fixture file, live MCP), resolves per-experience FramingConfig + per-item BehaviorConfig + per-collection cascade, picks layers in z-order (scene → content → overlay → chrome → narration), and mounts the right renderers. **Platform Phase 1 LIVE in production** (harmonic-wave-api-platform v0.10.31, 2026-05-03) — the data contract this engine builds against is stable, and the MCP endpoint is reachable cross-origin from any host. Repo is already public; v0.9.0 release tag lands when Step 13b POC parity + Step 14b platform cutover + Step 15 v0.9.0 announcement complete. v0.9.0 → v1.0.0 needs an explicit testing phase. See [`docs/SPEC.md`](docs/SPEC.md) for the engineering plan and [the public spec page](https://harmonicwave.ai/hwes/v1) for the consumed JSON shape.
 
 ### What's mounted (Steps 1-14a + Phase 0–4)
 
@@ -78,7 +78,7 @@ The engine ships as vanilla ES modules — no bundler required. What works today
 git clone https://github.com/imaginepeakstudios/harmonic-wave-universal-player.git
 cd harmonic-wave-universal-player
 bun install         # installs vitest + happy-dom + prettier + typescript (devDeps only — engine has zero runtime deps)
-bun run test        # 745 tests — should be green
+bun run test        # 758 tests — should be green
 bun run typecheck   # tsc --checkJs --noEmit on src/
 bun run dev         # python3 -m http.server 8080 --directory src
 # Open http://localhost:8080/?fixture=01-bare-audio&debug=1
@@ -147,7 +147,7 @@ harmonic-wave-universal-player/
 │   ├── sync-registry.sh           ← Pulls live registry from production into src/registry-snapshot/
 │   └── verify-readme.js           ← README drift gate (test count + platform version)
 ├── test/
-│   ├── unit/                      ← Per-module pure logic — 64 test files, 745 tests
+│   ├── unit/                      ← Per-module pure logic — 64 test files, 758 tests
 │   ├── snapshot/                  ← Per-renderer DOM snapshots
 │   ├── conformance/               ← THE SPEC VALIDATOR — 41 HWES v1 fixtures + expected shapes
 │   └── ci/
