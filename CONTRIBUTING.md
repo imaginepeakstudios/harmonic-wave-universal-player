@@ -2,7 +2,7 @@
 
 Thanks for your interest. This document covers how to contribute, what we accept, and what we don't — read it before opening a PR.
 
-> **Status:** Pre-1.0. The architecture is locked (see [`docs/SPEC.md`](docs/SPEC.md)) and the platform-side data contract this engine builds against is LIVE in production (harmonic-wave-api-platform v0.10.57, 2026-05-03). Engine implementation is in active build (Steps 1-14a of 15 complete). Some contribution paths aren't ready yet — see "Current state" below.
+> **Status:** Pre-1.0. The architecture is locked (see [`docs/SPEC.md`](docs/SPEC.md)) and the platform-side data contract this engine builds against is LIVE in production (harmonic-wave-api-platform v0.10.58, 2026-05-03). Engine implementation is in active build (Steps 1-14a of 15 complete). Some contribution paths aren't ready yet — see "Current state" below.
 
 ---
 

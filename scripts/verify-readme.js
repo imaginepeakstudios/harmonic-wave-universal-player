@@ -42,6 +42,22 @@ const fail = (check, message) => failures.push({ check, message });
 const ok = (check, detail) => console.log(`  \x1b[32m✓\x1b[0m ${check}${detail ? ` \x1b[2m(${detail})\x1b[0m` : ''}`);
 const skip = (check, why) => console.log(`  \x1b[33m–\x1b[0m ${check} \x1b[2m(skipped: ${why})\x1b[0m`);
 
+/**
+ * Classify the lag between a claimed semver and the live semver.
+ * Returns 'match' if equal; 'one-behind' if same major.minor and
+ * live patch is exactly claimed+1; 'drift' otherwise (different
+ * major, different minor, claimed-ahead-of-live, or 2+ patch lag).
+ */
+function comparePatchLag(claimed, live) {
+  if (claimed === live) return 'match';
+  const c = claimed.split('.').map((n) => parseInt(n, 10));
+  const l = live.split('.').map((n) => parseInt(n, 10));
+  if (c.length !== 3 || l.length !== 3 || c.some(isNaN) || l.some(isNaN)) return 'drift';
+  if (c[0] !== l[0] || c[1] !== l[1]) return 'drift';
+  if (l[2] === c[2] + 1) return 'one-behind';
+  return 'drift';
+}
+
 const README_PATH = join(ROOT, 'README.md');
 const CONTRIBUTING_PATH = join(ROOT, 'CONTRIBUTING.md');
 const PACKAGE_PATH = join(ROOT, 'package.json');
@@ -211,14 +227,30 @@ if (OFFLINE) {
       const liveVersion = body.version;
       if (!liveVersion) {
         fail('platform-version', `harmonicwave.ai/health returned no version field: ${JSON.stringify(body).slice(0, 100)}`);
-      } else if (liveVersion !== claimedVersion) {
-        fail(
-          'platform-version',
-          `README claims platform v${claimedVersion}; production at harmonicwave.ai is v${liveVersion}. ` +
-            `Either bump the README claim, or pin to the older version intentionally.`,
-        );
       } else {
-        ok(`README platform version matches production`, `v${liveVersion}`);
+        // Tolerate the README pin trailing live by exactly one patch
+        // version on the same major.minor. The platform ships small
+        // patch releases multiple times a day; strict equality would
+        // force a doc commit + push every time. Drift across minor or
+        // major boundaries, or by 2+ patch versions, still fails — that
+        // signals the README is genuinely stale relative to a feature
+        // release the player may rely on.
+        const lag = comparePatchLag(claimedVersion, liveVersion);
+        if (lag === 'match') {
+          ok(`README platform version matches production`, `v${liveVersion}`);
+        } else if (lag === 'one-behind') {
+          // Tolerated — README pin trails live by exactly one patch.
+          // Print a soft note so a human notices, but don't fail.
+          console.log(
+            `  \x1b[33m–\x1b[0m platform-version \x1b[2m(README v${claimedVersion} is one patch behind live v${liveVersion}; tolerated — bump on next doc commit)\x1b[0m`,
+          );
+        } else {
+          fail(
+            'platform-version',
+            `README claims platform v${claimedVersion}; production at harmonicwave.ai is v${liveVersion}. ` +
+              `Either bump the README claim, or pin to the older version intentionally.`,
+          );
+        }
       }
     } catch (e) {
       // Network failures are not fatal — CI may run offline. Print a
