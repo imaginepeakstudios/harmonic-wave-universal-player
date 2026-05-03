@@ -65,6 +65,12 @@ const PAUSE_AFTER_NARRATION_DEFAULT_S = 0;
  *   Phase 2.4 — Tier 2.
  * @property {(opts: { text: string, actor?: any }) => Promise<void>} speakBoundaryAnnounce
  *   Phase 2.4 — Tier 4 (preconditioned on Tier 2 having fired).
+ * @property {(opts: { text: string, actor?: any }) => Promise<void>} speakStationIdent
+ *   Station-ident bumper voiceover (broadcast_station_ident framing).
+ *   Caller passes the line text (seed or fallback); pipeline voices it.
+ * @property {(opts: { text: string, actor?: any }) => Promise<void>} speakOutro
+ *   Sign-off voiceover (closing: 'sign_off'). Fires on experience:ended
+ *   alongside the completion card mount.
  * @property {(kind: 'experience' | 'collection' | 'content' | 'boundary', id?: string) => boolean} willPlayDJ
  *   Phase 2.3 — gate predicate.
  * @property {(kind: 'experience' | 'collection' | 'content' | 'boundary' | 'released-collection', id?: string) => void} markPlayed
@@ -434,6 +440,47 @@ export function createNarrationPipeline(opts) {
       } finally {
         markPlayed('boundary', undefined);
       }
+    },
+    /**
+     * Station Identity bumper voiceover — fires during the `station_ident`
+     * opening framing (per `broadcast_station_ident` recipe). One-shot,
+     * not gated by once-per-session (the bumper itself is one-shot per
+     * page load). Caller composes the line; pipeline just routes to
+     * speakCore so the actor's voice + duck/kill rules apply.
+     *
+     * Spec text: "The HOST speaks ONE short line composed from
+     * `experience.station_ident` as the seed. Examples in the style of
+     * `actor.narrative_voice`:
+     *   • Seed: 'This is Wave Radio.' → spoken: 'This is Wave Radio. Stay tuned.'
+     * If station_ident is null, fall back to a generic ident composed
+     * from `experience.name` ('This is [name].')."
+     *
+     * @param {{ text: string, actor?: any }} opts
+     * @returns {Promise<void>}
+     */
+    async speakStationIdent({ text, actor }) {
+      if (typeof text !== 'string' || text.trim().length === 0) return;
+      await speakCore({ text, actor });
+    },
+    /**
+     * Sign-off voiceover — fires on `experience:ended` when
+     * `framing_directives.closing === 'sign_off'`. One-shot, not
+     * once-per-session-gated (only fires when the experience genuinely
+     * ends; the gate is the closing primitive itself).
+     *
+     * Spec text: "After the last clip, COMPOSE an outro... 'thanks for
+     * watching'-style line, experience.name, the actor credit. If
+     * outro_hint is set, treat as a SEED — do not paste verbatim.
+     * Compose around it." Without an LLM, the universal player passes
+     * the seed (or fallback) directly to speakCore — closer to verbatim
+     * than the LLM path, but voiced in the actor's narrative voice.
+     *
+     * @param {{ text: string, actor?: any }} opts
+     * @returns {Promise<void>}
+     */
+    async speakOutro({ text, actor }) {
+      if (typeof text !== 'string' || text.trim().length === 0) return;
+      await speakCore({ text, actor });
     },
     async speakForItem(speakOpts) {
       const { item, behavior, actor, phase } = speakOpts;

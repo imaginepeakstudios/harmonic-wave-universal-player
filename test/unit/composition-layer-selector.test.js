@@ -100,6 +100,32 @@ describe('composition/layer-selector — selectLayers', () => {
     const order = layers.map((l) => l.layer);
     expect(order.indexOf('content')).toBeLessThan(order.indexOf('chrome'));
   });
+
+  test('collection-reference items SUPPRESS the content layer', () => {
+    // Phase 5 cosmetic — collection-refs (collection_id set, content_id
+    // null) are presentation moments owned by the segment-title-card
+    // path. Surfacing the 'unsupported' content renderer for them
+    // produced a "Untitled — Renderer for content type 'unknown' lands
+    // in Step 6" placeholder visible during the bootstrap mount and
+    // bleeding through behind the segment card. Rule: skip the content
+    // layer entirely for collection-ref shapes; chrome still renders
+    // so the user has a Play button to unlock audio.
+    const collectionRef = { collection_id: 7, content_id: null };
+    const layers = selectLayers(collectionRef, defaultBehavior());
+    const layerNames = layers.map((l) => l.layer);
+    expect(layerNames).not.toContain('content');
+    expect(layerNames).toContain('chrome');
+  });
+
+  test('content items with no content_id but a content_type_slug still render content', () => {
+    // Edge case: an item with only content_type_slug + no IDs is
+    // treated as content (unknown shape, but renderer falls through
+    // to 'unsupported'). The collection-ref suppression applies ONLY
+    // when collection_id is set AND content_id is null — that's the
+    // canonical wrapper shape per spec.
+    const layers = selectLayers({ content_type_slug: 'song' }, defaultBehavior());
+    expect(layers.map((l) => l.layer)).toContain('content');
+  });
 });
 
 describe('composition/layer-selector — LAYER_RULES registry', () => {

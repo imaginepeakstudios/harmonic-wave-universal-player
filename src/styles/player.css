@@ -1122,7 +1122,8 @@ body {
 body.hwes-cinematic .hwes-header-bar,
 body.hwes-cinematic .hwes-chapter-bar,
 body.hwes-cinematic .hwes-drawer-toggle,
-body.hwes-cinematic .hwes-show-ident {
+body.hwes-cinematic .hwes-show-ident,
+body.hwes-cinematic .hwes-narration {
   opacity: 0;
   pointer-events: none;
 }

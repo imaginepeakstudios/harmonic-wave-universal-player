@@ -1190,6 +1190,33 @@ let activeBumper = null;
           else if (cta === 'whats_next') analytics.emit(PLAYER_EVENTS.CTA_WHATS_NEXT);
         },
       });
+      // Sign-off voiceover — fires alongside the completion card mount
+      // for closing: 'sign_off' (default for broadcast_show /
+      // broadcast_station_ident). Voicing is gated symmetrically with
+      // station-ident: the seed must be creator-authored AND opted into
+      // TTS via the tts_fields whitelist. We never fabricate a fallback
+      // "thanks for listening" — if the creator hasn't authored an
+      // outro and enabled it, the experience ends with the visual
+      // completion card alone.
+      if (framing.closing === 'sign_off' && narration) {
+        const outroSeed = /** @type {any} */ (view.experience)?.outro_hint;
+        const tts = parseTtsFieldsWhitelist(view.experience?.tts_fields);
+        const eligible =
+          typeof outroSeed === 'string' &&
+          outroSeed.trim().length > 0 &&
+          tts.includes('outro_hint');
+        if (eligible) {
+          try {
+            await narration.speakOutro({
+              text: outroSeed,
+              actor: view.actor ?? undefined,
+            });
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.warn('[hwes/boot] outro speak failed:', err);
+          }
+        }
+      }
     });
 
     // Wait for the bumper (started at boot top in parallel with the
@@ -1197,6 +1224,40 @@ let activeBumper = null;
     // immediately into item:started — the bumper's CSS fade-out
     // overlaps with the first item mounting underneath.
     await bumperDone;
+
+    // Station-ident voiceover — fires AFTER the bumper visual+SFX, in
+    // parallel with the bumper's CSS fade-out. Per `broadcast_station_ident`
+    // recipe: "The HOST speaks ONE short line composed from
+    // `experience.station_ident` as the seed."
+    //
+    // Voicing is gated by TWO conditions:
+    //   1. station_ident is creator-authored (non-empty string) — we
+    //      never fabricate copy. If the creator hasn't seeded it, the
+    //      bumper plays visual+SFX only (no spoken line). Spec recipe
+    //      describes a fallback compose ("This is [name].") but that
+    //      requires the LLM-rendered path's compose layer; the universal
+    //      player voices only what the creator wrote.
+    //   2. 'station_ident' appears in the experience's tts_fields
+    //      whitelist — creators opt fields into TTS explicitly. If
+    //      station_ident is authored but NOT whitelisted, the visual
+    //      copy lands without speech (audio off, text on).
+    if (bumperEnabled && framing.opening === 'station_ident' && narration) {
+      const seed = view.experience?.station_ident;
+      const tts = parseTtsFieldsWhitelist(view.experience?.tts_fields);
+      const eligible =
+        typeof seed === 'string' && seed.trim().length > 0 && tts.includes('station_ident');
+      if (eligible) {
+        try {
+          await narration.speakStationIdent({
+            text: seed,
+            actor: view.actor ?? undefined,
+          });
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn('[hwes/boot] station-ident speak failed; advancing:', err);
+        }
+      }
+    }
 
     // FE-arch P1-3 — chrome bars consolidated into a single module.
     // Mounts header-bar / chapter-bar / show-ident / playlist-drawer +
@@ -1249,16 +1310,18 @@ let activeBumper = null;
     // item:started subscriber above is idempotent vs. lastMountedIndex
     // so the post-unlock emit doesn't double-mount.
     if (!stateMachine.isAudioUnlocked() && view.items.length > 0) {
-      // Only bootstrap-mount when the first traversal node is a content
-      // item. If it's a collection-ref (chapter wrapper), the segment
-      // title card path will fire on unlock — no pre-unlock placeholder
-      // needed. The cold-open card (when present) covers the wait.
-      const firstNode = stateMachine.getCurrentNode();
-      if (!firstNode || firstNode.kind === 'content') {
-        activeIndex = 0;
-        lastMountedIndex = 0;
-        mountItem(0);
-      }
+      // Bootstrap mount — gives the user a visible Play button to unlock
+      // audio. We always mount, regardless of traversal[0].kind, because
+      // the chrome shell (header + controls + Play button) lives inside
+      // mountItem's layer-set. If traversal[0] is a collection-ref, the
+      // content layer renders 'unsupported' as a placeholder; the post-
+      // unlock item:started for kind='collection-ref' mounts the segment
+      // title card AT z=80 on top of the placeholder, hiding it. Brief
+      // visual artifact pre-gesture acceptable; alternative (mount chrome
+      // sans layer-set) would be a larger refactor.
+      activeIndex = 0;
+      lastMountedIndex = 0;
+      mountItem(0);
     }
 
     // Console banner: confirms the engine + composition + renderers
@@ -1356,6 +1419,30 @@ class BootEmptyError extends Error {
  * @param {string | undefined} pathname
  * @returns {string | undefined}
  */
+/**
+ * Parse the experience's `tts_fields` whitelist. Per HWES v1 spec:
+ * a JSON-string array of field names that are TTS-eligible. Creators
+ * opt fields into TTS explicitly via this whitelist (e.g.
+ * `["intro_hint","outro_hint"]`). The interpreter currently surfaces
+ * this field as the raw JSON-string for forward-compatibility, so
+ * boot does its own parse. Returns an empty array on null / parse
+ * error so callers can use `.includes()` safely.
+ *
+ * @param {unknown} raw
+ * @returns {string[]}
+ */
+function parseTtsFieldsWhitelist(raw) {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) return raw.filter((s) => typeof s === 'string');
+  if (typeof raw !== 'string') return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((s) => typeof s === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 function extractShareTokenFromPath(pathname) {
   if (typeof pathname !== 'string') return undefined;
   const match = pathname.match(/\/run\/([^/?#]+)/);

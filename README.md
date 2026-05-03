@@ -78,7 +78,7 @@ The engine ships as vanilla ES modules — no bundler required. What works today
 git clone https://github.com/imaginepeakstudios/harmonic-wave-universal-player.git
 cd harmonic-wave-universal-player
 bun install         # installs vitest + happy-dom + prettier + typescript (devDeps only — engine has zero runtime deps)
-bun run test        # 758 tests — should be green
+bun run test        # 765 tests — should be green
 bun run typecheck   # tsc --checkJs --noEmit on src/
 bun run dev         # python3 -m http.server 8080 --directory src
 # Open http://localhost:8080/?fixture=01-bare-audio&debug=1
@@ -147,7 +147,7 @@ harmonic-wave-universal-player/
 │   ├── sync-registry.sh           ← Pulls live registry from production into src/registry-snapshot/
 │   └── verify-readme.js           ← README drift gate (test count + platform version)
 ├── test/
-│   ├── unit/                      ← Per-module pure logic — 64 test files, 758 tests
+│   ├── unit/                      ← Per-module pure logic — 64 test files, 765 tests
 │   ├── snapshot/                  ← Per-renderer DOM snapshots
 │   ├── conformance/               ← THE SPEC VALIDATOR — 41 HWES v1 fixtures + expected shapes
 │   └── ci/

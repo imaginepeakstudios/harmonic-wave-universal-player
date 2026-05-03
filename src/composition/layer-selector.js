@@ -163,11 +163,22 @@ export const LAYER_RULES = [
     },
   },
 
-  // CONTENT — always present. The single load-bearing layer.
+  // CONTENT — always present for content items. Suppressed for
+  // collection-references (collection_id set, content_id null) so the
+  // segment-title-card path can own the visual without an "unsupported"
+  // placeholder showing through. Collection-refs are presentation
+  // moments — they don't have a content_type_slug to dispatch on, so
+  // pickContentRenderer would fall through to 'unsupported' and render
+  // the dev placeholder. The bootstrap (pre-Play) and post-unlock paths
+  // both rely on this rule being suppressed for collection-refs.
   {
     layer: 'content',
     renderer: (item) => pickContentRenderer(item),
-    when: () => true,
+    when: (item) => {
+      const i = /** @type {any} */ (item);
+      const isCollectionRef = i?.collection_id != null && i?.content_id == null;
+      return !isCollectionRef;
+    },
   },
 
   // OVERLAY — three lyric variants (LRC-synced, audio.currentTime-driven)

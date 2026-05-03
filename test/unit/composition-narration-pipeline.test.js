@@ -458,4 +458,45 @@ describe('composition/narration-pipeline — Phase 2 four-tier hierarchy + once-
     pipeline.markPlayed('content', 100); // simulates speak via path A
     expect(pipeline.willPlayDJ('content', 100)).toBe(false); // path B sees the mark
   });
+
+  test('speakStationIdent voices the line through speakCore', async () => {
+    await pipeline.speakStationIdent({
+      text: 'This is The Time Is Now.',
+    });
+    expect(stub.utterances.length).toBe(1);
+    // Pipeline's format-intro normalizer may prepend a separator; verify
+    // the seed line is present in the spoken text.
+    expect(stub.utterances[0].text).toMatch(/This is The Time Is Now\./);
+  });
+
+  test('speakStationIdent is NOT once-per-session-gated', async () => {
+    // Bumper is one-shot per page load; pipeline does not gate. Each
+    // call fires (no markPlayed bookkeeping). Verifies the bumper can
+    // be re-triggered (e.g., dev hot-reload, fork that loops the boot
+    // for testing) without a stale "already played" lockout.
+    await pipeline.speakStationIdent({ text: 'This is Wave Radio.' });
+    await pipeline.speakStationIdent({ text: 'This is Wave Radio.' });
+    expect(stub.utterances.length).toBe(2);
+  });
+
+  test('speakStationIdent no-ops on empty/whitespace text', async () => {
+    await pipeline.speakStationIdent({ text: '' });
+    await pipeline.speakStationIdent({ text: '   ' });
+    await pipeline.speakStationIdent({ text: /** @type {any} */ (null) });
+    expect(stub.utterances.length).toBe(0);
+  });
+
+  test('speakOutro voices the line through speakCore', async () => {
+    await pipeline.speakOutro({
+      text: "That's The Time Is Now. Thanks for listening.",
+    });
+    expect(stub.utterances.length).toBe(1);
+    expect(stub.utterances[0].text).toMatch(/That's The Time Is Now\.\s*Thanks for listening\./);
+  });
+
+  test('speakOutro no-ops on empty/whitespace text', async () => {
+    await pipeline.speakOutro({ text: '' });
+    await pipeline.speakOutro({ text: '   ' });
+    expect(stub.utterances.length).toBe(0);
+  });
 });

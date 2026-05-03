@@ -342,6 +342,17 @@ export function getCollectionView(item) {
  *   Sign-off text — read by the framing recipe's closing slot when
  *   framing_directives.closing === 'sign_off'. Treat as a SEED for the
  *   composed outro per broadcast_show recipe text (do not paste verbatim).
+ * @property {string | null | undefined} station_ident
+ *   Brand-bumper line — read by the framing recipe's opening slot when
+ *   framing_directives.opening === 'station_ident' (e.g. broadcast_station_ident
+ *   recipe). Per HWES v1 spec v0.10.31: short branded line ("This is Wave
+ *   Radio.") that the host extends into a 5-10s spoken ident. When null,
+ *   recipe fallback composes from experience.name. Stored independently
+ *   of intro_hint so creators can switch framing recipe without losing copy.
+ * @property {string | null | undefined} station_logo_url
+ *   Pro-gated brand mark image for the station-ident bumper visual.
+ *   When null (Free tier or unset), bumper falls back to the platform's
+ *   default mark; type-only renderers fall further to cover_art_url.
  * @property {number | undefined} tts_intro
  *   Boolean flag (0/1, integer in production wire) indicating whether
  *   the experience.intro_hint is TTS-eligible. Per HWES v1 spec re-fetch
@@ -625,10 +636,12 @@ export function interpret(rawResponse, opts = {}) {
     // engine's framing-engine.js resolves them from framing_recipes when
     // not pre-resolved.
     framing_directives: rawResponse.framing_directives,
-    // Cold-open / sign-off slots — read by the framing recipe's opening
-    // and closing primitives.
+    // Cold-open / sign-off / station-ident slots — read by the framing
+    // recipe's opening and closing primitives.
     intro_hint: rawResponse.intro_hint,
     outro_hint: rawResponse.outro_hint,
+    station_ident: rawResponse.station_ident,
+    station_logo_url: rawResponse.station_logo_url,
     // tts_intro is a 0/1 boolean flag per HWES v1 spec (re-fetch
     // 2026-05-03). Keep as integer; pass-through.
     tts_intro: rawResponse.tts_intro,
