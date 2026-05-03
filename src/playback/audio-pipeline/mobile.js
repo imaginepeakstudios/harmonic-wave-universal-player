@@ -31,6 +31,9 @@
 
 /**
  * @typedef {object} AudioPipeline
+ * @property {'desktop' | 'mobile'} kind  Diagnostics only.
+ * @property {boolean} supportsConcurrentSources  Mobile: false (iOS coexistence trap).
+ * @property {boolean} supportsMusicBed  Mobile: false (same trap).
  * @property {(element: HTMLMediaElement) => MobileChannelHandle} attachContent
  * @property {(element: HTMLMediaElement) => void} detachContent
  * @property {(opts?: object) => Promise<void>} startMusicBed
@@ -51,6 +54,12 @@
 export function createMobileAudioPipeline() {
   return {
     kind: 'mobile',
+    // FE-arch P1-6 — capability flags. Mobile pipeline can NOT run
+    // concurrent media-element sources (per IMPLEMENTATION-GUIDE
+    // §3.3 — iOS Safari coexistence trap) and can NOT play a music
+    // bed alongside content audio (same trap).
+    supportsConcurrentSources: false,
+    supportsMusicBed: false,
     attachContent(_element) {
       // No routing — element plays standalone via its native controls
       // / .play(). No analyser → visualizer stays at silent amplitude.

@@ -1,0 +1,23 @@
+{
+  "_comment": "Mixed items[]: a content-ref (item 0) and a collection-ref (item 1). Schema interpreter normalizes both. The collection-ref's stringified-JSON collection_metadata + collection_recipes get parsed; the nested collection_content[] entries are recursively normalized. Engine layer asserts the standalone song renders [content, chrome] (default) and the collection-ref item itself doesn't pin a layer plan — collection-ref rendering is layer-selector's segment-title-card territory (not yet shipped; deferred to Phase 3 chapter bar work). For Phase 0c, this fixture validates the schema-layer projection only.",
+  "experience": {
+    "id": 42,
+    "slug": "collection-reference",
+    "name": "Collection Reference Conformance Fixture"
+  },
+  "hwes_extensions_honored": ["display_recipes_v1"],
+  "items": [
+    {
+      "item_id": 4201,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full"
+      },
+      "layers": ["content", "chrome"]
+    },
+    {
+      "item_id": 4202
+    }
+  ]
+}

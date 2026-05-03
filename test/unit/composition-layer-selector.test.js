@@ -24,13 +24,32 @@ describe('composition/layer-selector — pickContentRenderer', () => {
     expect(pickContentRenderer({ content_type_slug: 'image' })).toBe('image');
   });
 
-  test('document / lecture map to document renderer (Step 6)', () => {
+  test('document maps to document renderer (Step 6)', () => {
+    // Phase 5 sweep — `document` is media_format: text → document renderer.
+    // `lecture` is media_format: video per spec → video renderer (was
+    // misrouted as 'document' pre-sweep).
     expect(pickContentRenderer({ content_type_slug: 'document' })).toBe('document');
-    expect(pickContentRenderer({ content_type_slug: 'lecture' })).toBe('document');
+    expect(pickContentRenderer({ content_type_slug: 'other-text' })).toBe('document');
   });
 
-  test('sound_effect maps to sound-effect renderer (Step 6)', () => {
-    expect(pickContentRenderer({ content_type_slug: 'sound_effect' })).toBe('sound-effect');
+  test('lecture maps to video renderer (Phase 5 sweep — lecture is media_format:video per spec)', () => {
+    expect(pickContentRenderer({ content_type_slug: 'lecture' })).toBe('video');
+  });
+
+  test('sound-effect (with hyphen) maps to sound-effect renderer (Phase 5 sweep)', () => {
+    // Spec content_type_slug uses HYPHEN (`sound-effect`) not underscore.
+    // Phase 5 sweep fixed the prior `sound_effect` typo that routed to 'unsupported'.
+    expect(pickContentRenderer({ content_type_slug: 'sound-effect' })).toBe('sound-effect');
+  });
+
+  test('other-* and unspecified-* escape hatches route to media_format renderers (Phase 5)', () => {
+    expect(pickContentRenderer({ content_type_slug: 'other-audio' })).toBe('audio');
+    expect(pickContentRenderer({ content_type_slug: 'other-video' })).toBe('video');
+    expect(pickContentRenderer({ content_type_slug: 'other-image' })).toBe('image');
+    expect(pickContentRenderer({ content_type_slug: 'other-text' })).toBe('document');
+    expect(pickContentRenderer({ content_type_slug: 'unspecified-audio' })).toBe('audio');
+    expect(pickContentRenderer({ content_type_slug: 'unspecified-video' })).toBe('video');
+    expect(pickContentRenderer({ content_type_slug: 'unspecified-image' })).toBe('image');
   });
 
   test('unknown / missing slug falls through to "unsupported"', () => {

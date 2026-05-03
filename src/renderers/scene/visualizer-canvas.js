@@ -57,6 +57,24 @@ export function createVisualizerSceneRenderer({ item, mount }) {
     extractPalette(coverUrl).then((palette) => {
       viz.setPalette(palette);
       bars.setPalette(palette);
+      // Phase 3.8 — propagate per-song palette to chrome CSS custom
+      // properties so header bar, chapter bar, drawer toggles, and
+      // every other `var(--player-primary)` consumer pick up the
+      // song-specific accent. Per skill 1.5.0 + V1-COMPLIANCE-AUDIT
+      // decision F. Theme injector sets these at boot from the
+      // experience's player_theme; we override per-song while a
+      // cinematic visualizer is mounted. On teardown the next item's
+      // palette overwrites; if no next-item palette exists, the
+      // theme defaults remain (acceptable graceful degradation).
+      try {
+        const root = document.documentElement;
+        if (root && root.style && typeof root.style.setProperty === 'function') {
+          root.style.setProperty('--player-primary', palette.primary);
+          if (palette.secondary) root.style.setProperty('--player-secondary', palette.secondary);
+        }
+      } catch {
+        /* defensive — no DOM in tests */
+      }
     });
   }
   viz.start();

@@ -25,7 +25,7 @@ import { createControls } from './controls.js';
  * @typedef {object} Shell
  * @property {HTMLElement} root  The mounted shell element.
  * @property {() => HTMLElement} getContentMount  Where content renderers attach.
- * @property {(opts: ControlsCallbacks) => import('./controls.js').Controls | null}
+ * @property {(opts: ControlsAttachOpts) => import('./controls.js').Controls | null}
  *   attachControls  Returns the Controls instance so callers can drive
  *   setNowPlaying / setPlayingState directly. Returns null when chrome
  *   level is 'none' (composition skips this layer; controls aren't mounted).
@@ -38,10 +38,17 @@ import { createControls } from './controls.js';
  */
 
 /**
- * @typedef {object} ControlsCallbacks
+ * @typedef {object} ControlsAttachOpts
+ * Either the legacy callbacks-only shape OR an object with both audioElement
+ * and callbacks. Snapshot tests still use the legacy shape; boot.js uses
+ * the new shape with audioElement so progress + volume can wire.
+ * @property {HTMLMediaElement | null} [audioElement]
  * @property {() => void} [onPlay]
  * @property {() => void} [onPause]
  * @property {() => void} [onSkip]
+ * @property {() => void} [onSkipNarration]
+ * @property {(t: number) => void} [onSeek]
+ * @property {(v: number) => void} [onVolumeChange]
  */
 
 /**
@@ -159,7 +166,16 @@ export function createShell(opts) {
     getContentMount: () => contentMount,
     attachControls(cbs) {
       if (controls) controls.teardown();
-      controls = createControls({ mount: controlsMount, callbacks: cbs });
+      // Accept either the legacy callbacks-only shape (snapshot tests +
+      // older callers) OR the new shape with audioElement at the top
+      // level. The createControls factory always takes { mount,
+      // audioElement, callbacks }.
+      const audioElement = /** @type {any} */ (cbs).audioElement ?? null;
+      controls = createControls({
+        mount: controlsMount,
+        audioElement,
+        callbacks: cbs,
+      });
       return controls;
     },
     getControls: () => controls,

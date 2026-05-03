@@ -1,6 +1,6 @@
 # HWES v1 Spec Conformance — Coverage Matrix
 
-**Generated 2026-04-19 during Step 13a (spec audit + expansion).**
+**Generated 2026-04-19 during Step 13a (spec audit + expansion). Updated 2026-05-02 in Phase 0a (V1 compliance audit) — registry resync swapped `lyrics_karaoke` + `lyrics_along` recipes for the broader `text_overlay`; conformance fixture 29 retired; added `broadcast_show` + `web_page` framing recipes (engine wiring lands in Phase 0b).**
 
 This document maps every contract surface in the HWES v1 spec to the conformance fixture(s) that exercise it. Use it to:
 
@@ -22,9 +22,9 @@ This document maps every contract surface in the HWES v1 spec to the conformance
 | `autoplay` | `off` | `02-cinematic-fullscreen` (muted), `05-background-visual` (muted), `27-loop-ambient` (on) | enum: off / on / muted |
 | `loop` | `false` | `05-background-visual` (true), `27-loop-ambient` (true) | boolean |
 | `transition` | `cut` | `10-cross-fade-transitions` (crossfade), `28-build-anticipation` (fade_through_black) | enum: cut / crossfade / fade_through_black / slide |
-| `lyrics_display` | `none` | `07-lyrics-karaoke` (scroll_synced), `29-lyrics-along` (scroll_synced) | enum: none / scroll_synced / spotlight_line / typewriter |
+| `lyrics_display` | `none` | `07-lyrics-karaoke` (scroll_synced via text_overlay) | enum: none / scroll_synced / spotlight_line / typewriter |
 | `doc_display` | `none` | `08-document-excerpt` (excerpt) | enum: none / excerpt / fullscreen_reader |
-| `expand_button` | `false` | `07-lyrics-karaoke`, `08-document-excerpt`, `29-lyrics-along` | boolean |
+| `expand_button` | `false` | `07-lyrics-karaoke` (via text_overlay), `08-document-excerpt` | boolean |
 | `sequence_dwell_seconds` | `5` | `09-image-sequence` (5), `22-visual-first` (3) | number 0..600 |
 | `pause_between_items_seconds` | `0` | `20-chapter-sequence` (2), `21-late-night-reflection` (3), `19-full-immersion` (0) | number 0..30 |
 | `content_advance` | `auto` | `04-performance-mode` (manual), `09-image-sequence` (auto), `20-chapter-sequence` (auto) | enum: auto / manual |
@@ -50,7 +50,7 @@ These value gaps are NOT contract bugs in the spec — the spec correctly declar
 
 ---
 
-## Display recipes (10) — `src/registry-snapshot/recipes.json` `display`
+## Display recipes (12) — `src/registry-snapshot/recipes.json` `display`
 
 | Recipe | Covered by | Notes |
 |---|---|---|
@@ -60,16 +60,18 @@ These value gaps are NOT contract bugs in the spec — the spec correctly declar
 | `cinematic_fullscreen` | `02-cinematic-fullscreen`, `11-cascade-display-and-delivery` | hero + fullscreen + chrome:none + autoplay:muted |
 | `background_visual` | `05-background-visual` | standard + cover + autoplay:muted + loop |
 | `letterbox_21_9` | `06-letterbox-21-9` | contain + minimal chrome |
-| `lyrics_karaoke` | `07-lyrics-karaoke` | lyrics_display:scroll_synced + expand_button (precondition: lrc_lyrics) |
+| `text_overlay` | `07-lyrics-karaoke` (filename retained for git history; exercises text_overlay) | lyrics_display:scroll_synced + expand_button (precondition: lrc_lyrics + lrc_data + applicable_content_types includes song/podcast/narration/movie/lecture) |
 | `document_excerpt` | `08-document-excerpt` | doc_display:excerpt + expand_button (precondition: document type) |
 | `image_sequence` | `09-image-sequence` | sequence_dwell:5 + content_advance:auto + transition:crossfade (precondition: photo/image) |
 | `cross_fade_transitions` | `10-cross-fade-transitions` | transition:crossfade |
+| `broadcast_show` (framing) | `40-framing-broadcast-show` | page_shell:broadcast + show_ident:persistent + opening:cold_open + closing:sign_off (experience-level, non-cascading) — engine produces FramingConfig via `engine/framing-engine.js` |
+| `web_page` (framing) | `41-framing-web-page` | page_shell:web_page + show_ident:none + opening:straight + closing:abrupt (experience-level, non-cascading) — alternate render path via `chrome/page-shell-web.js` |
 
-**Status:** all 10 display recipes have dedicated fixtures.
+**Status:** all 12 display recipes have dedicated fixtures (Phase 0b shipped framing wiring 2026-05-02).
 
 ---
 
-## Delivery recipes (12) — `src/registry-snapshot/recipes.json` `delivery`
+## Delivery recipes (11) — `src/registry-snapshot/recipes.json` `delivery`
 
 | Recipe | Covered by | Notes |
 |---|---|---|
@@ -84,11 +86,33 @@ These value gaps are NOT contract bugs in the spec — the spec correctly declar
 | `compare_and_contrast` | `26-compare-and-contrast` | narration_position:between_items + pause:2 |
 | `loop_ambient` | `27-loop-ambient` | loop + chrome:none + autoplay:on + narration_position:before |
 | `build_anticipation` | `28-build-anticipation` | narration_position:before + pause:2 + transition:fade_through_black |
-| `lyrics_along` | `29-lyrics-along` | lyrics_display:scroll_synced + expand_button (precondition: lrc_lyrics, song/narration) |
 
-**Status:** all 12 delivery recipes have dedicated fixtures (added in Step 13a — previously only `story_then_play` was exercised via cascade fixture 11).
+**Status:** all 11 delivery recipes have dedicated fixtures. (`lyrics_along` was retired from the spec 2026-05-02 in favor of the broader `text_overlay` display recipe — fixture 29 deleted.)
 
 ---
+
+## Framing primitives (4) — `src/registry-snapshot/primitives.json` `framing_primitives`
+
+| Primitive | Default | Covered by | Notes |
+|---|---|---|---|
+| `page_shell` | `broadcast` | `40-framing-broadcast-show` (broadcast), `41-framing-web-page` (web_page) | enum: broadcast / web_page / podcast_feed (reserved) / film_screening (reserved) / gallery_wall (reserved) |
+| `show_ident` | `persistent` | `40-framing-broadcast-show` (persistent), `41-framing-web-page` (none) | enum: none / persistent / opening_only |
+| `opening` | `cold_open` | `40-framing-broadcast-show` (cold_open), `41-framing-web-page` (straight) | enum: straight / cold_open / station_ident |
+| `closing` | `sign_off` | `40-framing-broadcast-show` (sign_off), `41-framing-web-page` (abrupt) | enum: abrupt / sign_off / credits_roll |
+
+Engine consumption per Phase 0b:
+- `opening: 'station_ident'` → bumper plays
+- `opening: 'cold_open'` → cold-open card mounts (`renderers/framing/cold-open-card.js`)
+- `opening: 'straight'` → no opening ceremony; mount item 0 directly
+- `closing: 'sign_off'` → completion card renders (existing `end-of-experience/completion-card.js`)
+- `closing: 'credits_roll'` → completion card renders (variant rendering deferred to Phase 4)
+- `closing: 'abrupt'` → no end-of-experience card; experience just stops
+- `show_ident: 'persistent'` → bug stays through experience (`chrome/show-ident.js`)
+- `show_ident: 'opening_only'` → bug fades out on first item
+- `show_ident: 'none'` → no bug rendered
+- `page_shell: 'broadcast'` → existing full-bleed cinematic flow
+- `page_shell: 'web_page'` → alternate in-flow render path (`chrome/page-shell-web.js`)
+- Reserved page_shell values fall back to broadcast (defensive default)
 
 ## Cascade rules — `docs/SPEC.md §13 #30`
 
@@ -112,7 +136,7 @@ These value gaps are NOT contract bugs in the spec — the spec correctly declar
 
 ---
 
-## Extensions (4 known) — surfaced via `hwes_extensions` array
+## Extensions (13 known — 7 core + 6 added 2026-05-03 from spec re-fetch)
 
 | Extension | Covered by | Notes |
 |---|---|---|
@@ -120,6 +144,15 @@ These value gaps are NOT contract bugs in the spec — the spec correctly declar
 | `display_recipes_v1` | every fixture using display_directives | Player honors display recipes when present |
 | `player_theme_v1` | `17-player-theme-extension` | Custom CSS variables injected into `:root` |
 | `seo_metadata_v1` | `12-production-holding-on` | seo_title, seo_description, og_image, etc. — surfaced for SSR / metadata extraction |
+| `content_coming_soon_v1` | `43-coming-soon` | content_status='coming_soon' + release_at exposed on ItemView; cover renders normally, /media/play returns 403 until release |
+| `experience_status_cluster_v1` | (allowlist only — pass-through metadata) | Stable share_token across private/paused state transitions |
+| `commerce_v1` | (allowlist only — pass-through metadata) | access_type / price / currency / grant_types_supported |
+| `delivery_recipes_v1` | (allowlist only — every fixture using delivery_instructions) | Per-item delivery_instructions presence marker (Phase 0c addition 2026-05-03) |
+| `framing_recipes_v1` | `40-framing-broadcast-show`, `41-framing-web-page` | Experience-level framing shell (Phase 0c addition 2026-05-03) |
+| `intro_bumper_v1` (beta) | (allowlist only — bumper is player-side gated by opening:'station_ident') | Pre-experience station ID animation hook |
+| `tts_resolution_v1` (beta) | (allowlist only — narration-pipeline consumes resolved fields) | Narration provider fallback chain |
+| `music_bed_v1` (beta) | (allowlist only — wired via SPEC #34 synthesized provider) | Mood-driven ambient audio bed |
+| `player_capabilities_v1` (beta) | (allowlist only) | Player runtime capability declarations |
 
 ---
 
@@ -145,7 +178,28 @@ These value gaps are NOT contract bugs in the spec — the spec correctly declar
 | Custom recipe (free-text instructions) → silently skipped | `36-custom-recipe-ignored` | AI-only field; engine skips |
 | Empty items array → boot short-circuits with `setEmpty()` info screen (NOT the EOE completion card — empty never had a "thanks for watching" moment) | `37-empty-experience` | Boot path at `src/boot.js:233-236`. State machine ALSO supports `items.length === 0` (fires `experience:ended` on start) for non-boot callers; boot doesn't take that path |
 | Missing media_play_url → renderer.done resolves on error event | `13-broken-media-mid-sequence` | Auto-advance past broken items |
-| Recipe precondition fails (lyrics_karaoke without lrc_lyrics) | `38-precondition-fail-graceful` | Engine returns SkippedRecipe with reason: 'precondition' |
+| Recipe precondition fails (text_overlay without lrc_lyrics or lrc_data) | `38-precondition-fail-graceful` | Engine returns SkippedRecipe with reason: 'precondition' |
+
+---
+
+## Collection-reference handling (Phase 0c — 2026-05-03)
+
+| Behavior | Covered by | Notes |
+|---|---|---|
+| Mixed items[] (content-ref + collection-ref) | `42-collection-reference` | items[] mixes both shapes; interpreter normalizes each |
+| Stringified-JSON collection_metadata + collection_recipes parsed | `42-collection-reference` | Same parseJsonField contract as content_metadata |
+| Nested collection_content[] recursively normalized | `42-collection-reference` | Each entry is a usable ItemView |
+| `isCollectionReference(item)` predicate | (unit tests) | Discriminates content_id-set vs collection_id-set |
+| `getCollectionView(item)` accessor | (unit tests) | Returns CollectionView typedef (collection_name, numeral, date_range, etc.) |
+
+Layer rules for collection-references (segment-title-card per broadcast_show recipe text) are deferred to Phase 3 chapter-bar work.
+
+## Visual scene cascade (Phase 0c)
+
+| Behavior | Covered by | Notes |
+|---|---|---|
+| Content → collection → experience cascade | (unit tests) | `view.getItemVisualScene(item)` accessor |
+| Cover-art chain (cover → alt1 → alt2 → banner1 → banner2) | (unit tests) | `view.getItemCoverChain(item)` returns deduped URL list; banner-animated activation reads `alt_cover_art_*_url` per skill 1.5.0 |
 
 ---
 
@@ -157,7 +211,7 @@ Per `src/composition/layer-selector.js` + `docs/SPEC.md §3.1`. Layer order back
 |---|---|
 | scene (visualizer-canvas, banner-static, banner-animated) | `02-cinematic-fullscreen` (visualizer when audio + cinematic), `05-background-visual` |
 | content (audio, video, image, document, sound-effect) | every fixture |
-| overlay (lyrics-scrolling, lyrics-spotlight, lyrics-typewriter, text-overlay) | `07-lyrics-karaoke`, `29-lyrics-along` |
+| overlay (lyrics-scrolling, lyrics-spotlight, lyrics-typewriter, text-overlay) | `07-lyrics-karaoke` (text_overlay → lyrics-scrolling renderer) |
 | chrome (shell + controls) | `01-bare-audio` (chrome:full), `03-album-art-forward` (minimal); chrome:none verified by `02`, `04`, etc. NOT mounting shell |
 | narration (overlay text via narration-pipeline) | runtime-only — exercised by demo fixture `13-narration-intro` and unit tests |
 
@@ -167,7 +221,7 @@ Per `src/composition/layer-selector.js` + `docs/SPEC.md §3.1`. Layer order back
 
 | Content type | Renderer | Covered by |
 |---|---|---|
-| song / audio | `audio.js` | `01`, `02`, `07`, `10`, `12`, `27`, `29` |
+| song / audio | `audio.js` | `01`, `02`, `07`, `10`, `12`, `27` |
 | podcast / narration | `audio.js` | `21-late-night-reflection`, `25-guided-walkthrough` |
 | video / movie | `video.js` | `04-performance-mode`, `06-letterbox-21-9` |
 | photo / image | `image.js` | `09-image-sequence`, `22-visual-first` |

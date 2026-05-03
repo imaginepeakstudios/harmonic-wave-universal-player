@@ -1,5 +1,5 @@
 {
-  "_comment": "Expected projection of the production Holding On response. The single experience-level recipe `custom_make_it_a_playlist` is a CUSTOM (creator-defined) slug — the `custom_` prefix is the platform's convention. The engine's recipe-engine SKIPS unknown slugs silently per SPEC §5.4 (custom recipes are AI-only per decision #12), so resolved_behavior is DEFAULT_BEHAVIOR for both items. layers = [content, chrome] (chrome=full default keeps the chrome layer). hwes_extensions_honored captures only seo_metadata_v1 (the one extension production declares). The schema parser MUST handle the production wire shape correctly: stringified-JSON content_metadata, item_display_recipes, content_recipes, recipes; flattened actor_* (all null here so actor is null); content_cover_art_url aliased to cover_art_url at the item level.",
+  "_comment": "Expected projection of the production Holding On response. The single experience-level recipe `custom_make_it_a_playlist` is a CUSTOM (creator-defined) slug — the `custom_` prefix is the platform's convention. The engine's recipe-engine SKIPS unknown slugs silently per SPEC §5.4 (custom recipes are AI-only per decision #12), so resolved_behavior is DEFAULT_BEHAVIOR for both items. layers = [scene, content, chrome] — Phase 0c (2026-05-03) updated the layer-selector so banner-animated activates on alt_cover_art_1_url + alt_cover_art_2_url (cover-art rotation per skill 1.5.0 / decision #4); production Holding On items each ship both alt covers, so the scene layer fires. hwes_extensions_honored captures only seo_metadata_v1 (the one extension production declares). The schema parser MUST handle the production wire shape correctly: stringified-JSON content_metadata, item_display_recipes, content_recipes, recipes; flattened actor_* (all null here so actor is null); content_cover_art_url aliased to cover_art_url at the item level.",
   "experience": {
     "id": 6,
     "slug": "my-test",
@@ -31,7 +31,7 @@
         "audio_ducking_db": -6,
         "narration_music_bed": "none"
       },
-      "layers": ["content", "chrome"]
+      "layers": ["scene", "content", "chrome"]
     },
     {
       "item_id": 5,

@@ -122,6 +122,17 @@ export function createNetworkBumper({ mount, audioPipeline, options = {} }) {
   // <h1>) lands ahead of the bumper visual.
   root.setAttribute('aria-hidden', 'true');
 
+  // Phase 1.1 (skill 1.5.4) — halo sibling animates the cyan glow
+  // ramp on its own opacity keyframes so the logo's transform
+  // animation can keep filter STATIC. Without this split, iOS Safari
+  // computes filter per-frame inside the logo's keyframes and skips
+  // the transform interpolation, causing the snap. Halo sits behind
+  // logo (z=1 vs logo z=2) at the same center position.
+  const halo = document.createElement('div');
+  halo.className = 'hwes-network-bumper__halo';
+  halo.setAttribute('aria-hidden', 'true');
+  root.appendChild(halo);
+
   const logo = document.createElement('img');
   logo.className = 'hwes-network-bumper__logo';
   logo.src = logoUrl;

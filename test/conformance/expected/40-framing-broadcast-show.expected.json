@@ -1,0 +1,19 @@
+{
+  "_comment": "broadcast_show framing recipe resolves to page_shell:broadcast, show_ident:persistent, opening:cold_open, closing:sign_off. Engine treats this as the default per HWES v1 spec.",
+  "experience": {
+    "id": 40,
+    "slug": "framing-broadcast-show",
+    "name": "Framing — Broadcast Show",
+    "framing_recipes": ["broadcast_show"],
+    "intro_hint": "Welcome to the broadcast — three cuts, hand-picked by the host.",
+    "outro_hint": "That's our show. Thanks for tuning in."
+  },
+  "framing": {
+    "page_shell": "broadcast",
+    "show_ident": "persistent",
+    "opening": "cold_open",
+    "closing": "sign_off",
+    "appliedRecipe": "broadcast_show",
+    "unknownRecipes": []
+  }
+}

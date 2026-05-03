@@ -44,28 +44,61 @@
  * (rendered as a "unsupported content" card by boot.js so the
  * experience doesn't dead-stop on an unknown item type).
  *
+ * Phase 3.7 — items with `content_status === 'coming_soon'` (extension
+ * content_coming_soon_v1) bypass the content-type dispatch and use the
+ * dedicated coming-soon renderer. Per spec: cover renders, no playback
+ * attempt (would 403); dwell timer auto-advances after a few seconds.
+ *
+ * Phase 5 sweep (2026-05-03) — content_type_slug enum aligned with the
+ * canonical HWES v1 vocabulary:
+ *   - `sound-effect` (with hyphen) per spec, NOT `sound_effect`
+ *   - `other-audio` / `other-video` / `other-image` / `other-text` —
+ *     escape hatches; route to their underlying media_format renderer
+ *   - `unspecified-audio` / `unspecified-video` / `unspecified-image` —
+ *     placeholders for un-categorized content; route as best-effort
+ *
  * @param {import('../schema/interpreter.js').ItemView} item
  * @returns {string}
  */
 export function pickContentRenderer(item) {
+  const i = /** @type {any} */ (item);
+  // Phase 3.7 — pre-release items render via coming-soon, not the
+  // content-type renderer (no /media/play call).
+  if (i?.content_status === 'coming_soon') return 'coming-soon';
   const slug = item?.content_type_slug;
   switch (slug) {
+    // Audio family
     case 'song':
     case 'podcast':
     case 'narration':
     case 'audiobook':
+    case 'sound-effect':
+    case 'other-audio':
+    case 'unspecified-audio':
+      // Sound-effect items get their dedicated renderer (compact card,
+      // always-autoplay); everything else uses the standard audio
+      // renderer. Per spec content_type_slug uses HYPHEN (`sound-effect`)
+      // not underscore — Phase 5 sweep fix from prior `sound_effect`
+      // typo that would have routed to 'unsupported'.
+      if (slug === 'sound-effect') return 'sound-effect';
       return 'audio';
+    // Video family
     case 'movie':
     case 'video':
-      return 'video'; // Step 6
+    case 'lecture':
+    case 'other-video':
+    case 'unspecified-video':
+      return 'video';
+    // Image family
     case 'photo':
     case 'image':
-      return 'image'; // Step 6
+    case 'other-image':
+    case 'unspecified-image':
+      return 'image';
+    // Text family
     case 'document':
-    case 'lecture':
-      return 'document'; // Step 6
-    case 'sound_effect':
-      return 'sound-effect'; // Step 6
+    case 'other-text':
+      return 'document';
     default:
       return 'unsupported';
   }
@@ -98,18 +131,35 @@ export const LAYER_RULES = [
     layer: 'scene',
     renderer: 'banner-animated',
     when: (item, _behavior) => {
+      // Phase 0c: activate when EITHER (alt_cover_art_1_url +
+      // alt_cover_art_2_url) OR (banner1_url + banner2_url). Per skill
+      // 1.5.0 / decision #4 — alt_cover variants are the first-party
+      // chain; banner_* is legacy/fallback.
+      const i = /** @type {any} */ (item);
       const vs = /** @type {{ banner1_url?: string, banner2_url?: string }} */ (
-        item?.content_metadata?.visual_scene
+        i?.content_metadata?.visual_scene
       );
-      return !!(vs && vs.banner1_url && vs.banner2_url);
+      const altPair = !!(i?.alt_cover_art_1_url && i?.alt_cover_art_2_url);
+      const bannerPair = !!(vs && vs.banner1_url && vs.banner2_url);
+      return altPair || bannerPair;
     },
   },
   {
     layer: 'scene',
     renderer: 'banner-static',
     when: (item, _behavior) => {
-      const vs = /** @type {{ banner1_url?: string }} */ (item?.content_metadata?.visual_scene);
-      return !!(vs && vs.banner1_url);
+      const i = /** @type {any} */ (item);
+      const vs = /** @type {{ banner1_url?: string, banner2_url?: string }} */ (
+        i?.content_metadata?.visual_scene
+      );
+      // Activate banner-static as the FALLBACK when banner-animated
+      // doesn't activate — i.e., when we have ONLY ONE of either pair.
+      // Phase 0c: check that banner-animated's predicate is false AND
+      // a single cover/banner exists.
+      const altPair = !!(i?.alt_cover_art_1_url && i?.alt_cover_art_2_url);
+      const bannerPair = !!(vs && vs.banner1_url && vs.banner2_url);
+      if (altPair || bannerPair) return false; // banner-animated wins
+      return !!(i?.alt_cover_art_1_url || (vs && vs.banner1_url));
     },
   },
 

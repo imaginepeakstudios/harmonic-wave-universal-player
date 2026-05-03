@@ -240,10 +240,15 @@ describe('renderers/narration/tts-bridge — silent fallback', () => {
     const boundaries = [];
     bridge.on('boundary', (e) => boundaries.push(e));
     await bridge.speak({ text: 'one two three' });
-    expect(boundaries.length).toBe(3);
-    expect(boundaries[0]).toMatchObject({ index: 0, charStart: 0, charEnd: 3 });
-    expect(boundaries[1]).toMatchObject({ index: 1, charStart: 4, charEnd: 7 });
-    expect(boundaries[2]).toMatchObject({ index: 2, charStart: 8, charEnd: 13 });
+    // Phase 2.1: formatIntroForTTS prepends ". " filler-defusal token
+    // to the spoken text → silent provider sees "." + 3 words = 4
+    // boundary events. The "." is the first emission (index 0); real
+    // words follow at indices 1-3.
+    expect(boundaries.length).toBe(4);
+    expect(boundaries[0]).toMatchObject({ index: 0, charStart: 0, charEnd: 1 });
+    expect(boundaries[1]).toMatchObject({ index: 1, charStart: 2, charEnd: 5 });
+    expect(boundaries[2]).toMatchObject({ index: 2, charStart: 6, charEnd: 9 });
+    expect(boundaries[3]).toMatchObject({ index: 3, charStart: 10, charEnd: 15 });
     bridge.teardown();
   });
 

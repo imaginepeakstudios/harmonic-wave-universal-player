@@ -37,11 +37,16 @@ const CROSSFADE_DURATION_MS = 1_200;
  */
 export function createBannerAnimatedRenderer(opts) {
   const { item, mount } = opts;
+  // Phase 0c: cover-chain fallback per skill 1.5.0 + decision #4. Prefer
+  // item.alt_cover_art_*_url (first-party item cover variants); fall
+  // back to content_metadata.visual_scene.banner1/banner2_url (legacy).
+  // Either pair is valid for Ken Burns rotation.
+  const i = /** @type {any} */ (item);
   const visualScene = /** @type {{ banner1_url?: string, banner2_url?: string }} */ (
-    item?.content_metadata?.visual_scene ?? {}
+    i?.content_metadata?.visual_scene ?? {}
   );
-  const url1 = visualScene.banner1_url ?? null;
-  const url2 = visualScene.banner2_url ?? null;
+  const url1 = i?.alt_cover_art_1_url ?? visualScene.banner1_url ?? i?.cover_art_url ?? null;
+  const url2 = i?.alt_cover_art_2_url ?? visualScene.banner2_url ?? null;
 
   const root = document.createElement('div');
   root.className = 'hwes-scene hwes-scene--animated';

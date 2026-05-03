@@ -12,6 +12,14 @@
  * Hard rule (IMPLEMENTATION-GUIDE.md §3.2): NO LRC → NO overlay.
  * Composition layer-selector enforces this; the renderer also defends
  * against being mounted with empty entries by no-op'ing teardown-safe.
+ *
+ * Phase 4.2 (skill 1.5.6) — lyric overlay supersession. Old line's
+ * sweep animation has `animation-fill-mode: forwards` ending at
+ * opacity:0; naive class-toggle restart snaps the line back to
+ * opacity:1 before re-fading. Fix: capture computed style via
+ * getComputedStyle(), pin those values inline, force reflow, then
+ * swap to a fresh sweep. Lines mid-sweep continue from their
+ * partial state instead of jumping back.
  */
 
 import { parseLRC } from './lrc-parser.js';
@@ -61,12 +69,34 @@ export function createLyricsScrollingRenderer(opts) {
     if (next !== activeIndex) {
       activeIndex = next;
       if (next >= 0 && next < entries.length) {
-        line.textContent = entries[next].text;
-        // Trigger sweep — restart the animation by toggling a class.
+        // Phase 4.2 (skill 1.5.6) supersession: capture the line's
+        // current rendered state BEFORE swapping animations. If the
+        // prior sweep was mid-flight (line partially visible), we
+        // pin its current opacity/transform/filter inline so the
+        // subsequent class change restarts cleanly without snapping
+        // back to opacity:1. The reflow forces the browser to commit
+        // the inline styles before the new animation kicks in.
+        try {
+          const cs = globalThis.getComputedStyle?.(line);
+          if (cs) {
+            line.style.opacity = cs.opacity;
+            line.style.transform = cs.transform === 'none' ? '' : cs.transform;
+            line.style.filter = cs.filter === 'none' ? '' : cs.filter;
+          }
+        } catch {
+          /* defensive — getComputedStyle can throw in detached test envs */
+        }
         line.classList.remove('hwes-lyrics__line--sweep');
-        // Force reflow so the class re-add restarts the animation.
+        // Force reflow so the inline styles + class removal commit
+        // before the next class addition reseats the animation.
         // eslint-disable-next-line no-unused-expressions
         line.offsetWidth;
+        // Now clear the inline pins so the new sweep animation can
+        // run against the natural CSS values.
+        line.style.opacity = '';
+        line.style.transform = '';
+        line.style.filter = '';
+        line.textContent = entries[next].text;
         line.classList.add('hwes-lyrics__line--sweep');
       }
     }

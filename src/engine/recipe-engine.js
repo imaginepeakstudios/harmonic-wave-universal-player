@@ -20,7 +20,7 @@
  *
  * Diagnostic output: `resolveBehavior` returns `{ behavior, applied,
  * skipped }` so debug builds can show creators what fired and what
- * didn't (e.g., "lyrics_karaoke skipped because content_metadata.lrc_lyrics
+ * didn't (e.g., "text_overlay skipped because content_metadata.lrc_lyrics
  * is missing"). Renderers ignore the diagnostic fields; they only consume
  * `.behavior`.
  */

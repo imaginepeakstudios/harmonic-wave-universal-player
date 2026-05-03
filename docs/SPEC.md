@@ -70,7 +70,7 @@ Every feature in the POC must be expressible in v2 via composition (HWES schema 
 | Music bed under DJ narration (desktop only) | Delivery recipe directive: `narration_music_bed: 'auto'` |
 | Sequential mobile / multi-channel desktop audio | Engine handles platform detection internally — `playback/audio-pipeline/desktop.js` vs `mobile.js` |
 | Chapter-based song organization (6 chapters) | Collections — each chapter is a collection containing its songs |
-| LRC-synced lyrics overlay | Display recipe `lyrics_karaoke` with `lyrics_display: 'scroll_synced'` |
+| LRC-synced lyrics overlay | Display recipe `text_overlay` with `lyrics_display: 'scroll_synced'` (renamed from `lyrics_karaoke` 2026-05-02) |
 | Lyrics + Story side panel | Display recipe directive `expand_button: true` + chrome treatment |
 | Playlist drawer | Standard chrome treatment when `chrome: 'full'` directive applies |
 | Audio-reactive Canvas (particles, waves, orb, palette extraction) | `visualizer/` module — opt-in via theme setting OR display recipe |
@@ -663,6 +663,69 @@ The modular structure allows incremental shipping. Each step produces a working 
 - ⏳ **Announcement post** — write + publish on the platform blog / X / LinkedIn / HN. Should reference: TV-feel framing, HWES v1 conformance suite for forks, fully self-contained defaults (browser TTS + synthesized music bed) so anyone can run it without API keys.
 - ⏳ **v0.9.0 → v1.0.0 testing phase** per `project_player_versioning_plan.md` — explicit cross-browser / cross-device / POC parity / creator UAT / a11y / perf / Layer 2 analytics validation pass before the production-stable v1.0.0 tag.
 
+### Phase 0a — Registry sync + dead-recipe cleanup ✅ (2026-05-02)
+- Synced `src/registry-snapshot/` from live `https://harmonicwave.ai/hwes/v1/{recipes,primitives}.json`.
+- Dropped retired recipes `lyrics_along` + `lyrics_karaoke`; live registry consolidated both into the broader `text_overlay` display recipe with applicable_content_types covering song/podcast/narration/movie/lecture.
+- Added framing recipes `broadcast_show` + `web_page` (kind: display, category: framing, levels: ["experience"]).
+- Added `framing_primitives` block (page_shell, show_ident, opening, closing).
+- Added `levels` field on every recipe.
+- Migrated 3 unit tests, 2 conformance fixtures (07, 38), 2 demo fixtures (07, 09); deleted retired fixture 29.
+- Added 3 extensions to conformance allowlist: `content_coming_soon_v1`, `experience_status_cluster_v1`, `commerce_v1`.
+- Updated COVERAGE-MATRIX.md, conformance README, IMPLEMENTATION-GUIDE.md, this SPEC, STEP-13B-PARITY-PLAYBOOK.md, README.md.
+
+### Phase 0b — Framing system wiring ✅ (2026-05-02)
+- Schema interpreter exposes `framing_recipes` (JSON-string array, default `["broadcast_show"]`), `framing_directives` (resolved object), `intro_hint`, `outro_hint`, `tts_intro`, `pairing_hint`, `arc_role`, `narrative_voice`, `generated_media`.
+- New `engine/framing-engine.js` with `resolveFraming(view) → FramingConfig` + 11 unit tests. Pre-resolved framing_directives wins; falls back to recipe registry lookup; defensive defaults match spec broadcast_show.
+- Boot.js dispatches on `framing.page_shell`: broadcast (existing flow) vs web_page (new alternate path).
+- Bumper gated by `framing.opening === 'station_ident'` (URL override `?bumper=on` for dev).
+- New `renderers/framing/cold-open-card.js` (full-bleed cover + title + premise + creator credit, voices intro_hint via narration pipeline).
+- New `chrome/show-ident.js` (persistent corner brand bug per `show_ident: 'persistent'`; opening-only fade variant).
+- New `chrome/page-shell-web.js` — full POC-quality web_page shell: in-flow scrollable cards, section headers per collection, native HTML5 controls per item, no bumper/cold-open/sign-off.
+- Chrome controls (`controls.js`) gained: volume slider (0-1, default 0.8); progress bar with seek using `e.currentTarget` per skill 1.5.6; Skip Intro button (visibility-toggleable); skip-disabled boundary state per skill 1.5.8.
+- Conformance fixtures `40-framing-broadcast-show` + `41-framing-web-page` + framing-layer test slice in the harness.
+
+### Phase 0c — Schema interpreter completeness ✅ (2026-05-03)
+- ExperienceView gained 11 fields: `hwes_spec_url`, `sort_order`, `created_at`, `updated_at`, `status`, `experience_mode_applied`, `profile_recipe_library`, `media_note`, `recipe_note`, `content_rating_filter_applied`, `filtered_count`.
+- ItemView gained 15 fields: `sort_order`, `content_status`, `release_at`, `content_type_name`, `content_rating`, `rights_confirmed`, `arc_role`, `alt_cover_art_1_url`, `alt_cover_art_2_url`, `stream_count`, `intro_hint`, `outro_hint`, `item_script`, `override_enabled`, `delivery_override_instruction`.
+- New `CollectionView` typedef + `isCollectionReference(item)` predicate + `getCollectionView(item)` projector. Recursive normalization of nested `collection_content[]`.
+- New `view.getItemVisualScene(item)` accessor (content → collection → experience cascade) + `view.getItemCoverChain(item)` (deduped URL list across cover_art_url + alt_cover_art_*_url + banner_*_url).
+- `tts_intro` typedef corrected from `string` to `number` (0/1 flag); `tts_fields` typedef added.
+- 6 more extensions added to conformance allowlist after 2026-05-03 spec re-fetch: `delivery_recipes_v1`, `framing_recipes_v1`, `intro_bumper_v1`, `tts_resolution_v1`, `music_bed_v1`, `player_capabilities_v1`.
+- banner-animated activation extended: fires on `alt_cover_art_1_url + alt_cover_art_2_url` (skill 1.5.0 cover rotation) OR legacy `banner1_url + banner2_url`. banner-static is the proper mutual-exclusion fallback.
+- New conformance fixtures `42-collection-reference` + `43-coming-soon`.
+
+### Phase 1 — iOS / mobile audio hardening ✅ (2026-05-03)
+- 1.1 Bumper filter-snap fix (skill 1.5.4): static 5-stack drop-shadow on `.hwes-network-bumper__logo`; keyframes touch only transform/opacity. New `.hwes-network-bumper__halo` sibling animates the cyan glow ramp on its own opacity-only keyframes.
+- 1.2 Bumper SFX `await Promise.race([ctx.resume(), 3s])` before scheduling oscillators (skill 1.5.2).
+- 1.3 New `playback/audio-pipeline/silent-keepalive.js` — 1-sec silent WAV data URI on a looping `<audio>` forces iOS audio session into 'Playback' (vs. 'AmbientSound' default which respects mute switch). Started before bumper SFX; torn down on dispose.
+- 1.4 HTMLMediaElement pre-warm — TTS bridge creates a single pre-warmed `<audio>` at construction time + plays/pauses silent WAV inside the gesture frame; subsequent `speakPlatformAudio()` reuses by reassigning `.src`, preserving iOS gesture-approval.
+- 1.5 Mobile autostart audit — programmatic autoplay gated on `audioPipeline.kind === 'desktop'`; mobile path uses chrome Play button as canonical user-gesture entry.
+
+### Phase 2 — Narration architecture parity ✅ (2026-05-03)
+- 2.1 `formatIntroForTTS()` normalizer + 2.2 `filterDjTimings()` shared helper in new `renderers/narration/format-intro.js` (skill 1.5.7). Idempotent leading `". "` filler-defusal, ellipses → comma, em/en-dash → comma, sentence-per-paragraph with abbreviation guard. Wired into TTS bridge `speak()` at the call boundary; display source stays clean.
+- 2.3 + 2.5 Once-per-session tracking + single `markPlayed(kind, id)` write path in narration-pipeline. Four canonical structures: `playedExperienceOverview` boolean, `playedCollectionIntros` Set, `playedContentIntros` Set, `playedBoundaryAnnounce` boolean + `playedReleasedCollection` precondition flag. Closes the producer-gap trap (skill 1.5.8).
+- 2.4 Four-tier hierarchy methods on the pipeline: `speakForExperience` (Tier 1), `speakForCollection` (Tier 2), `speakForItem` (Tier 3, gated by willPlayDJ('content', contentId)), `speakBoundaryAnnounce` (Tier 4, preconditioned on Tier 2 having fired). Internal `speakCore()` consolidates shared overlay/duck/bridge orchestration.
+- 2.6/2.7 Skip-Intro + interrupt-on-reentry verified via tests; existing narration:skip cancel-and-resolve preserved.
+- Cold-open card now uses `speakForExperience()` (Tier 1) when available.
+
+### Phase 3 — POC visual + interaction parity ✅ (2026-05-03)
+- 3.1 New `chrome/header-bar.js` (persistent boot-scope, z=70) — experience name + creator credit + link to /p/<slug>.
+- 3.2 New `chrome/chapter-bar.js` + `findCollectionForItem()` helper — reads CollectionView from Phase 0c. Updates per item:started.
+- 3.3 New `chrome/playlist-drawer.js` — slide-out from right; chapter grouping + Released/Coming Soon split; click jumps via `stateMachine.seek()`.
+- 3.4 New `chrome/lyrics-panel.js` — slide-out from left; Story (full_story) + Lyrics (lyrics) sections from content_metadata; updates per item.
+- 3.5 New `makeRandomBedPicker()` in music-bed selector — picks random released audio item as bed (skill 1.5.0); synthesized stays as fallback.
+- 3.6 Cover-art darken during lyrics — CSS `:has()` selector (`.hwes-layer-set:has(.hwes-lyrics) .hwes-scene { filter: brightness(0.55); }`).
+- 3.7 New `renderers/content/coming-soon.js` — bypasses `/media/play` 403; cover + "Releases <date>" + dwell timer auto-advance. Layer-selector dispatches on `item.content_status === 'coming_soon'`.
+- 3.8 Per-song palette → chrome `--player-primary` propagation in visualizer-canvas (writes to `:root` after extractPalette resolves).
+- 3.9 deferred to Phase 4.
+
+### Phase 4 — UX polish ✅ (2026-05-03)
+- 4.1 Three-channel concurrent desktop audio (skill 1.5.0) — boot.js mounts the layer-set CONCURRENTLY with narration on desktop; schedules `renderer.start()` at ~40% of estimated narration duration. Mobile path stays sequential. Stale-callback guard via `advanceCounter`.
+- 4.2 Lyric overlay supersession (skill 1.5.6) — lyrics-scrolling captures computed style before class swap, pins inline, forces reflow, clears pins. Eliminates snap-back-then-fade flash.
+- 4.3 prefers-reduced-motion audit — new `client-runtime/prefers-reduced-motion.js`. Visualizer particle count drops 200 → 40 under preference; layer-set crossfade drops 800ms → 60ms.
+- 4.4 Color token discipline audit — `--player-text` default flipped to cream `#e8e6d8` (skill 1.5.2); per-song `--player-primary` vs structural cream split documented in `:root`.
+- 4.5 Visible UI swap deferral (skill 1.5.0) — when narrationInFlight, new layer-set wrap mounts at opacity:0 and fades in over 800ms after 850ms delay. Reduced-motion bypasses.
+
 Each step is a deployable increment. v2 doesn't ship in one big-bang.
 
 ---
@@ -704,7 +767,7 @@ On the platform side (not in this repo):
 4. For each song, populate metadata: lyrics, full_story, primary_quote, lrc_lyrics, intro
 5. Create experience "The Catalog Journey" with all 10 songs as items
 6. Set experience.player_theme to match existing cyan/purple/glass aesthetic
-7. Set experience-level recipes: `story_then_play`, `lyrics_karaoke`
+7. Set experience-level recipes: `story_then_play`, `text_overlay`
 
 ### Phase 2 — Build the v2 player engine (this repo)
 
@@ -794,6 +857,22 @@ For traceability, every architectural decision made in the spec discussion:
 35. **Renderer `fadeOut(ms)` is the renderer-level contract for cross-fade audio; pipeline `gain` ramp is the tighter-control superset for desktop** — Audio + video renderers expose an optional `fadeOut(ms): Promise<void>` that ramps `element.volume` from current → 0 over `ms` and resolves when complete. Boot.js `mountItem` calls `oldSet.renderer?.fadeOut?.(CROSSFADE_MS)` alongside the visual opacity ramp on the old layer-set during a `behavior.transition === 'crossfade'` mountItem. Step 9's desktop audio pipeline ALSO exposes a `GainNode` per channel via `attachContent(element) → { analyser, gain }`, which gives tighter sample-accurate control via `gain.gain.linearRampToValueAtTime`. The mobile pipeline returns `gain: null` (no Web Audio routing), so the renderer-level `fadeOut` is the universal fallback that works everywhere. Both paths are wired so the same crossfade behaves the same visually + audibly across desktop and mobile, with desktop getting better timing fidelity. Per FE arch review of `f183286` (P1 #3) — without this contract, the visual crossfade leaves audio hard-cutting underneath, breaking the broadcast-feel.
 
 36. **State machine is a pure event emitter; renderer + audio pipeline + chrome controls subscribe rather than reach into each other** — `playback/state-machine.js` has no DOM, no audio, no Web Audio. It tracks `{ items, currentIndex, audioUnlocked, experienceComplete, advanceCounter, pendingStart }` and emits `item:started` / `item:ended` / `narration:skip` / `audio:unlocked` / `experience:ended`. The state machine is the **single source of truth for "what item is current"** — boot.js subscribes to `item:started` to mount, to `item:ended` to call `next()` (gated by `behavior.content_advance === 'auto'`), to `experience:ended` to render the end-of-experience moment. The chrome controls' Play button calls `stateMachine.unlockAudio()` from inside the click handler — that's the iOS-Safari user-gesture entry point for `audioCtx.resume()`. The state machine refuses to emit `item:started` until `audioUnlocked === true`, queueing the first emission via `pendingStart` and flushing it on `unlockAudio()`. The narration pipeline (Step 11) will subscribe to `narration:skip` for the same skip button. **The advanceCounter is the load-bearing piece for the rapid-skip teardown-during-transition race** — subscribers capture it at handler-call time and check before acting on async work; if it's incremented when the async work resolves, the work is stale and discarded. This replaces the inline auto-advance from Steps 5-8 that the FE arch review of `f183286` (P1 #1) flagged as the root cause of the rapid-skip layer-set leak. The split also means a fork can replace the state machine (different sequencing logic, e.g. shuffle, A/B testing branches) without touching renderers or the audio pipeline.
+
+37. **Framing recipe vocabulary is data-driven, not hard-coded** (Phase 0b, 2026-05-02) — `engine/framing-engine.js` resolves `framing_recipes` via the registry-snapshot lookup; renderer dispatch in `boot.js` keys on the resolved `page_shell` value (`broadcast` / `web_page` / reserved future shells). Unknown shells fall back to broadcast as a defensive default. New spec-added framings (`podcast_feed`, `film_screening`, `gallery_wall`, `magazine_layout` — currently reserved) flow through `scripts/sync-registry.sh` without engine surgery. Framing is non-cascading per spec — single-element JSON-string array on the experience, first element authoritative.
+
+38. **Network bumper is gated by `framing_directives.opening === 'station_ident'`** (Phase 0b, 2026-05-02) — bumper is a player-side feature, NOT an HWES extension (the spec's `intro_bumper_v1` extension is reserved/beta and not yet finalized). The bumper plays only when `framing.opening === 'station_ident'`; default `cold_open` mounts the cold-open card instead; `straight` skips both. URL overrides `?bumper=on` / `?opening=` provided for dev workflows. The catalog-side path to "POC parity" is to set `framing_directives.opening: 'station_ident'` on experiences that want the bumper (the platform pre-resolves framing_directives; engine respects pre-resolved values).
+
+39. **Volume slider ships in chrome controls** (Phase 0b, 2026-05-02) — V1-COMPLIANCE-AUDIT decision #3 deviated from the original "TV-feel: no volume slider, OS owns it" stance. Listener feedback prioritizes the volume affordance over the broadcast-metaphor purity. Range 0-1, default 0.8, wired to audio element's `.volume` directly. Per-song accent applied to slider thumb glow.
+
+40. **Progress bar uses `e.currentTarget` for seek math** (Phase 0b, skill 1.5.6) — bind the click listener to the wrap, NOT the fill child. Read `e.currentTarget.getBoundingClientRect()` for the rect. The fill child overlays the played portion; clicks on it report `target = fill` whose rect is only the played width — wrong seek times that drift with playback. Same trap shows up in volume sliders, range pickers, container-with-overlay-children patterns. Locked into `chrome/controls.js` + tested in `test/unit/chrome-controls.test.js`.
+
+41. **Web-page shell is a parallel render path, not a fallback inside broadcast** (Phase 0b, 2026-05-02) — `chrome/page-shell-web.js` is the full alternate path: scrollable in-flow cards, native HTML5 controls per item, section headers per collection wrapper, no bumper / cold-open / show-ident / completion card / state-machine sequencing. Activated by `framing.page_shell === 'web_page'`. Items render simultaneously (vs. broadcast's one-at-a-time). Forks wanting fancier web-page rendering substitute their own page-shell-web.js by branching on `framing.page_shell` in boot.js.
+
+42. **Once-per-session narration is a top-level discipline; single mark-played write path closes the producer-gap trap** (Phase 2, skill 1.5.8) — narration-pipeline tracks four structures: `playedExperienceOverview` boolean, `playedCollectionIntros` Set, `playedContentIntros` Set, `playedBoundaryAnnounce` boolean + `playedReleasedCollection` precondition flag. Unified `willPlayDJ(kind, id)` predicate gates speak; single `markPlayed(kind, id)` write path is called by ALL speak* methods. The producer-gap trap: if mark-as-played lives in only one code path but multiple paths can fire that intro, the bug surfaces only on a specific user action (Back-button after auto-advance, playlist jump). Single write path eliminates it. Boundary announcements are preconditioned on at least one released-collection traversal so cold deep-links don't trigger out-of-context narration ("Up next are pre-release tracks" without context).
+
+43. **Three-channel concurrent desktop audio: song fades up at ~40% through DJ narration** (Phase 4, skill 1.5.0) — boot.js item:started handler detects audio-content + desktop-pipeline + before_content/between_items narration position. When all three: mounts the layer-set CONCURRENTLY with narration (sets `narrationInFlight = true` so mountItem's auto-start gate fires NOT), schedules `renderer.start()` at ~40% of estimated narration duration (text length / 2.5 wps, floor 800ms). Stale-callback guard via `advanceCounter` prevents the deferred start from firing on torn-down items (rapid skip during DJ). Mobile path stays sequential (DJ first, then song) per IMPLEMENTATION-GUIDE §3.3 — mobile audio session can't run concurrent media-element sources cleanly.
+
+44. **Per-song palette propagates to chrome `--player-primary`** (Phase 3.8 + 4.4, skill 1.5.0/1.5.2) — visualizer-canvas writes the extracted cover-art palette `primary` + `secondary` to `:root` CSS custom properties after `extractPalette()` resolves. Header bar, chapter bar, drawer toggles, all `var(--player-primary)` consumers pick up the song-specific accent. Theme defaults from `--player-theme` extension stay as the fallback; the visualizer overwrite is per-song while a cinematic visualizer is mounted. Structural cream `#e8e6d8` (`--player-text`) is decoupled — dynamic per-song accent can't make chrome text invisible against the dark UI on a dark-cover song.
 
 ---
 

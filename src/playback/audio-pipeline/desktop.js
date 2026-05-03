@@ -35,6 +35,13 @@ import { selectMusicBedProvider } from './music-bed/index.js';
 
 /**
  * @typedef {object} AudioPipeline
+ * @property {'desktop' | 'mobile'} kind  Diagnostics; capabilities are the API.
+ * @property {boolean} supportsConcurrentSources  Per FE-arch P1-6.
+ *   true → can run multiple media-element sources + Web Audio outputs
+ *   simultaneously (DJ + song + bed). false → sequential only.
+ * @property {boolean} supportsMusicBed  Per FE-arch P1-6.
+ *   true → music-bed audio routes through the pipeline. false → bed
+ *   start is a no-op (mobile, due to iOS Safari coexistence trap).
  * @property {(element: HTMLMediaElement) => DesktopChannelHandle} attachContent
  * @property {(element: HTMLMediaElement) => void} detachContent
  * @property {(opts: object) => Promise<void>} startMusicBed
@@ -87,6 +94,12 @@ export function createDesktopAudioPipeline(opts = {}) {
 
   return {
     kind: 'desktop',
+    // FE-arch P1-6 — capability flags. Callers should branch on
+    // `supportsConcurrentSources` (and similar capability questions)
+    // rather than `kind === 'desktop'`. The kind discriminator stays
+    // for diagnostics; capabilities are the API surface.
+    supportsConcurrentSources: true,
+    supportsMusicBed: true,
     attachContent(element) {
       const audioContext = ensureContext();
       // crossOrigin is set by the audio + video renderers BEFORE

@@ -46,6 +46,7 @@ import { createMcpClient } from './api/mcp-client.js';
 import { interpret } from './schema/interpreter.js';
 import { listKnownExtensions } from './schema/conformance.js';
 import { resolveBehavior } from './engine/recipe-engine.js';
+import { resolveFraming } from './engine/framing-engine.js';
 import { defaultBehavior } from './engine/behavior-config.js';
 import { composeItem } from './composition/index.js';
 import { injectTheme } from './theme/injector.js';
@@ -55,6 +56,7 @@ import { createVideoRenderer } from './renderers/content/video.js';
 import { createImageRenderer } from './renderers/content/image.js';
 import { createDocumentRenderer } from './renderers/content/document.js';
 import { createSoundEffectRenderer } from './renderers/content/sound-effect.js';
+import { createComingSoonRenderer } from './renderers/content/coming-soon.js';
 import { createBannerStaticRenderer } from './renderers/scene/banner-static.js';
 import { createBannerAnimatedRenderer } from './renderers/scene/banner-animated.js';
 import { createVisualizerSceneRenderer } from './renderers/scene/visualizer-canvas.js';
@@ -67,11 +69,18 @@ import { isMobile, readMobileOverride } from './playback/audio-pipeline/detect.j
 import { createDesktopAudioPipeline } from './playback/audio-pipeline/desktop.js';
 import { createMobileAudioPipeline } from './playback/audio-pipeline/mobile.js';
 import { createAnalyserAmplitudeProvider } from './playback/audio-pipeline/analyser-amplitude-provider.js';
+import { createSilentKeepalive } from './playback/audio-pipeline/silent-keepalive.js';
+import { makeRandomBedPicker } from './playback/audio-pipeline/music-bed/index.js';
+import { prefersReducedMotion as prefersReducedMotionFn } from './client-runtime/prefers-reduced-motion.js';
 import { createKeyboardInteractions } from './interactions/keyboard.js';
 import { createGestureInteractions } from './interactions/gestures.js';
 import { createSingleAudioGuard } from './interactions/single-audio-guard.js';
 import { createNetworkBumper } from './intro/network-bumper.js';
 import { createNarrationPipeline } from './composition/narration-pipeline.js';
+import { createColdOpenCard } from './renderers/framing/cold-open-card.js';
+import { findCollectionForItem } from './chrome/chapter-bar.js';
+import { createChromeBars } from './boot/chrome-bars.js';
+import { createWebPageShell } from './renderers/framing/page-shell-web.js';
 import { createCompletionCard } from './end-of-experience/completion-card.js';
 import { createEventStream, PLAYER_EVENTS } from './analytics/event-stream.js';
 
@@ -97,6 +106,7 @@ const RENDERERS = {
   image: createImageRenderer,
   document: createDocumentRenderer,
   'sound-effect': createSoundEffectRenderer,
+  'coming-soon': createComingSoonRenderer,
   unsupported: createUnsupportedRenderer,
 };
 
@@ -204,37 +214,132 @@ let activeBumper = null;
 
 (async () => {
   try {
-    // Network Station ID Bumper IS the loading state — no separate
-    // "Loading experience…" placeholder. The bumper plays for ~7s
-    // (HW wordmark + waveform + SFX), and we load the experience data
-    // in parallel so by the time the bumper finishes the experience
-    // is ready to mount immediately. Mobile pipeline gives null ctx
-    // → bumper is silent visual; desktop ctx attempts SFX (may be
-    // silent on first-visit-without-engagement per browser policy).
-    const bumperDisabled = params.get('bumper') === 'off';
-    const useMobileForBumper = readMobileOverride(params) ?? isMobile() ?? false;
-    const bumperPipeline = useMobileForBumper
-      ? createMobileAudioPipeline()
-      : createDesktopAudioPipeline();
-    /** @type {Promise<void>} */
-    const bumperDone = (async () => {
-      if (bumperDisabled) return;
-      bumperPipeline.ensureAudioContext?.();
-      activeBumper = createNetworkBumper({ mount: app, audioPipeline: bumperPipeline });
-      // bumper.play() resolves the moment the bumper enters its leaving
-      // state — boot.js mounts the experience underneath WHILE the
-      // bumper continues to fade out (CSS opacity transition + auto-
-      // teardown when the fade completes). No explicit teardown here.
-      await activeBumper.play();
-    })();
+    // Phase 0b — Bumper is now gated by HWES v1 framing primitive
+    // `opening: 'station_ident'`. The default broadcast_show recipe
+    // sets opening:'cold_open' (cold-open card, not bumper). Creators
+    // wanting the bumper set framing_directives.opening to
+    // 'station_ident' on the experience.
+    //
+    // URL overrides:
+    //   ?bumper=off  → forces no bumper regardless of framing
+    //   ?bumper=on   → forces bumper regardless of framing (dev)
+    //   ?opening=station_ident|cold_open|straight → overrides framing.opening
+    //
+    // FE-arch P0-3 fix (2026-05-03): bumperPipeline + silentKeepalive
+    // are created AFTER the page_shell dispatch, not before. Web_page
+    // shell never creates the AudioContext or the looping silent <audio>
+    // element — those are broadcast-only resources and would leak on
+    // SPA unmount of a web_page experience.
+    const bumperParamOverride = params.get('bumper');
 
     const raw = await loadHwesResponse({ fixtureName });
     const view = interpret(raw, { warn: true });
+
+    // Resolve framing once at boot — opening/closing/show_ident/page_shell
+    // are experience-level and don't change per-item. URL overrides
+    // (?opening=) win for dev workflows; otherwise the spec-resolved
+    // values flow through.
+    const framing = (() => {
+      const base = resolveFraming(view);
+      const openingOverride = params.get('opening');
+      const closingOverride = params.get('closing');
+      const shellOverride = params.get('page_shell');
+      const identOverride = params.get('show_ident');
+      return {
+        ...base,
+        opening: openingOverride ?? base.opening,
+        closing: closingOverride ?? base.closing,
+        page_shell: shellOverride ?? base.page_shell,
+        show_ident: identOverride ?? base.show_ident,
+      };
+    })();
 
     if (view.items.length === 0) {
       setEmpty('This experience has no items.');
       return;
     }
+
+    // Phase 0b — page_shell dispatch. When framing.page_shell ===
+    // 'web_page', the experience renders as a scrollable in-flow page
+    // (no bumper, no broadcast machinery). All items mount at once;
+    // each card has its own play controls (native HTML5). Spec recipe
+    // text: "Present the experience as a standard web page... no cold
+    // open, no chyrons, no sign-off — just a well-designed page."
+    //
+    // The web_page path skips ALL broadcast machinery: no state machine,
+    // no audio pipeline (each card uses native <audio>/<video> controls),
+    // no narration pipeline, no completion card. It's a parallel render
+    // path. teardownActive handles only the page-shell teardown.
+    //
+    // For 'broadcast' (default) and any unknown shell, fall through
+    // to the existing broadcast flow below.
+    if (framing.page_shell === 'web_page') {
+      const webShell = createWebPageShell({ mount: app, view });
+      teardownActive = () => {
+        webShell.teardown();
+      };
+      // eslint-disable-next-line no-console
+      console.info(
+        '[Harmonic Wave Universal Player] Web-page shell mounted.\n' +
+          `  Experience: ${view.experience?.name ?? '(unnamed)'} (${view.items.length} item${view.items.length === 1 ? '' : 's'})`,
+      );
+      return;
+    }
+
+    // Broadcast path — set up the audio-pipeline + silent keepalive now.
+    // Web_page returned above so these never get created on that path.
+    const useMobileForBumper = readMobileOverride(params) ?? isMobile() ?? false;
+    const bumperPipeline = useMobileForBumper
+      ? createMobileAudioPipeline()
+      : createDesktopAudioPipeline();
+
+    // Bumper plays IFF (URL override forces it) OR (framing says station_ident
+    // AND URL hasn't disabled it). Stage 1 of Phase 0b — cold-open card
+    // (for opening:'cold_open') and straight (no opening ceremony) both
+    // currently fall through to direct item-0 mount; the cold-open card
+    // renderer ships in a follow-up commit.
+    const bumperEnabled =
+      bumperParamOverride === 'on' ||
+      (framing.opening === 'station_ident' && bumperParamOverride !== 'off');
+
+    // Phase 1.3 — iOS Silent Mode keepalive (skill 1.5.2). A silent
+    // looping <audio> in parallel with Web Audio output forces the
+    // iOS audio session into 'Playback' (vs. 'AmbientSound' default
+    // which respects the mute switch). Without this, bumper SFX +
+    // synthesized music bed are inaudible on a muted iPhone.
+    // Kick off in parallel with the bumper — the keepalive's .play()
+    // counts as part of the same user gesture chain that triggered
+    // boot. Active for the lifetime of the experience; torn down by
+    // teardownActive below.
+    const silentKeepalive = createSilentKeepalive();
+    /** @type {Promise<void>} */
+    const bumperDone = (async () => {
+      if (!bumperEnabled) {
+        // Even when bumper is suppressed, still start the keepalive so
+        // any later Web Audio output (cold-open card narration's
+        // music-bed duck, item-level music bed) can audibly play on
+        // muted iPhones.
+        silentKeepalive.start().catch(() => {});
+        return;
+      }
+      bumperPipeline.ensureAudioContext?.();
+      // Start keepalive BEFORE the bumper so the audio session category
+      // is set BEFORE the SFX schedules its first oscillator. iOS picks
+      // the session category lazily on first audio output; sequencing
+      // here avoids the category lock from happening on the bumper SFX
+      // (which would lock to AmbientSound and kill the SFX silently).
+      silentKeepalive.start().catch(() => {});
+      activeBumper = createNetworkBumper({ mount: app, audioPipeline: bumperPipeline });
+      // FE-arch P1-5 — toggle `body.hwes-cinematic` so chrome (header,
+      // chapter bar, drawer toggles, show-ident) fades out during the
+      // bumper. CSS handles the visual; JS owns the state.
+      document.body?.classList?.add('hwes-cinematic');
+      try {
+        await activeBumper.play();
+      } finally {
+        document.body?.classList?.remove('hwes-cinematic');
+      }
+    })();
 
     injectTheme(view.experience?.player_theme);
 
@@ -321,6 +426,11 @@ let activeBumper = null;
     // 3d675a6.
     /** @type {ReturnType<typeof createNarrationPipeline> | null} */
     let narration = null;
+    // FE-arch P1-3 — chrome bars consolidated into a single module.
+    // Hoisted because boot's teardownActive runs from pagehide which
+    // can fire during the data-fetch await window.
+    /** @type {ReturnType<typeof createChromeBars> | null} */
+    let chromeBars = null;
 
     // Module-scope playing flag — kept in lockstep with whatever the
     // currently-mounted controls show. Read by the keyboard space-bar
@@ -329,6 +439,24 @@ let activeBumper = null;
     // could one day toggle play/pause too). Set by every control path
     // that changes playback (chrome button, keyboard, gesture, guard).
     let isPlaying = false;
+    // Phase 4.1 / FE-arch P1-2 (2026-05-03) — counter set by
+    // item:started while narration is voicing. mountItem reads
+    // `isNarrationInFlight()` to defer auto-start; the concurrent
+    // audio path schedules renderer.start() at the 40% mark instead
+    // of mount-time. Mobile path leaves the counter at 0 (sequential
+    // narration → mount).
+    //
+    // The counter (vs. a boolean) is the load-bearing fix for the
+    // two-handler race: when handler1's narration is still in flight
+    // and handler2 starts (rapid skip), both increment. handler1's
+    // finally decrements but the counter stays > 0 — handler2 still
+    // sees `isNarrationInFlight() === true`. The boolean form had
+    // handler1's finally clearing the flag while handler2 was still
+    // alive, briefly violating mountItem's invariant.
+    let narrationInFlightCount = 0;
+    function isNarrationInFlight() {
+      return narrationInFlightCount > 0;
+    }
 
     /**
      * Centralized play action. All entry points (chrome Play button,
@@ -413,6 +541,11 @@ let activeBumper = null;
       gestures.teardown();
       audioGuard.teardown();
       narration?.teardown();
+      chromeBars?.teardown();
+      // Phase 1.3 — release the iOS Silent Mode keepalive. Stops the
+      // silent loop element + removes from DOM. Without this, the audio
+      // session stays in 'Playback' even after SPA unmount.
+      silentKeepalive.teardown();
       // Analytics teardown sync-flushes any queued events before
       // detaching the pagehide listener. SPA-unmount loses any not-
       // yet-batched events otherwise.
@@ -510,14 +643,22 @@ let activeBumper = null;
       // Music bed: start when behavior.narration_music_bed !== 'none'
       // AND the audio context is unlocked. Synthesized provider is
       // the default per SPEC #34 — works without any external asset.
-      // Mobile pipeline's startMusicBed is a no-op (per IMPLEMENTATION-
-      // GUIDE §3.3 — bed coexistence is broken on iOS Safari).
+      // Phase 3.5 — pass pickRandomBedUrl so the selector can pick a
+      // random released audio item from the experience as the bed
+      // (skill 1.5.0). Synthesized stays as fallback when no playable
+      // items exist. Mobile pipeline's startMusicBed is a no-op (per
+      // IMPLEMENTATION-GUIDE §3.3 — bed coexistence is broken on iOS).
       if (
         behavior.narration_music_bed !== 'none' &&
         stateMachine.isAudioUnlocked() &&
-        audioPipeline.kind === 'desktop'
+        audioPipeline.supportsMusicBed
       ) {
-        audioPipeline.startMusicBed({ experience: view.experience, item, behavior });
+        audioPipeline.startMusicBed({
+          experience: view.experience,
+          item,
+          behavior,
+          pickRandomBedUrl: makeRandomBedPicker(view, index),
+        });
       }
 
       const audioEl = mediaElement;
@@ -535,8 +676,21 @@ let activeBumper = null;
         onPlay: doPlay,
         onPause: doPause,
         onSkip: doSkipNext, // user-driven skip → analytics emits item.skipped
+        // Phase 0b: chrome-level Skip Intro button (was keyboard 'N'
+        // only). Same wire as the keyboard handler.
+        onSkipNarration: () => stateMachine.requestSkipNarration(),
+        // Phase 0b: progress bar + volume slider need the underlying
+        // audio element to read currentTime/duration + set .volume.
+        // For non-audio renderers (image, document, sound-effect),
+        // audioElement is null and the controls render without progress.
+        audioElement: mediaElement,
       });
       controls?.setNowPlaying(item?.content_title ?? `Item ${index + 1} of ${view.items.length}`);
+      // Phase 0b — Playlist boundary UX (skill 1.5.8): Skip button is
+      // disabled at the last item. Auto-advance also stops at the end.
+      // The state machine doesn't wrap; the chrome reflects this so
+      // the listener can SEE that there's nothing further.
+      controls?.setSkipDisabled(index >= view.items.length - 1);
 
       // Renderer.done resolution → tell the state machine; the SM
       // emits item:ended which the sequential subscription below
@@ -641,10 +795,56 @@ let activeBumper = null;
       const newSet = buildLayerSet(index);
       activeSet = newSet;
 
+      // Phase 4.5 (skill 1.5.0) — visible UI swap deferral. When
+      // narration is about to fire (or already firing), the next item's
+      // visual chrome should NOT pop instantly under the DJ overlay —
+      // that produces a "flash of next song" before the host has
+      // introduced it. Defer the wrap's opacity ramp so the new card
+      // fades in 800ms after mount, by which point the DJ overlay is
+      // visible and listener attention is on the voice. Reduced-motion:
+      // skip the deferral (pop is preferred over delay).
+      if (isNarrationInFlight() && !prefersReducedMotionFn()) {
+        const wrap = newSet.wrap;
+        if (wrap) {
+          wrap.style.opacity = '0';
+          wrap.style.transition = 'opacity 800ms ease-in';
+          // requestAnimationFrame so the initial opacity:0 commits
+          // BEFORE we schedule the fade-up.
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              if (activeSet === newSet) {
+                wrap.style.opacity = '1';
+              }
+            }, 850);
+          });
+        }
+      }
+
       // Honor autoplay AFTER activeSet is current so doPlay sees the
       // right set + the single-audio-guard announces correctly. autoplay
       // ='off' leaves isPlaying = false (controls already showed Play).
-      if (newSet.behavior.autoplay !== 'off') doPlay();
+      //
+      // Phase 1.5 audit (skill 1.5.0) — mobile/iOS does NOT honor
+      // programmatic .play() as a user gesture; autoplay calls outside
+      // a click handler are rejected with NotAllowedError. The chrome
+      // Play button click is the canonical mobile gesture entry. So:
+      //   desktop → run autoplay as before
+      //   mobile  → skip programmatic autoplay; user clicks Play
+      // The mobile path also covers the first-load case where audio is
+      // locked — the chrome Play button is the unlock trigger.
+      //
+      // Phase 4.1 (skill 1.5.0 three-channel concurrent audio) —
+      // when narration is currently in flight, do NOT auto-start the
+      // content. The item:started subscriber schedules renderer.start()
+      // at ~40% of estimated narration duration so the song fades up
+      // under the DJ's voice. Mobile path remains sequential.
+      if (
+        newSet.behavior.autoplay !== 'off' &&
+        audioPipeline.supportsConcurrentSources &&
+        !isNarrationInFlight()
+      ) {
+        doPlay();
+      }
 
       if (!oldSet || oldSet === newSet) return; // first mount or self
       if (oldSet.pendingTeardown != null) return; // already cleared above
@@ -656,7 +856,10 @@ let activeBumper = null;
         // Cross-fade: opacity ramp on the OLD wrap from 1 → 0 over
         // CROSSFADE_MS, with audio fade alongside (FE arch P1 #3).
         // Tear down the old set after the ramp completes.
-        const CROSSFADE_MS = 800;
+        // Phase 4.3 (WCAG 2.3.3) — when prefers-reduced-motion, drop
+        // to a near-instant cross-fade (60ms is fast enough to avoid
+        // a hard cut frame but short enough to satisfy the preference).
+        const CROSSFADE_MS = prefersReducedMotionFn() ? 60 : 800;
         oldSet.wrap.style.transition = `opacity ${CROSSFADE_MS}ms ease-in-out`;
         // Force a layout flush so the transition takes hold.
         // eslint-disable-next-line no-unused-expressions
@@ -669,7 +872,9 @@ let activeBumper = null;
         //     sample-accurate timing
         oldSet.renderer?.fadeOut?.(CROSSFADE_MS);
         const oldGain = oldSet.channelHandle?.gain;
-        const oldCtx = audioPipeline.kind === 'desktop' ? audioPipeline.getAudioContext() : null;
+        const oldCtx = audioPipeline.supportsConcurrentSources
+          ? audioPipeline.getAudioContext()
+          : null;
         if (oldGain && oldCtx) {
           const now = oldCtx.currentTime;
           oldGain.gain.cancelScheduledValues(now);
@@ -707,6 +912,10 @@ let activeBumper = null;
     let lastMountedIndex = -1;
     stateMachine.on('item:started', async ({ index, item }) => {
       activeIndex = index;
+      // FE-arch P1-3 — single-call per-item chrome refresh (chapter
+      // bar + playlist drawer highlight + lyrics panel contents).
+      const itemCollection = findCollectionForItem(view, index);
+      chromeBars?.updateOnItemStart({ item, index, collection: itemCollection });
       if (index === lastMountedIndex && activeSet) {
         // Bootstrap-then-unlock path: the visible card is already the
         // right one; just kick playback now that audio is unlocked.
@@ -722,6 +931,108 @@ let activeBumper = null;
       const itemActor = view.getItemActor(item);
       const position = /** @type {string} */ (itemBehavior.narration_position ?? 'before_content');
       if (position === 'before_content' || position === 'between_items') {
+        // FE-arch P1-4 — wire Phase 2.4 four-tier hierarchy. Before
+        // the per-item narration (Tier 3), fire collection-intro
+        // (Tier 2) when entering a new chapter, and boundary-announce
+        // (Tier 4) when crossing the released → pre-release boundary.
+        // Each is once-per-session per the willPlayDJ gate; markPlayed
+        // closes the producer-gap trap. All four tiers serialize
+        // through speakCore so this serial composition Just Works.
+        if (itemCollection?.collection_id != null) {
+          await narration.speakForCollection({
+            collection: itemCollection,
+            actor: itemActor ?? undefined,
+          });
+        }
+        // Boundary announcement: fires once when crossing from a
+        // released item into a pre-release (coming_soon) item.
+        // narration.willPlayDJ('boundary') checks the
+        // playedReleasedCollection precondition itself, so cold
+        // deep-links into a coming_soon item don't misfire.
+        const isComingSoon = /** @type {any} */ (item)?.content_status === 'coming_soon';
+        const prevWasReleased =
+          activeIndex > 0 &&
+          /** @type {any} */ (view.items[activeIndex - 1])?.content_status !== 'coming_soon';
+        if (isComingSoon && prevWasReleased && narration.willPlayDJ('boundary')) {
+          const collName = itemCollection?.collection_name;
+          const boundaryText = collName
+            ? `That was ${collName}. Up next are pre-release tracks from upcoming chapters.`
+            : 'Up next are pre-release tracks from upcoming chapters.';
+          await narration.speakBoundaryAnnounce({
+            text: boundaryText,
+            actor: itemActor ?? undefined,
+          });
+        }
+        // Phase 4.1 (skill 1.5.0) — three-channel concurrent audio on
+        // desktop. Song fades up at ~40% through the DJ narration so
+        // the listener hears DJ + bed + song-rising-under, the broadcast
+        // pattern. Mobile path stays sequential (DJ first, then song)
+        // because mobile audio session can't run concurrent media-element
+        // sources cleanly per IMPLEMENTATION-GUIDE §3.3.
+        const isAudioContent =
+          item?.content_type_slug === 'song' ||
+          item?.content_type_slug === 'podcast' ||
+          item?.content_type_slug === 'narration' ||
+          item?.content_type_slug === 'audiobook';
+        const concurrent = audioPipeline.supportsConcurrentSources && isAudioContent;
+        if (concurrent) {
+          narrationInFlightCount++;
+          const speakP = narration.speakForItem({
+            item,
+            behavior: itemBehavior,
+            actor: itemActor ?? undefined,
+            phase: position === 'between_items' ? 'between' : 'intro',
+          });
+          // Mount the layer-set immediately. autoStart is suppressed
+          // by mountItem's `isNarrationInFlight()` check above, so the
+          // renderer is mounted but not yet playing.
+          mountItem(index);
+          // FE-arch P0-2 fix — show the Skip Intro chrome button while
+          // narration is in flight. activeSet is current after mountItem
+          // above. Hidden again in `finally` regardless of natural-end
+          // vs user skip.
+          activeSet?.controls?.setSkipNarrationVisible(true);
+          // Estimate narration duration from text length. Browser TTS
+          // has no native duration accessor pre-utterance; ~2.5 wps is
+          // a conservative rate that matches the 0.95 playbackRate the
+          // bridge uses. Platform-audio could read audio.duration once
+          // metadata loads — but the timer fires earlier than that
+          // typically, so text-based estimate is the safe default.
+          const introText =
+            /** @type {any} */ (item)?.intro_hint ?? item?.content_metadata?.intro_hint ?? '';
+          const wordCount = String(introText).split(/\s+/).filter(Boolean).length || 8;
+          const estimatedMs = (wordCount / 2.5) * 1000;
+          const triggerMs = Math.max(800, estimatedMs * 0.4);
+          // Schedule the song-up trigger; cleanup if the user advances.
+          const counterAtSchedule = stateMachine.getAdvanceCounter();
+          const startTimer = setTimeout(() => {
+            // Stale-callback guard: if the user advanced before the
+            // timer fired, drop the start.
+            if (stateMachine.getAdvanceCounter() !== counterAtSchedule) return;
+            if (!activeSet || activeIndex !== index) return;
+            doPlay();
+          }, triggerMs);
+          try {
+            await speakP;
+          } finally {
+            narrationInFlightCount = Math.max(0, narrationInFlightCount - 1);
+            clearTimeout(startTimer);
+            // FE-arch P0-2 — hide Skip Intro button now that narration
+            // is over. Idempotent if already hidden.
+            activeSet?.controls?.setSkipNarrationVisible(false);
+            // After narration ends, ensure song is playing. If the
+            // 40% timer already started it, doPlay() is idempotent
+            // (audio.play() on an already-playing element is a no-op).
+            if (
+              activeSet &&
+              activeIndex === index &&
+              stateMachine.getAdvanceCounter() === counterAtSchedule
+            ) {
+              doPlay();
+            }
+          }
+          return; // skip the unconditional mountItem below
+        }
         await narration.speakForItem({
           item,
           behavior: itemBehavior,
@@ -740,7 +1051,12 @@ let activeBumper = null;
       const b = activeSet.behavior;
       if (b?.narration_music_bed === 'none') return;
       const item = view.items[activeIndex];
-      audioPipeline.startMusicBed({ experience: view.experience, item, behavior: b });
+      audioPipeline.startMusicBed({
+        experience: view.experience,
+        item,
+        behavior: b,
+        pickRandomBedUrl: makeRandomBedPicker(view, activeIndex),
+      });
     });
     stateMachine.on('item:ended', ({ index }) => {
       // Natural end (renderer.done resolved without user skip) →
@@ -762,10 +1078,22 @@ let activeBumper = null;
       // eslint-disable-next-line no-console
       console.info('[hwes/boot] experience:ended');
       // Step 14a — Layer 2 analytics. Headline metric: did the
-      // listener finish the whole experience?
+      // listener finish the whole experience? Always emits regardless
+      // of closing primitive — the metric is independent of UX.
       analytics.emit(PLAYER_EVENTS.EXPERIENCE_COMPLETED, {
         item_count: view.items.length,
       });
+      // Phase 0b — Closing primitive gates the end-of-experience card.
+      //   - 'abrupt' → no card; experience just stops
+      //   - 'sign_off' (broadcast_show default) → completion card + outro
+      //     voicing of experience.outro_hint (outro voicing lands in a
+      //     follow-up commit; current card already shows cover-montage +
+      //     CTAs which is the spec's signing-off intent)
+      //   - 'credits_roll' → completion card with credits-style variant
+      //     (variant rendering ships in a follow-up; for now uses the
+      //     same card layout — closing param is captured so the card can
+      //     branch internally once that lands)
+      if (framing.closing === 'abrupt') return;
       // Step 12: mount the completion card on top of the last layer-set
       // (which stays underneath as the visual fade target). 3 retention
       // CTAs: Share / Try Another / What's Next from this creator.
@@ -798,6 +1126,50 @@ let activeBumper = null;
     // immediately into item:started — the bumper's CSS fade-out
     // overlaps with the first item mounting underneath.
     await bumperDone;
+
+    // FE-arch P1-3 — chrome bars consolidated into a single module.
+    // Mounts header-bar / chapter-bar / show-ident / playlist-drawer +
+    // toggle / lyrics-panel + toggle. Boot calls
+    // chromeBars.updateOnItemStart() per item:started; teardown via
+    // chromeBars.teardown() in teardownActive.
+    chromeBars = createChromeBars({
+      mount: app,
+      view,
+      framing,
+      stateMachine,
+    });
+
+    // Phase 0b — Cold-open card. Activated when framing.opening ===
+    // 'cold_open' (the default for broadcast_show). Renders cover +
+    // title + premise + creator credit, then voices experience.intro_hint
+    // via the narration pipeline before resolving so item 0 can mount.
+    // 'station_ident' path skipped this (bumper played instead);
+    // 'straight' path skips this (direct to item 0).
+    if (framing.opening === 'cold_open') {
+      const card = createColdOpenCard({
+        mount: app,
+        experience: view.experience,
+        actor: view.actor,
+        narrationPipeline: narration,
+        stateMachine,
+      });
+      // FE-arch P1-5 — toggle `body.hwes-cinematic` so chrome bars +
+      // toggles + show-ident fade out during the cold-open card. Class
+      // is removed in finally regardless of natural completion or skip.
+      document.body?.classList?.add('hwes-cinematic');
+      try {
+        await card.play();
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[hwes/boot] cold-open card.play threw; advancing:', err);
+      } finally {
+        document.body?.classList?.remove('hwes-cinematic');
+      }
+      // Don't await teardown — overlap card fade-out with item 0 mount
+      // for the same broadcast-feel as the bumper-to-item transition.
+      card.teardown();
+    }
+
     stateMachine.start({ items: view.items });
     // If audio is locked (no user gesture yet), the SM holds the first
     // item:started event until unlockAudio() fires. To bootstrap the
@@ -813,13 +1185,16 @@ let activeBumper = null;
 
     // Console banner: confirms the engine + composition + renderers
     // wired up cleanly. Useful for the README's "Open and you should
-    // see…" expectation.
+    // see…" expectation. Per FE-arch P2-4 — banner reflects active
+    // framing (where the listener actually is in the rendering tree)
+    // instead of the legacy "Steps 1-14a" version line.
     // eslint-disable-next-line no-console
     console.info(
-      '[Harmonic Wave Universal Player] Steps 1-14a mounted.\n' +
+      '[Harmonic Wave Universal Player] mounted.\n' +
         `  Audio:      ${audioPipeline.kind} pipeline${stateMachine.isAudioUnlocked() ? ' (unlocked)' : ' (locked — first Play unlocks)'}\n` +
         `  Source:     ${describeSource({ fixtureName })}\n` +
         `  Experience: ${view.experience?.name ?? '(unnamed)'} (${view.items.length} item${view.items.length === 1 ? '' : 's'})\n` +
+        `  Framing:    page_shell=${framing.page_shell} · opening=${framing.opening} · closing=${framing.closing} · show_ident=${framing.show_ident}\n` +
         `  Recipes:    ${Object.keys(BUILTIN_DELIVERY_RECIPES).length} delivery + ${Object.keys(BUILTIN_DISPLAY_RECIPES).length} display\n` +
         `  Primitives: ${Object.keys(DEFAULT_BEHAVIOR).length}\n` +
         `  Extensions: ${listKnownExtensions().join(', ')}\n` +

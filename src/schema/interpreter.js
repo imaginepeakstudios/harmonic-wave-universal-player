@@ -111,9 +111,28 @@ function synthesizeActorFromFlat(raw) {
 }
 
 /**
+ * True when the raw item is a collection-reference (chapter / album
+ * wrapper) per HWES v1 spec — `collection_id` is set and `content_id`
+ * is null. Used by isCollectionReference() accessor.
+ */
+function isCollectionReferenceShape(rawItem) {
+  return (
+    rawItem != null &&
+    typeof rawItem === 'object' &&
+    rawItem.collection_id != null &&
+    rawItem.content_id == null
+  );
+}
+
+/**
  * Normalize an item from the production wire shape into the HwesView
  * shape. Aliases production field names + parses stringified JSON in
  * place. Returns a NEW object (doesn't mutate the original).
+ *
+ * Handles both content-reference items (content_id set) AND collection-
+ * reference items (collection_id set). For collection-refs, the nested
+ * collection_content[] array is recursively normalized so each entry
+ * is itself a usable ItemView.
  *
  * @param {Record<string, unknown>} rawItem
  * @returns {ItemView}
@@ -142,7 +161,55 @@ function normalizeItem(rawItem) {
   if (rawItem.cover_art_url == null && rawItem.content_cover_art_url != null) {
     normalized.cover_art_url = rawItem.content_cover_art_url;
   }
+  // Phase 0c — collection-reference handling. When this item IS a
+  // collection-reference (collection_id set, content_id null), parse
+  // its stringified-JSON collection_* fields + recursively normalize
+  // the nested collection_content[] entries.
+  if (isCollectionReferenceShape(rawItem)) {
+    normalized.collection_metadata = parseJsonField(rawItem.collection_metadata, {});
+    normalized.collection_recipes = parseJsonField(rawItem.collection_recipes, []);
+    normalized.collection_visual_scene = parseJsonField(rawItem.collection_visual_scene, undefined);
+    if (Array.isArray(rawItem.collection_content)) {
+      normalized.collection_content = rawItem.collection_content.map(normalizeItem);
+    }
+  }
   return /** @type {any} */ (normalized);
+}
+
+/**
+ * Public predicate: is this item a collection-reference (vs content-ref)?
+ * Per HWES v1 spec — `collection_id` set and `content_id` null.
+ *
+ * @param {ItemView | null | undefined} item
+ * @returns {boolean}
+ */
+export function isCollectionReference(item) {
+  return isCollectionReferenceShape(/** @type {any} */ (item));
+}
+
+/**
+ * Project a collection-reference item to a CollectionView shape.
+ * Returns null when the item isn't a collection-reference.
+ *
+ * @param {ItemView | null | undefined} item
+ * @returns {CollectionView | null}
+ */
+export function getCollectionView(item) {
+  if (!isCollectionReferenceShape(/** @type {any} */ (item))) return null;
+  const i = /** @type {any} */ (item);
+  return {
+    collection_id: i.collection_id,
+    collection_name: i.collection_name,
+    collection_slug: i.collection_slug,
+    collection_type: i.collection_type,
+    collection_numeral: i.collection_numeral,
+    collection_date_range: i.collection_date_range,
+    collection_metadata: i.collection_metadata,
+    collection_recipes: i.collection_recipes,
+    collection_tts_fields: i.collection_tts_fields,
+    collection_visual_scene: i.collection_visual_scene,
+    collection_content: i.collection_content,
+  };
 }
 
 /**
@@ -158,11 +225,22 @@ function normalizeItem(rawItem) {
  * @property {(item: ItemView) => ActorView | null} getItemActor
  * @property {(item: ItemView) => string[]} getItemDisplayDirectives
  * @property {(item: ItemView) => string[]} getItemDeliveryInstructions
+ * @property {(item: ItemView) => object | null} getItemVisualScene
+ * @property {(item: ItemView) => string[]} getItemCoverChain
  */
 
 /**
  * @typedef {object} ExperienceView
  * @property {number | undefined} id
+ * @property {string | undefined} hwes_spec_url
+ *   The spec version + URL the experience is encoded against. Per spec
+ *   re-fetch 2026-05-03; pass-through.
+ * @property {number | undefined} sort_order
+ * @property {string | undefined} created_at
+ * @property {string | undefined} updated_at
+ * @property {string | undefined} status
+ *   Enum per spec: draft / private / published / paused / archived.
+ *   Engine doesn't enforce — pass-through for chrome / SEO logic.
  * @property {string | undefined} slug
  * @property {string | undefined} name
  * @property {string | undefined} description
@@ -170,10 +248,58 @@ function normalizeItem(rawItem) {
  * @property {string | undefined} icon_url
  * @property {string | undefined} mood_tags
  * @property {string | undefined} experience_mode
+ * @property {string | undefined} experience_mode_applied
+ *   Echo of the resolved listening mode (after fallback chain). Pass-through.
  * @property {string | undefined} arc_summary
  * @property {object | undefined} visual_scene
  * @property {string[] | undefined} delivery_instructions
  * @property {string[] | undefined} display_directives
+ * @property {string | undefined} profile_recipe_library
+ *   JSON-string of creator-authored custom recipes. Engine ignores
+ *   creator-defined slugs (skipped as 'unknown' in recipe-engine);
+ *   surfaced for AI-listener consumers + diagnostics.
+ * @property {string | undefined} media_note
+ * @property {string | undefined} recipe_note
+ * @property {string[] | undefined} content_rating_filter_applied
+ * @property {number | undefined} filtered_count
+ * @property {string[] | undefined} framing_recipes
+ *   Single-element JSON-string array per HWES v1 spec. Closed vocabulary
+ *   from the framing category of /hwes/v1/recipes.json (broadcast_show,
+ *   web_page, plus reserved podcast_feed/film_screening/gallery_wall).
+ *   Default ["broadcast_show"]. Engine treats the FIRST element as
+ *   authoritative (single-element rule); the array exists so future
+ *   stacked-framing semantics can layer on without a wire-shape change.
+ * @property {object | undefined} framing_directives
+ *   Resolved framing primitives object — `{ page_shell, show_ident,
+ *   opening, closing }`. Computed by engine/framing-engine.js from
+ *   framing_recipes + the registry. Pass-through field for any platform-
+ *   pre-resolved directives.
+ * @property {string | undefined} intro_hint
+ *   Cold-open monologue text — read by the framing recipe's opening slot
+ *   when framing_directives.opening === 'cold_open'. Per HWES v1 spec.
+ * @property {string | undefined} outro_hint
+ *   Sign-off text — read by the framing recipe's closing slot when
+ *   framing_directives.closing === 'sign_off'. Treat as a SEED for the
+ *   composed outro per broadcast_show recipe text (do not paste verbatim).
+ * @property {number | undefined} tts_intro
+ *   Boolean flag (0/1, integer in production wire) indicating whether
+ *   the experience.intro_hint is TTS-eligible. Per HWES v1 spec re-fetch
+ *   2026-05-03: this is a flag, NOT a URL. Pre-rendered audio URLs are
+ *   surfaced via `generated_media.intro_hint.audio` instead.
+ * @property {string | undefined} tts_fields
+ *   JSON-string array of field names that are TTS-eligible
+ *   (whitelist). Per spec: only `["intro_hint"]` is currently in the
+ *   whitelist, but the array shape is preserved for future expansion.
+ *   Surfaced as the raw JSON-string here; consumers parse via
+ *   parseJsonField when they need the array.
+ * @property {string | undefined} tts_intro_text
+ *   Resolved version of the cold-open text (post-AI-composition). May
+ *   differ from intro_hint when an AI host is given intro_hint as a seed.
+ * @property {string | undefined} pairing_hint
+ *   Listener-context note ("best with headphones", "for late-night listening").
+ * @property {string | undefined} arc_role
+ * @property {string | undefined} narrative_voice
+ * @property {object | undefined} generated_media
  * @property {object | undefined} player_theme
  * @property {object | undefined} seo
  * @property {string[] | undefined} starter_prompts_resolved
@@ -226,22 +352,99 @@ function normalizeItem(rawItem) {
  */
 
 /**
+ * @typedef {object} CollectionView
+ * Collection-reference item shape per HWES v1 spec 2026-05-03 re-fetch.
+ * Returned from `getItemCollection(item)` when an item carries
+ * `collection_id` (vs `content_id`). The `collection_content[]` array
+ * holds nested content rows (each a normalized ItemView), already
+ * cascade-resolved by the platform.
+ *
+ * Use `isCollectionReference(item)` to discriminate at runtime.
+ *
+ * @property {number} collection_id
+ * @property {string | undefined} collection_name
+ * @property {string | undefined} collection_slug
+ * @property {string | undefined} collection_type
+ *   Examples: album, playlist, series, season, episode_block.
+ * @property {string | undefined} collection_numeral
+ *   Display marker like "I" / "II" / "1" — used by chapter-bar.
+ * @property {string | undefined} collection_date_range
+ *   Display string like "1999–2002".
+ * @property {object | undefined} collection_metadata
+ *   Stringified-JSON in production wire; parsed via parseJsonField.
+ * @property {string[] | undefined} collection_recipes
+ *   Collection-tier delivery recipe slugs (cascade tier between
+ *   experience and content). Stringified-JSON in production wire.
+ * @property {string | undefined} collection_tts_fields
+ *   JSON-string whitelist of TTS-eligible collection fields.
+ * @property {object | undefined} collection_visual_scene
+ *   Collection-level visual scene; cascade-resolves to content level.
+ * @property {ItemView[] | undefined} collection_content
+ *   Nested content rows in this collection — each is itself a
+ *   normalized ItemView with cascade-resolved actor + recipes +
+ *   override surface (override_enabled, delivery_override_instruction,
+ *   intro_hint).
+ */
+
+/**
  * @typedef {object} ItemView
  * @property {number | undefined} item_id
+ * @property {number | undefined} sort_order
  * @property {number | undefined} content_id
  * @property {number | undefined} collection_id
  * @property {string | undefined} content_title
+ * @property {string | undefined} content_slug
+ * @property {string | undefined} content_status
+ *   Per spec re-fetch 2026-05-03 (extension `content_coming_soon_v1`):
+ *   active / paused / coming_soon / draft / archived / removed /
+ *   uploading / processing / pending_review / failed.
+ *   Items with content_status='coming_soon' render cover + metadata but
+ *   /media/play/:id returns 403 with release_at. Engine consumption
+ *   in Phase 0c.4.
+ * @property {string | undefined} release_at
+ *   ISO 8601 timestamp; meaningful when content_status === 'coming_soon'.
  * @property {string | undefined} content_type_slug
+ * @property {string | undefined} content_type_name
+ * @property {string | undefined} content_rating
+ *   Enum: clean / explicit / mature.
+ * @property {number | undefined} rights_confirmed
+ *   Boolean flag (0/1, integer per production wire).
+ * @property {string | undefined} arc_role
+ *   Per-item enum: opening / reflection / confession / struggle /
+ *   turning_point / surrender / breakthrough / resolution.
+ * @property {string | undefined} mood_tags
+ *   Per-item override; falls through to experience-level mood_tags.
  * @property {string | undefined} media_play_url
  * @property {string | undefined} cover_art_url
  *   Optional top-level cover. When present, takes precedence over
  *   `content_metadata.cover_art_url` (some platform versions surface it
  *   here to save a metadata lookup; renderers should read both with
  *   top-level winning).
+ * @property {string | undefined} alt_cover_art_1_url
+ *   Alternate cover variant — used by banner-animated for Ken Burns
+ *   rotation. Per skill 1.5.0 + V1-COMPLIANCE-AUDIT decision #4.
+ * @property {string | undefined} alt_cover_art_2_url
+ * @property {number | undefined} stream_count
+ * @property {string | undefined} intro_hint
+ *   Per-item cold-open / throw-to text (cascade-resolved). Read by
+ *   narration pipeline as the per-item host script.
+ * @property {string | undefined} outro_hint
+ *   Per-item sign-off text (cascade-resolved).
+ * @property {string | undefined} item_script
+ *   Production wire alias for intro_hint when authored on the
+ *   experience_items / content_collections junction row. Schema
+ *   interpreter accepts both for back-compat.
  * @property {ActorView | undefined} resolved_actor
  * @property {string[] | undefined} display_directives
  * @property {string[] | undefined} delivery_instructions
  * @property {object | undefined} content_metadata
+ * @property {boolean | number | undefined} override_enabled
+ *   Override leaf flag — per spec, ONLY content_collections junction
+ *   rows carry overrides. When 1/true, the parent cascade is replaced
+ *   (not merged) by the override fields on this entry.
+ * @property {string | undefined} delivery_override_instruction
+ *   Marker text emitted by the platform when override_enabled === 1.
+ *   Pass-through; engine logic uses the resolved fields, not the marker.
  */
 
 /**
@@ -321,9 +524,24 @@ export function interpret(rawResponse, opts = {}) {
     ? rawResponse.starter_prompts_resolved
     : parseJsonField(rawResponse.starter_prompts, undefined);
 
+  // Framing recipes — closed vocabulary, single-element JSON-string array
+  // per HWES v1. Engine treats first element as authoritative. The
+  // raw value can arrive as a stringified array (production) or
+  // already-parsed array (clean fixtures); parseJsonField handles both.
+  // Default to ['broadcast_show'] when the field is missing entirely
+  // (matches spec default + universal player's native rendering flow).
+  const expFraming = /** @type {string[]} */ (
+    parseJsonField(rawResponse.framing_recipes, ['broadcast_show']) ?? ['broadcast_show']
+  );
+
   /** @type {ExperienceView} */
   const experience = {
     id: rawResponse.id,
+    hwes_spec_url: rawResponse.hwes_spec_url,
+    sort_order: rawResponse.sort_order,
+    created_at: rawResponse.created_at,
+    updated_at: rawResponse.updated_at,
+    status: rawResponse.status,
     slug: rawResponse.slug,
     name: rawResponse.name,
     description: rawResponse.description,
@@ -331,10 +549,35 @@ export function interpret(rawResponse, opts = {}) {
     icon_url: rawResponse.icon_url,
     mood_tags: rawResponse.mood_tags,
     experience_mode: rawResponse.experience_mode,
+    experience_mode_applied: rawResponse.experience_mode_applied,
     arc_summary: rawResponse.arc_summary,
     visual_scene: rawResponse.visual_scene,
+    profile_recipe_library: rawResponse.profile_recipe_library,
+    media_note: rawResponse.media_note,
+    recipe_note: rawResponse.recipe_note,
+    content_rating_filter_applied: rawResponse.content_rating_filter_applied,
+    filtered_count: rawResponse.filtered_count,
     delivery_instructions: /** @type {string[] | undefined} */ (expDelivery),
     display_directives: /** @type {string[] | undefined} */ (expDisplay),
+    framing_recipes: Array.isArray(expFraming) ? expFraming : ['broadcast_show'],
+    // Pass-through any platform-pre-resolved framing_directives. The
+    // engine's framing-engine.js resolves them from framing_recipes when
+    // not pre-resolved.
+    framing_directives: rawResponse.framing_directives,
+    // Cold-open / sign-off slots — read by the framing recipe's opening
+    // and closing primitives.
+    intro_hint: rawResponse.intro_hint,
+    outro_hint: rawResponse.outro_hint,
+    // tts_intro is a 0/1 boolean flag per HWES v1 spec (re-fetch
+    // 2026-05-03). Keep as integer; pass-through.
+    tts_intro: rawResponse.tts_intro,
+    // tts_fields is a JSON-string whitelist (currently only ["intro_hint"]).
+    tts_fields: rawResponse.tts_fields,
+    tts_intro_text: rawResponse.tts_intro_text,
+    pairing_hint: rawResponse.pairing_hint,
+    arc_role: rawResponse.arc_role,
+    narrative_voice: rawResponse.narrative_voice,
+    generated_media: rawResponse.generated_media,
     player_theme: rawResponse.player_theme,
     seo: rawResponse.seo,
     starter_prompts_resolved: /** @type {string[] | undefined} */ (starterPrompts),
@@ -396,6 +639,58 @@ export function interpret(rawResponse, opts = {}) {
       return Array.isArray(experience.delivery_instructions)
         ? experience.delivery_instructions
         : [];
+    },
+    /**
+     * Resolve the visual scene for an item per HWES v1's visual_scene
+     * cascade: content_metadata.visual_scene → item.visual_scene →
+     * collection_visual_scene (when item is a collection-ref entry) →
+     * experience.visual_scene. The platform pre-resolves but client-side
+     * fallthrough is defense-in-depth for fixtures + production-wire
+     * variants. Returns the most-specific non-empty value or null. When
+     * called with null/undefined item, returns null (not the experience-
+     * level scene — caller asked about an item, none was given).
+     *
+     * @param {ItemView | null | undefined} item
+     * @returns {object | null}
+     */
+    getItemVisualScene(item) {
+      if (item == null) return null;
+      const i = /** @type {any} */ (item);
+      const cm = /** @type {any} */ (i?.content_metadata);
+      if (cm && typeof cm === 'object' && cm.visual_scene) return cm.visual_scene;
+      if (i?.visual_scene) return i.visual_scene;
+      if (i?.collection_visual_scene) return i.collection_visual_scene;
+      if (experience.visual_scene) return /** @type {any} */ (experience.visual_scene);
+      return null;
+    },
+    /**
+     * Resolve the cover art chain for an item per skill 1.5.0 + decision
+     * #4: cover_art_url → alt_cover_art_1_url → alt_cover_art_2_url +
+     * (visual_scene.banner1_url + banner2_url for banner-animated). Used
+     * by banner-animated for Ken Burns rotation. Returns an array of
+     * URLs (deduped, non-empty); empty array when no cover at all.
+     *
+     * @param {ItemView | null | undefined} item
+     * @returns {string[]}
+     */
+    getItemCoverChain(item) {
+      const i = /** @type {any} */ (item);
+      const candidates = [
+        i?.cover_art_url,
+        i?.alt_cover_art_1_url,
+        i?.alt_cover_art_2_url,
+        i?.content_metadata?.visual_scene?.banner1_url,
+        i?.content_metadata?.visual_scene?.banner2_url,
+      ];
+      const seen = new Set();
+      const result = [];
+      for (const c of candidates) {
+        if (typeof c !== 'string' || c.length === 0) continue;
+        if (seen.has(c)) continue;
+        seen.add(c);
+        result.push(c);
+      }
+      return result;
     },
   };
   return view;

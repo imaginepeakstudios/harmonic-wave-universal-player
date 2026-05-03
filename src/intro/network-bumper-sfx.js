@@ -30,7 +30,17 @@
  * unlocked) on mobile, so AudioContext is awake when this runs.
  * Desktop bumper plays at boot but the AudioContext is created on
  * the same gesture, so we're safe both ways.
+ *
+ * Phase 1.2 (skill 1.5.2 / 2026-05-03) — `audioContext.resume()` is
+ * asynchronous. Scheduling oscillator/buffer events while currentTime
+ * is 0 (suspended) means the events fire at past times and never
+ * play. Awaiting `Promise.race([resume(), 3s timeout])` BEFORE
+ * scheduling is the canonical fix. The timeout floor handles the
+ * (rare) iOS Safari case where resume() never resolves on a context
+ * that was created without a user gesture — we fall through and
+ * schedule anyway; worst case the SFX is silent on that load.
  */
+const RESUME_TIMEOUT_MS = 3000;
 
 // ~9 second bumper (user direction 2026-04-19 — "need about 3 more
 // seconds"). Slow crescendo, bell hits at the visual climax + hold,
@@ -64,6 +74,28 @@ const NOISE_CACHE = new WeakMap();
  */
 export async function playNetworkBumperSfx(audioContext, destination) {
   const ctx = audioContext;
+
+  // Phase 1.2 (skill 1.5.2): await ctx.resume() with a 3s timeout
+  // floor BEFORE reading ctx.currentTime or scheduling any events.
+  // On iOS Safari, the context can be in 'suspended' state where
+  // currentTime stays at 0; scheduling against `now=0` produces
+  // events at past times that never play. Awaiting resume() promotes
+  // the context into 'running' so subsequent currentTime reads are
+  // a true wall-clock anchor. The timeout race protects against
+  // pathological cases where resume() never resolves (we fall through
+  // and schedule anyway — worst case SFX silent that load).
+  if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+    try {
+      await Promise.race([
+        ctx.resume(),
+        new Promise((resolve) => setTimeout(resolve, RESUME_TIMEOUT_MS)),
+      ]);
+    } catch {
+      // resume() can reject on browsers that disallow without gesture.
+      // Fall through and schedule anyway.
+    }
+  }
+
   const now = ctx.currentTime;
 
   // Master gain envelope (per user direction 2026-04-19 — "fade in to

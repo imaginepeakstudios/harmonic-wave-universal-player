@@ -15,12 +15,14 @@
 
 /**
  * @typedef {object} MediaChannel
- * @property {'audio' | 'video' | 'image' | 'document'} kind
+ * @property {'audio' | 'video' | 'image' | 'document' | 'placeholder'} kind
  *   What the renderer is producing. Audio/video kinds carry a media
- *   element the audio pipeline will route. Image/document kinds are
- *   non-routable (no audio stream); the channel still exists so boot.js
- *   can hold a uniform reference shape per active renderer, and the
- *   teardown contract stays consistent across types.
+ *   element the audio pipeline will route. Image/document/placeholder
+ *   kinds are non-routable (no audio stream); the channel still exists
+ *   so boot.js can hold a uniform reference shape per active renderer,
+ *   and the teardown contract stays consistent across types.
+ *   `placeholder` is used by the coming-soon renderer (no playback at
+ *   all — cover + countdown + dwell-timer auto-advance).
  * @property {HTMLMediaElement | HTMLImageElement | null} element
  *   The renderer-owned element (audio/video for media kinds, img for
  *   image kind, null for document kind). Pipeline routes media kinds

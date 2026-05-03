@@ -68,7 +68,7 @@ Each fixture is a complete HWES v1 `get_experience` response. The full shape is 
 }
 ```
 
-Use a fixture index (`01`–`99`) so test ordering is deterministic. Name fixtures by what they EXERCISE, not by content (`05-lyrics-karaoke.hwes.json` is good; `holding-on.hwes.json` is bad).
+Use a fixture index (`01`–`99`) so test ordering is deterministic. Name fixtures by what they EXERCISE, not by content (`05-text-overlay.hwes.json` is good; `holding-on.hwes.json` is bad).
 
 ## Expected-output format
 
@@ -134,7 +134,7 @@ bun run test:conformance
 HWES_PLAYER_ENGINE=path/to/fork/engine.js bun run test:conformance
 
 # Run a single fixture
-bun run test:conformance -- --grep "05-lyrics-karaoke"
+bun run test:conformance -- --grep "07-lyrics-karaoke"
 ```
 
 Forks / third-party players: copy this directory into your repo, port `conformance.test.js` to your test runner of choice (the harness is ~50 lines), and wire it to your engine entry point. The fixtures are JSON — no porting needed.
@@ -176,7 +176,7 @@ All 10 display recipes + all 12 delivery recipes have dedicated fixtures. Displa
 | `35-unknown-recipe-graceful` | Built-in slug + unknown slug; engine applies the known + silently skips the unknown. |
 | `36-custom-recipe-ignored` | Free-text creator-authored slug per SPEC #12 — engine ignores; defaults applied. |
 | `37-empty-experience` | Zero items; state-machine fires `experience:ended` on start. |
-| `38-precondition-fail-graceful` | `lyrics_karaoke` recipe without `lrc_lyrics` metadata; engine skips with `reason='precondition'`. |
+| `38-precondition-fail-graceful` | `text_overlay` recipe without `lrc_lyrics` or `lrc_data` metadata; engine skips with `reason='precondition'`. |
 
 ### Golden — production wire shape
 

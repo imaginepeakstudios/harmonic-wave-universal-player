@@ -13,7 +13,11 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { interpret } from '../../src/schema/interpreter.js';
+import {
+  interpret,
+  isCollectionReference,
+  getCollectionView,
+} from '../../src/schema/interpreter.js';
 
 // ---- Fixture helpers ------------------------------------------------------
 
@@ -389,5 +393,279 @@ describe('interpret — realistic HWES v1 payload shape', () => {
     expect(view.knownExtensions).toEqual([]);
     expect(view.getItemDisplayDirectives(view.items[0])).toEqual([]);
     expect(view.getItemActor(view.items[0])).toBeNull();
+  });
+});
+
+describe('schema/interpreter — Phase 0c additions (spec re-fetch 2026-05-03)', () => {
+  test('exposes new ExperienceView fields', () => {
+    const raw = {
+      hwes_version: 1,
+      hwes_extensions: [],
+      id: 99,
+      hwes_spec_url: 'https://harmonicwave.ai/hwes/v1',
+      sort_order: 3,
+      created_at: '2026-04-01T00:00:00Z',
+      updated_at: '2026-05-03T00:00:00Z',
+      status: 'published',
+      slug: 'test',
+      name: 'Test',
+      experience_mode_applied: 'late_night',
+      profile_recipe_library: '[]',
+      media_note: 'note',
+      recipe_note: 'rnote',
+      content_rating_filter_applied: ['clean'],
+      filtered_count: 0,
+      items: [],
+    };
+    const view = interpret(raw);
+    expect(view.experience.hwes_spec_url).toBe('https://harmonicwave.ai/hwes/v1');
+    expect(view.experience.sort_order).toBe(3);
+    expect(view.experience.status).toBe('published');
+    expect(view.experience.experience_mode_applied).toBe('late_night');
+    expect(view.experience.profile_recipe_library).toBe('[]');
+    expect(view.experience.media_note).toBe('note');
+    expect(view.experience.filtered_count).toBe(0);
+  });
+
+  test('exposes framing_recipes (parsed from JSON-string production wire)', () => {
+    const view = interpret({
+      hwes_version: 1,
+      hwes_extensions: [],
+      id: 1,
+      slug: 'test',
+      name: 'Test',
+      framing_recipes: '["web_page"]',
+      items: [],
+    });
+    expect(view.experience.framing_recipes).toEqual(['web_page']);
+  });
+
+  test('framing_recipes defaults to ["broadcast_show"] when missing', () => {
+    const view = interpret({
+      hwes_version: 1,
+      hwes_extensions: [],
+      id: 1,
+      slug: 'test',
+      name: 'Test',
+      items: [],
+    });
+    expect(view.experience.framing_recipes).toEqual(['broadcast_show']);
+  });
+
+  test('tts_intro is integer 0/1; tts_fields is JSON-string passthrough', () => {
+    const view = interpret({
+      hwes_version: 1,
+      hwes_extensions: [],
+      id: 1,
+      slug: 'test',
+      name: 'Test',
+      tts_intro: 1,
+      tts_fields: '["intro_hint"]',
+      items: [],
+    });
+    expect(view.experience.tts_intro).toBe(1);
+    expect(view.experience.tts_fields).toBe('["intro_hint"]');
+  });
+
+  test('isCollectionReference predicate discriminates content vs collection items', () => {
+    const contentItem = { content_id: 100, collection_id: null };
+    const collectionItem = { content_id: null, collection_id: 50 };
+    expect(isCollectionReference(contentItem)).toBe(false);
+    expect(isCollectionReference(collectionItem)).toBe(true);
+    expect(isCollectionReference(null)).toBe(false);
+    expect(isCollectionReference(undefined)).toBe(false);
+  });
+
+  test('getCollectionView projects collection-reference items to CollectionView', () => {
+    const raw = {
+      hwes_version: 1,
+      hwes_extensions: [],
+      id: 1,
+      slug: 'test',
+      name: 'Test',
+      items: [
+        {
+          item_id: 1,
+          collection_id: 50,
+          content_id: null,
+          collection_name: 'Chapter One',
+          collection_slug: 'chapter-one',
+          collection_type: 'album',
+          collection_numeral: 'I',
+          collection_date_range: '1999-2002',
+          collection_metadata: '{"theme":"awakening"}',
+          collection_recipes: '["story_then_play"]',
+          collection_visual_scene: { color_palette: '#00d2eb' },
+          collection_content: [
+            {
+              item_id: 11,
+              content_id: 200,
+              collection_id: 50,
+              content_type_slug: 'song',
+              content_title: 'First track',
+            },
+          ],
+        },
+      ],
+    };
+    const view = interpret(raw);
+    const collItem = view.items[0];
+    expect(isCollectionReference(collItem)).toBe(true);
+    const coll = getCollectionView(collItem);
+    expect(coll).not.toBeNull();
+    expect(coll.collection_id).toBe(50);
+    expect(coll.collection_name).toBe('Chapter One');
+    expect(coll.collection_numeral).toBe('I');
+    expect(coll.collection_date_range).toBe('1999-2002');
+    // Stringified-JSON parsed:
+    expect(coll.collection_metadata).toEqual({ theme: 'awakening' });
+    expect(coll.collection_recipes).toEqual(['story_then_play']);
+    // Visual scene normalized:
+    expect(coll.collection_visual_scene).toEqual({ color_palette: '#00d2eb' });
+    // Nested content recursively normalized:
+    expect(coll.collection_content).toHaveLength(1);
+    expect(coll.collection_content[0].content_title).toBe('First track');
+  });
+
+  test('getCollectionView returns null for content-reference items', () => {
+    const raw = {
+      hwes_version: 1,
+      hwes_extensions: [],
+      id: 1,
+      slug: 'test',
+      name: 'Test',
+      items: [{ item_id: 1, content_id: 100, content_type_slug: 'song' }],
+    };
+    const view = interpret(raw);
+    expect(getCollectionView(view.items[0])).toBeNull();
+  });
+
+  test('getItemVisualScene resolves cascade: content → collection → experience', () => {
+    const raw = {
+      hwes_version: 1,
+      hwes_extensions: [],
+      id: 1,
+      slug: 'test',
+      name: 'Test',
+      visual_scene: { color_palette: '#exp_level' },
+      items: [
+        {
+          item_id: 1,
+          content_id: 100,
+          content_metadata: { visual_scene: { color_palette: '#content_level' } },
+        },
+        {
+          item_id: 2,
+          content_id: 200,
+          content_metadata: {}, // no scene; falls through to experience
+        },
+        {
+          item_id: 3,
+          collection_id: 50,
+          content_id: null,
+          collection_visual_scene: { color_palette: '#collection_level' },
+        },
+      ],
+    };
+    const view = interpret(raw);
+    expect(view.getItemVisualScene(view.items[0]).color_palette).toBe('#content_level');
+    expect(view.getItemVisualScene(view.items[1]).color_palette).toBe('#exp_level');
+    expect(view.getItemVisualScene(view.items[2]).color_palette).toBe('#collection_level');
+    expect(view.getItemVisualScene(null)).toBeNull();
+  });
+
+  test('getItemCoverChain returns deduped cover URLs in priority order', () => {
+    const raw = {
+      hwes_version: 1,
+      hwes_extensions: [],
+      id: 1,
+      slug: 'test',
+      name: 'Test',
+      items: [
+        {
+          item_id: 1,
+          content_id: 100,
+          cover_art_url: 'https://example.com/main.jpg',
+          alt_cover_art_1_url: 'https://example.com/alt1.jpg',
+          alt_cover_art_2_url: 'https://example.com/alt2.jpg',
+          content_metadata: {
+            visual_scene: {
+              banner1_url: 'https://example.com/main.jpg', // duplicate of cover
+              banner2_url: 'https://example.com/banner2.jpg',
+            },
+          },
+        },
+      ],
+    };
+    const view = interpret(raw);
+    const chain = view.getItemCoverChain(view.items[0]);
+    expect(chain).toEqual([
+      'https://example.com/main.jpg',
+      'https://example.com/alt1.jpg',
+      'https://example.com/alt2.jpg',
+      'https://example.com/banner2.jpg',
+    ]);
+  });
+
+  test('getItemCoverChain returns empty array when no covers present', () => {
+    const view = interpret({
+      hwes_version: 1,
+      hwes_extensions: [],
+      id: 1,
+      slug: 'test',
+      name: 'Test',
+      items: [{ item_id: 1, content_id: 100 }],
+    });
+    expect(view.getItemCoverChain(view.items[0])).toEqual([]);
+  });
+
+  test('exposes new ItemView fields per spec re-fetch 2026-05-03', () => {
+    const raw = {
+      hwes_version: 1,
+      hwes_extensions: [],
+      id: 1,
+      slug: 'test',
+      name: 'Test',
+      items: [
+        {
+          item_id: 10,
+          sort_order: 2,
+          content_id: 100,
+          content_title: 'Test track',
+          content_status: 'coming_soon',
+          release_at: '2026-06-01T00:00:00Z',
+          content_type_name: 'Song',
+          content_type_slug: 'song',
+          content_rating: 'clean',
+          rights_confirmed: 1,
+          arc_role: 'opening',
+          alt_cover_art_1_url: 'https://example.com/alt1.jpg',
+          alt_cover_art_2_url: 'https://example.com/alt2.jpg',
+          stream_count: 42,
+          intro_hint: 'Hello.',
+          outro_hint: 'Goodbye.',
+          item_script: 'Override script.',
+          override_enabled: 1,
+          delivery_override_instruction: 'OVERRIDE...',
+        },
+      ],
+    };
+    const view = interpret(raw);
+    const item = /** @type {any} */ (view.items[0]);
+    expect(item.sort_order).toBe(2);
+    expect(item.content_status).toBe('coming_soon');
+    expect(item.release_at).toBe('2026-06-01T00:00:00Z');
+    expect(item.content_type_name).toBe('Song');
+    expect(item.content_rating).toBe('clean');
+    expect(item.rights_confirmed).toBe(1);
+    expect(item.arc_role).toBe('opening');
+    expect(item.alt_cover_art_1_url).toBe('https://example.com/alt1.jpg');
+    expect(item.alt_cover_art_2_url).toBe('https://example.com/alt2.jpg');
+    expect(item.stream_count).toBe(42);
+    expect(item.intro_hint).toBe('Hello.');
+    expect(item.outro_hint).toBe('Goodbye.');
+    expect(item.item_script).toBe('Override script.');
+    expect(item.override_enabled).toBe(1);
+    expect(item.delivery_override_instruction).toBe('OVERRIDE...');
   });
 });

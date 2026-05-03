@@ -66,9 +66,11 @@ describe('registry-snapshot/recipes.js', () => {
     expect(isBuiltinRecipeOfKind(knownDisplay, 'delivery')).toBe(false);
   });
 
-  test('historical 12 delivery + 10 display slugs survived the snapshot migration', () => {
-    // Lock in the Phase-1 vocabulary so a sync-registry run that
-    // accidentally drops a recipe surfaces here, not in production.
+  test('11 delivery + 12 display slugs survived the snapshot migration', () => {
+    // Lock in the v1 vocabulary so a sync-registry run that accidentally
+    // drops a recipe surfaces here, not in production. Live spec as of
+    // 2026-05-02: 11 delivery + 12 display (10 content/collection-level
+    // display + 2 framing-level display).
     const requiredDelivery = [
       'story_then_play',
       'emotional_opening',
@@ -81,7 +83,6 @@ describe('registry-snapshot/recipes.js', () => {
       'compare_and_contrast',
       'loop_ambient',
       'build_anticipation',
-      'lyrics_along',
     ];
     const requiredDisplay = [
       'inline_player',
@@ -90,10 +91,12 @@ describe('registry-snapshot/recipes.js', () => {
       'cinematic_fullscreen',
       'background_visual',
       'letterbox_21_9',
-      'lyrics_karaoke',
+      'text_overlay',
       'document_excerpt',
       'image_sequence',
       'cross_fade_transitions',
+      'broadcast_show',
+      'web_page',
     ];
     for (const slug of requiredDelivery) {
       expect(BUILTIN_DELIVERY_RECIPES, `delivery "${slug}"`).toHaveProperty(slug);

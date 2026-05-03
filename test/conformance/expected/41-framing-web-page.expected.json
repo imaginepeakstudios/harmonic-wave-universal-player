@@ -1,0 +1,17 @@
+{
+  "_comment": "web_page framing recipe resolves to page_shell:web_page, show_ident:none, opening:straight, closing:abrupt. Engine bypasses bumper / cold-open / show-ident / completion-card and renders items in-flow.",
+  "experience": {
+    "id": 41,
+    "slug": "framing-web-page",
+    "name": "Framing — Web Page",
+    "framing_recipes": ["web_page"]
+  },
+  "framing": {
+    "page_shell": "web_page",
+    "show_ident": "none",
+    "opening": "straight",
+    "closing": "abrupt",
+    "appliedRecipe": "web_page",
+    "unknownRecipes": []
+  }
+}

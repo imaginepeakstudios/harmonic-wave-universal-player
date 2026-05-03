@@ -1,0 +1,20 @@
+{
+  "_comment": "content_coming_soon_v1 extension: content_status + release_at flow through to ItemView per Phase 0c. Resolved behavior is DEFAULT (no recipes set). Layer plan is unchanged ([content, chrome]) — per spec, coming_soon items still render their cover + metadata; only the /media/play call returns 403 until release. Boundary UX (skipping coming_soon items from auto-advance) is Phase 0c.4+ polish; this fixture validates the schema parse only.",
+  "experience": {
+    "id": 43,
+    "slug": "coming-soon",
+    "name": "Coming Soon Conformance Fixture"
+  },
+  "hwes_extensions_honored": ["content_coming_soon_v1"],
+  "items": [
+    {
+      "item_id": 4301,
+      "resolved_behavior": {
+        "prominence": "standard",
+        "sizing": "contain",
+        "chrome": "full"
+      },
+      "layers": ["content", "chrome"]
+    }
+  ]
+}

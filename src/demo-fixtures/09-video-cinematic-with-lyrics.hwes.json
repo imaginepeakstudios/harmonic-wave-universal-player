@@ -1,10 +1,10 @@
 {
-  "_comment": "Browser-demo fixture combining VIDEO content + cinematic_fullscreen + lyrics_karaoke. Validates that text overlays (lyrics-scrolling) work on top of video, not just audio — lyrics tick off the video element's currentTime via the same rAF loop. This is the multi-layer composition: scene (none — video is its own backdrop) → content (video, fullscreen) → overlay (lyrics) → chrome (none, hidden by cinematic).",
+  "_comment": "Browser-demo fixture combining VIDEO content + cinematic_fullscreen + text_overlay. Validates that text overlays (lyrics-scrolling) work on top of video, not just audio — lyrics tick off the video element's currentTime via the same rAF loop. This is the multi-layer composition: scene (none — video is its own backdrop) → content (video, fullscreen) → overlay (lyrics) → chrome (none, hidden by cinematic). text_overlay's preconditions require both lrc_lyrics + lrc_data + applicable_content_types includes 'movie'; supplies both.",
   "hwes_version": 1,
   "hwes_extensions": ["display_recipes_v1"],
   "id": 1009,
   "slug": "demo-video-cinematic-lyrics",
-  "name": "Demo — Video Cinematic + Lyrics Overlay",
+  "name": "Demo — Video Cinematic + Text Overlay",
   "description": "Video in cinematic mode with synced LRC lyrics overlaid on top.",
   "items": [
     {
@@ -14,9 +14,10 @@
       "content_title": "Sample video with lyric overlay",
       "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
       "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/holding-on-cover-scaled.jpg",
-      "display_directives": ["cinematic_fullscreen", "lyrics_karaoke"],
+      "display_directives": ["cinematic_fullscreen", "text_overlay"],
       "content_metadata": {
-        "lrc_lyrics": "[00:00.50]A flower opens slowly\n[00:02.00]Petals catch the light\n[00:04.00]Color blooms across the screen\n[00:06.00]A small, quiet miracle\n[00:08.00]Watched in real time"
+        "lrc_lyrics": "[00:00.50]A flower opens slowly\n[00:02.00]Petals catch the light\n[00:04.00]Color blooms across the screen\n[00:06.00]A small, quiet miracle\n[00:08.00]Watched in real time",
+        "lrc_data": "[00:00.50]A flower opens slowly\n[00:02.00]Petals catch the light\n[00:04.00]Color blooms across the screen\n[00:06.00]A small, quiet miracle\n[00:08.00]Watched in real time"
       }
     }
   ]

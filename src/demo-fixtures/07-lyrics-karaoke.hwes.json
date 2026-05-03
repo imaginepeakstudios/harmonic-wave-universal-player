@@ -1,10 +1,10 @@
 {
-  "_comment": "Browser-demo fixture for Step 8 — song with synced LRC lyrics + lyrics_karaoke display recipe activates the scrolling lyrics overlay. Lyrics drive off audio.currentTime via rAF (per IMPLEMENTATION-GUIDE.md §3.5).",
+  "_comment": "Browser-demo fixture for Step 8 — song with synced LRC lyrics + text_overlay display recipe activates the scrolling lyrics overlay. Lyrics drive off audio.currentTime via rAF (per IMPLEMENTATION-GUIDE.md §3.5). text_overlay's preconditions require both lrc_lyrics + lrc_data; supply both.",
   "hwes_version": 1,
   "hwes_extensions": ["display_recipes_v1"],
   "id": 1007,
-  "slug": "demo-lyrics-karaoke",
-  "name": "Demo — Lyrics Karaoke",
+  "slug": "demo-text-overlay-lyrics",
+  "name": "Demo — Text Overlay (Lyrics)",
   "description": "Audio + LRC-synced scrolling lyrics overlay.",
   "items": [
     {
@@ -14,9 +14,10 @@
       "content_title": "T-Rex Roar with sample lyrics",
       "media_play_url": "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3",
       "cover_art_url": "https://matthewhartdev.wpenginepowered.com/wp-content/uploads/2026/03/without-you-cover-scaled.jpg",
-      "display_directives": ["lyrics_karaoke"],
+      "display_directives": ["text_overlay"],
       "content_metadata": {
-        "lrc_lyrics": "[00:00.00]The dinosaur opens its mouth\n[00:00.50]Slowly, deliberately\n[00:01.00]A roar from the deep past\n[00:01.50]Echoing through the present\n[00:02.00]This is what survival sounds like"
+        "lrc_lyrics": "[00:00.00]The dinosaur opens its mouth\n[00:00.50]Slowly, deliberately\n[00:01.00]A roar from the deep past\n[00:01.50]Echoing through the present\n[00:02.00]This is what survival sounds like",
+        "lrc_data": "[00:00.00]The dinosaur opens its mouth\n[00:00.50]Slowly, deliberately\n[00:01.00]A roar from the deep past\n[00:01.50]Echoing through the present\n[00:02.00]This is what survival sounds like"
       }
     }
   ]

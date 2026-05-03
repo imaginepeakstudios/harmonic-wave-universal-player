@@ -85,28 +85,33 @@ describe('engine/recipe-engine — resolveBehavior', () => {
   });
 
   test('failed precondition skips the recipe and explains why', () => {
-    // lyrics_karaoke requires content_metadata.lrc_lyrics
-    const view = viewWith({ display: ['lyrics_karaoke'] });
+    // text_overlay requires content_metadata.lrc_lyrics + lrc_data
+    // (current precondition-checker semantics: ALL listed fields must be
+    // present — see V1-COMPLIANCE-AUDIT.md §6 P1 for the OR-vs-AND gap).
+    const view = viewWith({ display: ['text_overlay'] });
     const item = { content_type_slug: 'song', content_metadata: {} };
     const { behavior, applied, skipped } = resolveBehavior(view, item);
     expect(behavior).toEqual(DEFAULT_BEHAVIOR);
     expect(applied).toEqual([]);
     expect(skipped).toHaveLength(1);
     expect(skipped[0].reason).toBe('precondition');
-    expect(skipped[0].detail).toMatch(/lrc_lyrics/);
+    expect(skipped[0].detail).toMatch(/lrc_lyrics|lrc_data/);
   });
 
   test('passing precondition allows directives to apply', () => {
-    const view = viewWith({ display: ['lyrics_karaoke'] });
+    const view = viewWith({ display: ['text_overlay'] });
     const item = {
       content_type_slug: 'song',
-      content_metadata: { lrc_lyrics: '[00:01.00]hello\n' },
+      content_metadata: {
+        lrc_lyrics: '[00:01.00]hello\n',
+        lrc_data: '[00:01.00]hello\n',
+      },
     };
     const { behavior, applied } = resolveBehavior(view, item);
     expect(behavior.lyrics_display).toBe('scroll_synced');
     expect(behavior.expand_button).toBe(true);
     expect(applied).toHaveLength(1);
-    expect(applied[0].slug).toBe('lyrics_karaoke');
+    expect(applied[0].slug).toBe('text_overlay');
   });
 
   test('content-type precondition correctly gates image_sequence', () => {
@@ -119,13 +124,13 @@ describe('engine/recipe-engine — resolveBehavior', () => {
 
   test('multiple skips are all reported (not short-circuit)', () => {
     const view = viewWith({
-      display: ['unknown_slug_1', 'lyrics_karaoke', 'unknown_slug_2'],
+      display: ['unknown_slug_1', 'text_overlay', 'unknown_slug_2'],
     });
-    const item = { content_type_slug: 'song' }; // no metadata, lyrics_karaoke fails
+    const item = { content_type_slug: 'song' }; // no metadata, text_overlay fails
     const { skipped } = resolveBehavior(view, item);
     expect(skipped.map((s) => s.slug)).toEqual([
       'unknown_slug_1',
-      'lyrics_karaoke',
+      'text_overlay',
       'unknown_slug_2',
     ]);
   });

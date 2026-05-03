@@ -224,7 +224,11 @@ describe('composition/narration-pipeline — speakForItem', () => {
     expect(mount.querySelectorAll('.hwes-narration__word').length).toBe(2);
     await speakP;
     expect(stub.utterances.length).toBe(1);
-    expect(stub.utterances[0].text).toBe('hello world');
+    // Phase 2.1 (skill 1.5.7): TTS bridge applies formatIntroForTTS
+    // at the speak() boundary — leading ". " filler-defusal prefix
+    // pushed into the spoken text. Display source ('hello world')
+    // stays clean.
+    expect(stub.utterances[0].text).toBe('. hello world');
   });
 
   test('allowDefaultNarration enables "Up next" fallback', async () => {
@@ -243,7 +247,8 @@ describe('composition/narration-pipeline — speakForItem', () => {
       behavior: /** @type {any} */ ({}),
       phase: 'intro',
     });
-    expect(stub.utterances[0].text).toBe('Up next: Holding On.');
+    // Phase 2.1 — leading ". " filler-defusal prefix from formatIntroForTTS.
+    expect(stub.utterances[0].text).toBe('. Up next: Holding On.');
   });
 
   test('audio_ducking: duckMusicBed called when narration starts', async () => {
@@ -305,5 +310,152 @@ describe('composition/narration-pipeline — speakForItem', () => {
     // fade window it should be gone.
     await new Promise((r) => setTimeout(r, 500));
     expect(mount.querySelector('.hwes-narration')).toBeNull();
+  });
+});
+
+describe('composition/narration-pipeline — Phase 2 four-tier hierarchy + once-per-session', () => {
+  /** @type {ReturnType<typeof installSpeechStub>} */
+  let stub;
+  /** @type {HTMLElement} */
+  let mount;
+  /** @type {ReturnType<typeof createStateMachine>} */
+  let sm;
+  /** @type {ReturnType<typeof createNarrationPipeline>} */
+  let pipeline;
+
+  beforeEach(() => {
+    stub = installSpeechStub();
+    mount = document.createElement('div');
+    document.body.appendChild(mount);
+    sm = createStateMachine();
+    pipeline = createNarrationPipeline({
+      audioPipeline: /** @type {any} */ ({
+        duckMusicBed: () => {},
+        killMusicBedInstantly: () => {},
+        kind: 'desktop',
+      }),
+      stateMachine: sm,
+      mount,
+    });
+  });
+
+  afterEach(() => {
+    pipeline?.teardown();
+    stub.restore();
+    mount.remove();
+  });
+
+  test('willPlayDJ + markPlayed gate the four tiers', () => {
+    expect(pipeline.willPlayDJ('experience')).toBe(true);
+    pipeline.markPlayed('experience');
+    expect(pipeline.willPlayDJ('experience')).toBe(false);
+
+    expect(pipeline.willPlayDJ('collection', 'col-A')).toBe(true);
+    pipeline.markPlayed('collection', 'col-A');
+    expect(pipeline.willPlayDJ('collection', 'col-A')).toBe(false);
+    expect(pipeline.willPlayDJ('collection', 'col-B')).toBe(true);
+
+    expect(pipeline.willPlayDJ('content', 100)).toBe(true);
+    pipeline.markPlayed('content', 100);
+    expect(pipeline.willPlayDJ('content', 100)).toBe(false);
+    expect(pipeline.willPlayDJ('content', 101)).toBe(true);
+  });
+
+  test('boundary announce requires released-collection precondition', () => {
+    // Cold deep-link case: no released-collection traversal yet.
+    expect(pipeline.willPlayDJ('boundary')).toBe(false);
+    // After a collection traversal, boundary becomes eligible.
+    pipeline.markPlayed('collection', 'col-A');
+    expect(pipeline.willPlayDJ('boundary')).toBe(true);
+    pipeline.markPlayed('boundary');
+    expect(pipeline.willPlayDJ('boundary')).toBe(false); // already played
+  });
+
+  test('speakForExperience marks experience-overview as played', async () => {
+    await pipeline.speakForExperience({
+      experience: { intro_hint: 'Welcome, listener.' },
+    });
+    expect(stub.utterances.length).toBe(1);
+    expect(stub.utterances[0].text).toMatch(/Welcome, listener\./);
+    expect(pipeline.session.playedExperienceOverview).toBe(true);
+  });
+
+  test('speakForExperience second call no-ops (once per session)', async () => {
+    await pipeline.speakForExperience({
+      experience: { intro_hint: 'First call.' },
+    });
+    await pipeline.speakForExperience({
+      experience: { intro_hint: 'Second call.' },
+    });
+    expect(stub.utterances.length).toBe(1); // only the first
+  });
+
+  test('speakForExperience with empty intro_hint still marks as played', async () => {
+    await pipeline.speakForExperience({ experience: {} });
+    expect(pipeline.session.playedExperienceOverview).toBe(true);
+    expect(stub.utterances.length).toBe(0);
+  });
+
+  test('speakForCollection marks collection + sets released-collection flag', async () => {
+    await pipeline.speakForCollection({
+      collection: {
+        collection_id: 'chapter-1',
+        collection_name: 'Chapter One',
+      },
+    });
+    expect(stub.utterances.length).toBe(1);
+    expect(pipeline.session.playedCollectionIntros.has('chapter-1')).toBe(true);
+    expect(pipeline.session.playedReleasedCollection).toBe(true);
+  });
+
+  test('speakForCollection second call for same collection no-ops', async () => {
+    await pipeline.speakForCollection({
+      collection: { collection_id: 'chapter-1', collection_name: 'Chapter One' },
+    });
+    await pipeline.speakForCollection({
+      collection: { collection_id: 'chapter-1', collection_name: 'Chapter One Repeat' },
+    });
+    expect(stub.utterances.length).toBe(1);
+  });
+
+  test('speakForItem marks content as played; second call no-ops', async () => {
+    const item = { content_id: 200, intro_hint: 'About this song.' };
+    await pipeline.speakForItem({
+      item,
+      behavior: /** @type {any} */ ({}),
+      phase: 'intro',
+    });
+    await pipeline.speakForItem({
+      item,
+      behavior: /** @type {any} */ ({}),
+      phase: 'intro',
+    });
+    expect(stub.utterances.length).toBe(1);
+    expect(pipeline.session.playedContentIntros.has('200')).toBe(true);
+  });
+
+  test('speakBoundaryAnnounce respects precondition', async () => {
+    // Without a prior collection traversal, boundary call no-ops.
+    await pipeline.speakBoundaryAnnounce({
+      text: 'Up next are pre-release tracks.',
+    });
+    expect(stub.utterances.length).toBe(0);
+    expect(pipeline.session.playedBoundaryAnnounce).toBe(false);
+
+    // After a collection traversal, boundary fires.
+    pipeline.markPlayed('collection', 'chapter-1');
+    await pipeline.speakBoundaryAnnounce({
+      text: 'Up next are pre-release tracks.',
+    });
+    expect(stub.utterances.length).toBe(1);
+    expect(pipeline.session.playedBoundaryAnnounce).toBe(true);
+  });
+
+  test('producer-gap trap: marking via different paths still gates correctly', () => {
+    // Skill 1.5.8 producer-gap trap: speak fires from path A but
+    // mark-played lives on path B → bug surfaces only on Back-button
+    // reentry. Single mark path closes this.
+    pipeline.markPlayed('content', 100); // simulates speak via path A
+    expect(pipeline.willPlayDJ('content', 100)).toBe(false); // path B sees the mark
   });
 });

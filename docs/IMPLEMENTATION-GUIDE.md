@@ -52,7 +52,7 @@ The POC is a single `index.html`. The line ranges below are the source-of-truth 
 | **DJ transition (Phase 1 / 2 / 3)** | 1711 – 1796, 1995 – 2247 | **`composition/narration-pipeline.js`** | See §3 extraction recipe |
 | Browser SpeechSynthesis fallback (`fallbackTTS`) | 1797 – 1820 | `renderers/narration/tts-bridge.js` (fallback path) | Keep as last-resort path |
 | **LRC parser** | 1821 – 1845 | **`renderers/overlay/lyrics-scrolling.js::parseLRC`** | See §3 extraction recipe |
-| LRC overlay tick + activation/deactivation | 1846 – 1925 | `renderers/overlay/lyrics-scrolling.js` | Driven by `lyrics_karaoke` display recipe |
+| LRC overlay tick + activation/deactivation | 1846 – 1925 | `renderers/overlay/lyrics-scrolling.js` | Driven by `text_overlay` display recipe (was `lyrics_karaoke` pre-2026-05-02) |
 | Time formatter | 1927 – 1929 | `client-runtime/utils.js` | Trivial |
 | Skip Intro / Start Over buttons | 2007 – 2247 (interleaved) | `interactions/keyboard.js` + `chrome/controls.js` | Skip becomes an `interactions` event the state machine listens to |
 
@@ -277,7 +277,7 @@ export function extractPalette(imageUrl, fallback): Promise<Palette>;
 
 ```js
 /**
- * LRC-synced lyrics overlay. Activated by the `lyrics_karaoke` display recipe
+ * LRC-synced lyrics overlay. Activated by the `text_overlay` display recipe
  * AND the presence of `lrc_lyrics` in content metadata. Position upper 16-28%
  * of viewport (NEVER covers the player chrome). Sweep animation: slide in
  * left → hold center → slide out right.

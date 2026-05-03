@@ -1,0 +1,28 @@
+{
+  "_comment": "Phase 0b conformance fixture — framing recipe broadcast_show. The default framing for v1.0 experiences. Resolves page_shell:'broadcast', show_ident:'persistent', opening:'cold_open', closing:'sign_off'. Engine renders cold-open card before item 0 (per opening) + completion-card with sign_off (per closing) + persistent show-ident bug throughout. Tests resolveFraming() against the registry-snapshot recipe definition.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 40,
+  "slug": "framing-broadcast-show",
+  "name": "Framing — Broadcast Show",
+  "description": "Validates HWES v1 framing system with broadcast_show recipe.",
+  "framing_recipes": ["broadcast_show"],
+  "intro_hint": "Welcome to the broadcast — three cuts, hand-picked by the host.",
+  "outro_hint": "That's our show. Thanks for tuning in.",
+  "items": [
+    {
+      "item_id": 4001,
+      "content_id": 100,
+      "content_type_slug": "song",
+      "content_title": "First cut",
+      "media_play_url": "/media/play/test.mp3"
+    },
+    {
+      "item_id": 4002,
+      "content_id": 101,
+      "content_type_slug": "song",
+      "content_title": "Second cut",
+      "media_play_url": "/media/play/test2.mp3"
+    }
+  ]
+}

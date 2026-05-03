@@ -1,0 +1,20 @@
+{
+  "_comment": "Phase 0c conformance fixture — content_coming_soon_v1 extension. Item carries content_status='coming_soon' + release_at. Per spec: cover art + metadata visible; /media/play/:id returns 403 with release_at until release. Engine still cascades behavior + composes layers normally — the coming_soon state is informational at the schema layer (engine reads via item.content_status; renderer's playback attempt will 403 gracefully).",
+  "hwes_version": 1,
+  "hwes_extensions": ["content_coming_soon_v1"],
+  "id": 43,
+  "slug": "coming-soon",
+  "name": "Coming Soon Conformance Fixture",
+  "items": [
+    {
+      "item_id": 4301,
+      "content_id": 300,
+      "content_type_slug": "song",
+      "content_title": "Future release",
+      "content_status": "coming_soon",
+      "release_at": "2026-12-01T00:00:00Z",
+      "media_play_url": "/media/play/future.mp3",
+      "cover_art_url": "https://example.com/future-cover.jpg"
+    }
+  ]
+}

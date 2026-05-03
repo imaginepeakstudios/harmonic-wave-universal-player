@@ -1,8 +1,8 @@
 {
-  "_comment": "lyrics_karaoke (precondition met) sets lyrics_display:scroll_synced, expand_button:true.",
+  "_comment": "text_overlay (precondition met) sets lyrics_display:scroll_synced, expand_button:true.",
   "experience": {
     "id": 7,
-    "slug": "lyrics-karaoke"
+    "slug": "text-overlay-lyrics"
   },
   "hwes_extensions_honored": ["display_recipes_v1"],
   "items": [

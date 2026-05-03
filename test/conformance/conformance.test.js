@@ -40,6 +40,7 @@ import { interpret } from '../../src/schema/interpreter.js';
 // crashing the suite.
 let resolveBehavior = null;
 let composeItem = null;
+let resolveFraming = null;
 try {
   // eslint-disable-next-line import/no-unresolved
   const engineMod = await import('../../src/engine/recipe-engine.js').catch(() => null);
@@ -52,6 +53,12 @@ try {
   if (compMod?.composeItem) composeItem = compMod.composeItem;
 } catch {
   /* composition not wired yet */
+}
+try {
+  const framingMod = await import('../../src/engine/framing-engine.js').catch(() => null);
+  if (framingMod?.resolveFraming) resolveFraming = framingMod.resolveFraming;
+} catch {
+  /* framing engine not wired yet */
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -199,6 +206,25 @@ describe('HWES v1 Conformance Suite', () => {
           }
         });
       }
+    });
+
+    // Framing-layer slice (Phase 0b): resolved FramingConfig per
+    // experience. Tests assert page_shell / show_ident / opening /
+    // closing values + appliedRecipe slug + unknownRecipes diagnostic.
+    // Fixtures with no `framing` block in expected/*.expected.json
+    // skip this assertion (most existing fixtures don't exercise
+    // framing yet).
+    const framingLoadable = typeof resolveFraming === 'function';
+    test.skipIf(!framingLoadable)(`${baseName} — framing layer conforms`, () => {
+      const fixture = loadJson(fixturePath);
+      const expected = loadJson(expectedPath);
+      if (expected.framing === undefined) {
+        // Most fixtures don't pin framing; treat absence as "skip".
+        return;
+      }
+      const view = interpret(fixture, { warn: false });
+      const config = resolveFraming(view);
+      assertConforms(config, expected.framing, '$.framing');
     });
   }
 });

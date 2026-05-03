@@ -28,8 +28,15 @@
 
 import { createSilenceProvider } from './amplitude-provider.js';
 import { DEFAULT_FALLBACK_PALETTE } from './palette-extractor.js';
+import { prefersReducedMotion } from '../client-runtime/prefers-reduced-motion.js';
 
-const PARTICLE_COUNT = 200;
+// Phase 4.3 (WCAG 2.3.3) — particle count + animation rates respond to
+// the user's prefers-reduced-motion setting. The full visualizer is
+// decorative motion; under the OS preference we dial it back (fewer
+// particles, slower drift) but never disable entirely — the static
+// orb + palette glow still convey "the music is playing here."
+const FULL_PARTICLE_COUNT = 200;
+const REDUCED_PARTICLE_COUNT = 40;
 const HARMONIC_WAVE_COUNT = 5;
 const PALETTE_LERP_MS = 600;
 
@@ -197,8 +204,9 @@ export function createVisualizer(opts) {
  * @returns {Particle[]}
  */
 function seedParticles(w, h) {
-  const out = new Array(PARTICLE_COUNT);
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
+  const count = prefersReducedMotion() ? REDUCED_PARTICLE_COUNT : FULL_PARTICLE_COUNT;
+  const out = new Array(count);
+  for (let i = 0; i < count; i++) {
     out[i] = {
       x: Math.random() * w,
       y: Math.random() * h,

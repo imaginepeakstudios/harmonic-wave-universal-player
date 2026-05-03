@@ -3,7 +3,8 @@
  *
  * Some recipes only apply when the item carries specific metadata or is
  * of a specific content type:
- *   - `lyrics_karaoke` requires `lrc_lyrics` in `content_metadata`
+ *   - `text_overlay` requires `lrc_lyrics` AND `lrc_data` in `content_metadata`
+ *     + content_type in [song, podcast, narration, movie, lecture]
  *   - `image_sequence` only applies to content_type "photo" or "image"
  *   - `quote_then_play` requires a `primary_quote` field
  *
@@ -13,8 +14,14 @@
  * recipe contributed nothing, but the engine doesn't crash.
  *
  * The checker returns a structured result so callers can log WHY a
- * recipe was skipped (helps creators debug when their `lyrics_karaoke`
+ * recipe was skipped (helps creators debug when their `text_overlay`
  * recipe doesn't fire because they forgot to attach LRC lyrics).
+ *
+ * Current `requires_metadata` semantics: ALL listed fields must be
+ * present (AND-semantics). Spec text on `text_overlay` reads "Use
+ * whichever timed-text field is populated (lrc_lyrics for songs,
+ * lrc_data for other types)" which suggests OR-semantics. See
+ * docs/V1-COMPLIANCE-AUDIT.md §6 P1 for that gap.
  */
 
 /**

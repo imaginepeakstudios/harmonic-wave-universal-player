@@ -23,6 +23,30 @@ const KNOWN = new Set([
   'display_recipes_v1',
   'player_theme_v1',
   'seo_metadata_v1',
+  // Added 2026-05-02 in Phase 0a (V1 compliance audit): the platform
+  // ships these extensions; allowlisting silences the spurious
+  // "unknown extension" warnings on every load. Engine consumption
+  // for content_coming_soon_v1 (content_status / release_at fields)
+  // lands in Phase 0c. The other two are pass-through metadata.
+  'content_coming_soon_v1',
+  'experience_status_cluster_v1',
+  'commerce_v1',
+  // Added 2026-05-03 from spec re-fetch (V1-COMPLIANCE-AUDIT-2026-05-03-rev.md):
+  // Core (schema frozen):
+  //   delivery_recipes_v1 — Per-item delivery_instructions presence marker
+  //   framing_recipes_v1  — Experience-level framing shell extension marker
+  // Beta (schema evolving within v1.x):
+  //   intro_bumper_v1     — Pre-experience station ID animation hook
+  //   tts_resolution_v1   — Narration provider fallback chain
+  //   music_bed_v1        — Mood-driven ambient audio bed (already wired
+  //                         via SPEC #34 synthesized provider)
+  //   player_capabilities_v1 — Player runtime capability declarations
+  'delivery_recipes_v1',
+  'framing_recipes_v1',
+  'intro_bumper_v1',
+  'tts_resolution_v1',
+  'music_bed_v1',
+  'player_capabilities_v1',
 ]);
 
 /**

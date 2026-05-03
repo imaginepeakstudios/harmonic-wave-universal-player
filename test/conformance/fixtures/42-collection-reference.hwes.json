@@ -1,0 +1,51 @@
+{
+  "_comment": "Phase 0c conformance fixture — collection-reference item shape per HWES v1 spec re-fetch 2026-05-03. items[] mixes content-refs (content_id set) and collection-refs (collection_id set + nested collection_content[]). Engine: schema interpreter normalizes both shapes; isCollectionReference() predicate discriminates; getCollectionView() projects collection-refs to CollectionView typedef; nested collection_content[] entries are recursively normalized. This fixture exercises the cascade-tier collection wrapper that POC's chapter system maps onto.",
+  "hwes_version": 1,
+  "hwes_extensions": ["display_recipes_v1"],
+  "id": 42,
+  "slug": "collection-reference",
+  "name": "Collection Reference Conformance Fixture",
+  "items": [
+    {
+      "item_id": 4201,
+      "content_id": 100,
+      "collection_id": null,
+      "content_type_slug": "song",
+      "content_title": "Standalone song",
+      "media_play_url": "/media/play/standalone.mp3"
+    },
+    {
+      "item_id": 4202,
+      "collection_id": 50,
+      "content_id": null,
+      "collection_name": "Chapter One",
+      "collection_slug": "chapter-one",
+      "collection_type": "album",
+      "collection_numeral": "I",
+      "collection_date_range": "1999-2002",
+      "collection_metadata": "{\"theme\":\"awakening\"}",
+      "collection_recipes": "[\"story_then_play\"]",
+      "collection_visual_scene": { "color_palette": "#00d2eb" },
+      "collection_content": [
+        {
+          "item_id": 4203,
+          "content_id": 200,
+          "collection_id": 50,
+          "content_type_slug": "song",
+          "content_title": "First track in chapter",
+          "media_play_url": "/media/play/first.mp3",
+          "delivery_instructions": ["story_then_play"]
+        },
+        {
+          "item_id": 4204,
+          "content_id": 201,
+          "collection_id": 50,
+          "content_type_slug": "song",
+          "content_title": "Second track in chapter",
+          "media_play_url": "/media/play/second.mp3",
+          "delivery_instructions": ["story_then_play"]
+        }
+      ]
+    }
+  ]
+}

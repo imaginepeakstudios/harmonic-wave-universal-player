@@ -1,0 +1,1876 @@
+:root {
+  --player-font-family: 'Inter', sans-serif;
+  --player-font-display: 'Orbitron', sans-serif;
+  /* Phase 4.4 — color token discipline audit (skill 1.5.2):
+     --player-primary is the per-song DYNAMIC accent (overwritten
+     by visualizer-canvas from extracted cover-art palette per
+     Phase 3.8). --player-text is the STRUCTURAL CREAM used by
+     all chrome / narration / nav surfaces — stays constant
+     regardless of song. The split prevents the failure mode where
+     a song with a dark cover yields a dark accent that goes
+     invisible against the dark UI. */
+  --player-primary: #6dd3ff;
+  --player-secondary: #a07adc;
+  --player-background: #0b0f14;
+  --player-text: #e8e6d8;
+  --player-text-muted: rgba(232, 230, 216, 0.6);
+  --player-border: rgba(255, 255, 255, 0.08);
+
+  /* TV-feel constants */
+  --player-chrome-fade-ms: 380ms;
+  --player-touch-target: 44px;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--player-background);
+  color: var(--player-text);
+  font-family: var(--player-font-family);
+  /* Lock the page — no scroll. The player IS the viewport. */
+  overflow: hidden;
+  /* Mobile: prevent rubber-band scroll + pull-to-refresh. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+#app {
+  position: relative;
+  width: 100%;
+  /* Use small viewport unit (svh) where supported — accounts for
+     the iOS Safari address bar. Fall back to vh for older browsers. */
+  height: 100vh;
+  height: 100svh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Boot states — centered, full-bleed. */
+.boot-loading,
+.boot-error,
+.boot-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+  opacity: 0.8;
+}
+.boot-loading h1,
+.boot-error h1,
+.boot-empty h1 {
+  font-family: var(--player-font-display);
+  font-size: clamp(1.1rem, 3.5vw, 1.6rem);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--player-primary);
+  margin: 0 0 12px;
+}
+.boot-loading p,
+.boot-error p,
+.boot-empty p {
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  max-width: 60ch;
+  line-height: 1.5;
+}
+.boot-error {
+  opacity: 1;
+}
+.boot-error h1 {
+  color: #ff6f6f;
+}
+
+/* SHELL — full viewport, no card framing. Chrome overlays content. */
+.hwes-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.hwes-shell--none {
+  /* No header, no controls — content owns the screen. */
+}
+
+/* HEADER — translucent overlay at the top, fades with chrome. */
+.hwes-shell__header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: calc(env(safe-area-inset-top, 0) + 16px) clamp(16px, 4vw, 32px) 24px;
+  background: linear-gradient(180deg, rgba(11, 15, 20, 0.75) 0%, rgba(11, 15, 20, 0) 100%);
+  z-index: 10;
+  pointer-events: none; /* don't block taps on content underneath */
+  transition: opacity var(--player-chrome-fade-ms) ease;
+}
+.hwes-shell__title {
+  font-family: var(--player-font-display);
+  font-size: clamp(1rem, 2.5vw, 1.4rem);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--player-primary);
+  margin: 0 0 4px;
+}
+.hwes-shell__byline {
+  margin: 0;
+  font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+  color: var(--player-text-muted);
+}
+/* CONTENT — fills the screen behind chrome overlays.
+   min-height: 0 is the load-bearing fix for flex-child sizing:
+   WITHOUT it, flex items default to min-height:auto (= content
+   size), so a large image inside the content slot would push the
+   flex chain to its natural size and overflow the viewport.
+   WITH it, the flex item can actually shrink to its allotted
+   space and object-fit:contain on the image takes effect. */
+.hwes-shell__content {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+/* CONTROLS — translucent overlay at the bottom, fades with chrome. */
+.hwes-shell__controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px clamp(16px, 4vw, 32px) calc(env(safe-area-inset-bottom, 0) + 16px);
+  background: linear-gradient(0deg, rgba(11, 15, 20, 0.75) 0%, rgba(11, 15, 20, 0) 100%);
+  z-index: 10;
+  transition: opacity var(--player-chrome-fade-ms) ease;
+}
+
+/* CHROME AUTO-HIDE — JS adds .hwes-shell--idle after 3s of no
+   user input. Header + controls fade out; tap/move/key wakes. */
+.hwes-shell--idle .hwes-shell__header,
+.hwes-shell--idle .hwes-shell__controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* CARD BASE — content cards live inside the content slot.
+   min-height/min-width: 0 + overflow: hidden is the recipe to
+   keep large content (esp. images and videos with intrinsic
+   dimensions larger than the viewport) inside the card box,
+   so object-fit:contain on the inner element actually scales
+   down to fit. Without these, intrinsic content size leaks
+   through the flex chain and overflows the viewport. */
+.hwes-audio,
+.hwes-video,
+.hwes-image,
+.hwes-document,
+.hwes-sfx {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 4vw, 48px);
+  gap: clamp(16px, 3vw, 32px);
+  overflow: hidden;
+}
+
+/* AUDIO — cover-art-forward by default; controls drive playback.
+   Cover sizing is constrained by viewport AND chrome height so it
+   can never overflow the available content slot:
+     - vmin floor handles narrow phones
+     - 50vh cap leaves room for title + chrome (header + controls)
+     - 360px ceiling for very wide desktops (don't go cinema-poster)
+   Use min() so the smallest constraint wins. */
+.hwes-audio__cover {
+  width: min(50vh, 60vmin, 360px);
+  height: min(50vh, 60vmin, 360px);
+  object-fit: cover;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+/* CINEMATIC mode (prominence=hero + sizing=fullscreen): the
+   visualizer scene IS the visual. Hide the audio card's cover
+   + title entirely so they don't flash on mount before the
+   visualizer takes over. The audio element itself stays
+   (display:none) so playback works. */
+.hwes-audio--hero.hwes-audio--fullscreen .hwes-audio__cover,
+.hwes-audio--hero.hwes-audio--fullscreen .hwes-audio__meta {
+  display: none;
+}
+.hwes-audio__title {
+  font-family: var(--player-font-display);
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  letter-spacing: 0.05em;
+  margin: 0;
+  text-align: center;
+}
+.hwes-audio__element {
+  display: none;
+}
+
+/* VIDEO — fills available space, letterboxed via object-fit. */
+.hwes-video {
+  padding: 0;
+}
+.hwes-video__element {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  object-fit: contain;
+}
+.hwes-video--cover .hwes-video__element {
+  object-fit: cover;
+}
+.hwes-video__meta {
+  display: none; /* TV mode: title lives in the chrome header */
+}
+
+/* IMAGE — same layout as video. The image element fills its
+   flex parent (the audio card surrounds it with center alignment)
+   and uses object-fit:contain so the source image is letterboxed
+   instead of stretched on aspect mismatch. max-width / max-height
+   constraints keep the image inside the viewport even when the
+   container reports oversized intrinsic dimensions. */
+.hwes-image {
+  padding: 0;
+}
+.hwes-image__element {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  object-fit: contain;
+}
+.hwes-image--cover .hwes-image__element {
+  object-fit: cover;
+}
+.hwes-image__meta {
+  display: none;
+}
+
+/* DOCUMENT — readable column, fills the screen. */
+.hwes-document {
+  padding: clamp(24px, 6vw, 64px);
+  max-width: 72ch;
+  margin: 0 auto;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+.hwes-document__title {
+  font-family: var(--player-font-display);
+  font-size: clamp(1.4rem, 3.5vw, 2rem);
+  letter-spacing: 0.05em;
+  color: var(--player-primary);
+  margin: 0 0 24px;
+}
+.hwes-document__body {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  font-size: clamp(0.95rem, 1.8vw, 1.1rem);
+}
+.hwes-document__expand {
+  appearance: none;
+  background: transparent;
+  color: var(--player-primary);
+  border: 1px solid var(--player-border);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-family: var(--player-font-family);
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-top: 24px;
+  min-height: var(--player-touch-target);
+}
+.hwes-document__expand:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* SOUND-EFFECT — minimal, transient. */
+.hwes-sfx {
+  opacity: 0.7;
+}
+.hwes-sfx__label {
+  font-size: 0.9rem;
+  color: var(--player-text-muted);
+  letter-spacing: 0.05em;
+}
+.hwes-sfx__element {
+  display: none;
+}
+
+/* SCENE layers — visualizer + banner backdrops. Behind everything. */
+.hwes-scene,
+.hwes-visualizer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  transition: filter 600ms ease-in-out;
+}
+/* Phase 3.6 — cover-art darken during lyrics. When the layer-set
+   contains a lyrics overlay, fade the scene layer's brightness so
+   the lyric text reads cleanly. Per skill 1.5.0. Uses :has()
+   (96%+ browser support); fallback gracefully degrades to "no
+   darken" on older browsers. */
+.hwes-layer-set:has(.hwes-lyrics) .hwes-scene,
+.hwes-layer-set:has(.hwes-lyrics) .hwes-visualizer {
+  filter: brightness(0.55);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hwes-scene,
+  .hwes-visualizer {
+    transition: none;
+  }
+}
+
+/* LYRIC OVERLAYS — text floats over content. */
+.hwes-lyrics {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 18%;
+  width: 90%;
+  max-width: 720px;
+  text-align: center;
+  z-index: 5;
+  pointer-events: none;
+}
+.hwes-lyrics--scrolling .hwes-lyrics__line {
+  font-family: var(--player-font-display);
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  color: var(--player-text);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+  opacity: 0;
+}
+.hwes-lyrics--scrolling .hwes-lyrics__line--sweep {
+  animation: hwes-lyric-sweep 2.6s cubic-bezier(0.2, 0.8, 0.4, 1);
+}
+@keyframes hwes-lyric-sweep {
+  0% { opacity: 0; transform: translateX(-100px); }
+  20% { opacity: 1; transform: translateX(0); }
+  80% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(100px); }
+}
+
+.hwes-lyrics--spotlight {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.hwes-lyrics__slot {
+  font-family: var(--player-font-display);
+  font-size: clamp(0.9rem, 1.8vw, 1.05rem);
+  color: var(--player-text-muted);
+  opacity: 0.4;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+  transition: all 240ms ease-out;
+}
+.hwes-lyrics__slot--active {
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  color: var(--player-text);
+  opacity: 1;
+}
+
+.hwes-lyrics--typewriter .hwes-lyrics__line {
+  font-family: var(--player-font-display);
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  color: var(--player-text);
+  display: inline;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
+.hwes-lyrics__cursor {
+  animation: hwes-lyric-cursor 1s steps(2) infinite;
+  color: var(--player-primary);
+}
+@keyframes hwes-lyric-cursor {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* GENERIC TEXT OVERLAY — title cards, captions, short notes
+   layered on top of any content. */
+.hwes-text-overlay {
+  position: absolute;
+  left: 50%;
+  bottom: 18%;
+  transform: translateX(-50%);
+  width: min(92%, 720px);
+  text-align: center;
+  z-index: 5;
+  pointer-events: none;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85);
+}
+.hwes-text-overlay__h1 {
+  font-family: var(--player-font-display);
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  letter-spacing: 0.05em;
+  margin: 0 0 12px;
+  color: var(--player-text);
+}
+.hwes-text-overlay__h2 {
+  font-family: var(--player-font-display);
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  margin: 0 0 8px;
+  color: var(--player-text);
+}
+.hwes-text-overlay__p {
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  line-height: 1.5;
+  margin: 0 0 8px;
+  color: var(--player-text);
+}
+.hwes-text-overlay__p:last-child {
+  margin-bottom: 0;
+}
+
+/* WAVEFORM BARS overlay — bottom strip, behind text overlays. */
+.hwes-waveform-bars {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 80px;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* CONTROLS — translucent pill row inside the bottom overlay. */
+.hwes-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 920px;
+  margin: 0 auto;
+}
+.hwes-controls__now-playing {
+  flex: 1;
+  font-size: clamp(0.85rem, 1.8vw, 0.95rem);
+  color: var(--player-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hwes-controls__buttons {
+  display: flex;
+  gap: 8px;
+}
+.hwes-controls__btn {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--player-text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 12px 24px;
+  font-family: var(--player-font-family);
+  font-size: 0.9rem;
+  cursor: pointer;
+  min-height: var(--player-touch-target);
+  min-width: var(--player-touch-target);
+  transition: background 120ms;
+}
+.hwes-controls__btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.hwes-controls__btn--primary {
+  background: var(--player-primary);
+  color: var(--player-background);
+  border-color: var(--player-primary);
+  font-weight: 600;
+}
+.hwes-controls__btn--primary:hover {
+  background: var(--player-primary);
+  opacity: 0.9;
+}
+.hwes-controls__btn:focus-visible {
+  outline: 2px solid var(--player-primary);
+  outline-offset: 2px;
+}
+.hwes-controls__btn[disabled],
+.hwes-controls__btn:disabled {
+  /* Phase 0b boundary UX (skill 1.5.8): Skip button at end of
+     playlist is disabled visually + functionally. No wrap. */
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.hwes-controls__btn--skip-intro {
+  /* Mounted but hidden by default (display:none set inline by JS).
+     Boot toggles visibility while narration is in flight. */
+  background: rgba(109, 211, 255, 0.12);
+  border-color: rgba(109, 211, 255, 0.4);
+}
+
+/* PROGRESS BAR + TIME (Phase 0b — POC parity). The wrap is the
+   click target; the fill child is overlay-positioned so clicks
+   on the played-portion still hit the wrap (e.currentTarget per
+   skill 1.5.6). */
+.hwes-controls__progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 8px 0;
+}
+.hwes-controls__time {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: rgba(232, 230, 216, 0.7);
+  min-width: 3.5ch;
+  text-align: center;
+}
+.hwes-controls__progress {
+  flex: 1;
+  position: relative;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  cursor: pointer;
+  overflow: hidden;
+}
+.hwes-controls__progress:focus-visible {
+  outline: 2px solid var(--player-primary);
+  outline-offset: 4px;
+}
+.hwes-controls__progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: var(--player-primary, rgba(109, 211, 255, 1));
+  box-shadow: 0 0 8px var(--player-primary, rgba(109, 211, 255, 0.6));
+  transition: width 200ms linear;
+  pointer-events: none; /* clicks land on the wrap, not the fill */
+}
+
+/* VOLUME SLIDER (Phase 0b — V1-COMPLIANCE-AUDIT decision #3). */
+.hwes-controls__volume-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.hwes-controls__volume-label {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.55);
+  min-width: 3ch;
+}
+.hwes-controls__volume {
+  flex: 1;
+  max-width: 140px;
+  height: 4px;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.hwes-controls__volume::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--player-primary, rgba(109, 211, 255, 1));
+  box-shadow: 0 0 8px var(--player-primary, rgba(109, 211, 255, 0.6));
+  cursor: pointer;
+  border: none;
+}
+.hwes-controls__volume::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--player-primary, rgba(109, 211, 255, 1));
+  box-shadow: 0 0 8px var(--player-primary, rgba(109, 211, 255, 0.6));
+  cursor: pointer;
+  border: none;
+}
+.hwes-controls__volume:focus-visible {
+  outline: 2px solid var(--player-primary);
+  outline-offset: 2px;
+}
+
+/* RESPONSIVE — extra tweaks for narrow phones. */
+@media (max-width: 480px) {
+  .hwes-controls__now-playing {
+    /* On tiny screens, hide the now-playing label so the
+       buttons get full width. The chrome header carries
+       the title anyway. */
+    display: none;
+  }
+  .hwes-shell__header {
+    padding-bottom: 16px;
+  }
+}
+
+/* REDUCED MOTION — respect the user's preference. The Ken Burns
+   + lyric sweep + cursor blink + palette lerp are all "non-essential
+   decorative animation" per WCAG 2.3.3. */
+@media (prefers-reduced-motion: reduce) {
+  .hwes-lyrics--scrolling .hwes-lyrics__line--sweep,
+  .hwes-lyrics__cursor,
+  .hwes-lyrics__slot {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* END-OF-EXPERIENCE COMPLETION CARD — Step 12. Mounted by boot
+   when the state machine fires experience:ended. The "you reached
+   the end" moment with cover-art montage + 3 retention CTAs
+   (Share / Try Another / What's Next from this creator). Same
+   broadcast-feel framing as the network bumper. */
+.hwes-completion {
+  position: fixed;
+  inset: 0;
+  z-index: 80; /* above content + chrome, below narration overlay */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(11, 15, 20, 0.92) 0%,
+      rgba(0, 0, 0, 0.98) 80%
+    );
+  opacity: 0;
+  transition: opacity 600ms ease-in-out;
+  padding: clamp(24px, 4vh, 56px);
+  gap: clamp(16px, 3vh, 36px);
+  text-align: center;
+}
+.hwes-completion--in {
+  opacity: 1;
+}
+.hwes-completion--leaving {
+  opacity: 0;
+}
+.hwes-completion__montage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: clamp(120px, 22vh, 200px);
+  gap: -16px; /* fan effect via negative margin overlap */
+}
+.hwes-completion__montage-img {
+  width: clamp(80px, 16vh, 160px);
+  height: clamp(80px, 16vh, 160px);
+  object-fit: cover;
+  border-radius: 14px;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.7),
+    0 0 32px rgba(109, 211, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.06);
+  margin-left: -16px;
+}
+.hwes-completion__montage-img:first-child {
+  margin-left: 0;
+}
+.hwes-completion__montage-img:nth-child(odd) {
+  transform: rotate(-4deg) translateY(6px);
+}
+.hwes-completion__montage-img:nth-child(even) {
+  transform: rotate(3deg) translateY(-4px);
+}
+.hwes-completion__hero {
+  max-width: min(720px, 90vw);
+}
+.hwes-completion__title {
+  font-family: var(--player-font-display);
+  font-size: clamp(1.6rem, 4vw, 2.8rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin: 0 0 8px 0;
+  text-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.7),
+    0 0 36px var(--player-primary);
+}
+.hwes-completion__byline {
+  font-family: var(--player-font-family);
+  font-size: clamp(0.95rem, 1.6vw, 1.15rem);
+  color: var(--player-text-muted);
+  margin: 0 0 20px 0;
+  letter-spacing: 0.06em;
+}
+.hwes-completion__tag {
+  font-family: var(--player-font-display);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.36em;
+  color: var(--player-primary);
+  opacity: 0.8;
+  margin: 0;
+}
+.hwes-completion__ctas {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.hwes-completion__cta {
+  font-family: var(--player-font-display);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  padding: 14px 28px;
+  min-height: var(--player-touch-target);
+  min-width: 160px;
+  background: rgba(109, 211, 255, 0.08);
+  color: var(--player-text);
+  border: 1px solid rgba(109, 211, 255, 0.4);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 240ms ease,
+    border-color 240ms ease,
+    transform 240ms ease,
+    box-shadow 240ms ease;
+}
+.hwes-completion__cta:hover {
+  background: rgba(109, 211, 255, 0.18);
+  border-color: var(--player-primary);
+  box-shadow: 0 0 24px rgba(109, 211, 255, 0.35);
+  transform: translateY(-1px);
+}
+.hwes-completion__cta:focus-visible {
+  outline: 2px solid var(--player-primary);
+  outline-offset: 3px;
+}
+.hwes-completion__cta--success {
+  background: rgba(120, 220, 140, 0.18);
+  border-color: rgba(120, 220, 140, 0.6);
+}
+.hwes-completion__cta--error {
+  background: rgba(220, 120, 120, 0.18);
+  border-color: rgba(220, 120, 120, 0.6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hwes-completion {
+    transition: none;
+  }
+  .hwes-completion__cta {
+    transition: none;
+  }
+}
+
+/* WEB-PAGE SHELL — Phase 0b framing renderer.
+   Activated when framing_directives.page_shell === 'web_page'.
+   Per spec: in-flow scrollable layout with section headers per
+   collection, generous breathing room, readable typography. No
+   bumper, no chyrons, no sign-off. Just a well-designed page. */
+.hwes-web-shell {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 64px) clamp(16px, 4vw, 48px);
+  font-family: var(--player-font-body, 'Rajdhani', 'Inter', sans-serif);
+  color: var(--player-text, #e8e6d8);
+}
+.hwes-web-shell__header {
+  margin-bottom: clamp(24px, 4vw, 48px);
+  text-align: center;
+}
+.hwes-web-shell__title {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: clamp(1.6rem, 4vw, 2.8rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0 0 1rem 0;
+  text-shadow: 0 0 30px var(--player-primary, rgba(109, 211, 255, 0.4));
+}
+.hwes-web-shell__intro {
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  line-height: 1.55;
+  max-width: 56ch;
+  margin: 0 auto 1rem auto;
+  color: rgba(232, 230, 216, 0.85);
+}
+.hwes-web-shell__credit {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.6);
+  margin: 0;
+}
+.hwes-web-shell__list {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(24px, 3vw, 40px);
+}
+.hwes-web-shell__section-header {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--player-primary, rgba(109, 211, 255, 0.9));
+  margin: 1.5rem 0 -0.5rem 0;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(109, 211, 255, 0.2);
+}
+.hwes-web-card {
+  background: rgba(12, 20, 35, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: clamp(16px, 3vw, 32px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.hwes-web-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.hwes-web-card__title {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: clamp(1.1rem, 2.2vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+.hwes-web-card__credit {
+  font-size: 0.85rem;
+  color: rgba(232, 230, 216, 0.6);
+  margin: 0;
+}
+.hwes-web-card__cover {
+  width: 100%;
+  max-width: 280px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.04);
+}
+.hwes-web-card__description {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: rgba(232, 230, 216, 0.85);
+  margin: 0;
+}
+.hwes-web-card__media {
+  width: 100%;
+}
+.hwes-web-card__media audio,
+.hwes-web-card__media video {
+  width: 100%;
+  max-width: 100%;
+  border-radius: 8px;
+}
+.hwes-web-card__document {
+  font-size: 1rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  max-height: 32em;
+  overflow-y: auto;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+}
+.hwes-web-card__unsupported {
+  font-style: italic;
+  color: rgba(232, 230, 216, 0.5);
+}
+.hwes-web-card__meta {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.5);
+  text-align: right;
+}
+.hwes-web-shell__footer {
+  margin-top: clamp(32px, 5vw, 64px);
+  padding-top: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+}
+.hwes-web-shell__more {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--player-primary, rgba(109, 211, 255, 0.9));
+  text-decoration: none;
+  padding: 12px 24px;
+  border: 1px solid rgba(109, 211, 255, 0.4);
+  border-radius: 999px;
+  display: inline-block;
+  transition: all 240ms ease;
+}
+.hwes-web-shell__more:hover {
+  background: rgba(109, 211, 255, 0.12);
+  border-color: var(--player-primary);
+  box-shadow: 0 0 24px rgba(109, 211, 255, 0.25);
+}
+
+/* COLD-OPEN CARD — Phase 0b framing renderer.
+   Activated when framing_directives.opening === 'cold_open'
+   (default for broadcast_show recipe). Full-bleed dark backdrop
+   with cover + title + premise + creator credit. Holds 3s, then
+   host voiceover (narration pipeline) reads experience.intro_hint.
+   Fades out as item 0 mounts. */
+.hwes-cold-open {
+  position: fixed;
+  inset: 0;
+  z-index: 90; /* above content+chrome (z<50), below narration (z=60) */
+  background: radial-gradient(
+      ellipse at center,
+      rgba(13, 21, 32, 0.88) 0%,
+      rgba(5, 9, 15, 0.98) 100%
+    );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 600ms ease-in-out;
+}
+.hwes-cold-open--visible {
+  opacity: 1;
+}
+.hwes-cold-open__card {
+  max-width: min(72vw, 800px);
+  text-align: center;
+  padding: 2rem;
+  transform: scale(0.92);
+  transition: transform 1200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hwes-cold-open--visible .hwes-cold-open__card {
+  transform: scale(1);
+}
+.hwes-cold-open__cover {
+  width: clamp(180px, 28vw, 320px);
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 1.6rem;
+  box-shadow:
+    0 12px 60px rgba(0, 0, 0, 0.7),
+    0 0 80px rgba(109, 211, 255, 0.25);
+}
+.hwes-cold-open__title {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin: 0 0 1rem 0;
+  color: var(--player-text, #e8e6d8);
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.8),
+    0 0 30px var(--player-primary, rgba(109, 211, 255, 0.5));
+}
+.hwes-cold-open__premise {
+  font-family: var(--player-font-body, 'Rajdhani', sans-serif);
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  font-weight: 300;
+  line-height: 1.45;
+  color: rgba(232, 230, 216, 0.85);
+  margin: 0 0 2rem 0;
+  max-width: 56ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+.hwes-cold-open__credit {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.5);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hwes-cold-open {
+    transition: none;
+  }
+  .hwes-cold-open__card {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* CINEMATIC MOMENTS — Phase 3 + FE-arch P1-5 (2026-05-03).
+   Single-source list of chrome elements that hide during the
+   bumper, cold-open card, or any other "cinematic moment."
+   JS-toggled `body.hwes-cinematic` is set/cleared from boot.js
+   around the bumper.play() and coldOpenCard.play() lifecycles.
+   Replaces three previous sibling-selector blocks (.hwes-network-
+   bumper ~ X, .hwes-cold-open ~ X) which were fragile to DOM
+   reordering and didn't cover .hwes-show-ident. */
+body.hwes-cinematic .hwes-header-bar,
+body.hwes-cinematic .hwes-chapter-bar,
+body.hwes-cinematic .hwes-drawer-toggle,
+body.hwes-cinematic .hwes-show-ident {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* HEADER BAR — Phase 3.1 persistent chrome.
+   Pinned at top across the experience lifetime. Glass aesthetic
+   with backdrop-filter blur + subtle bottom border. z=70 — above
+   narration overlay (z=60), below cold-open card (z=90) and
+   bumper (z=200) so cinematic moments aren't broken. */
+.hwes-header-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(109, 211, 255, 0.08);
+  padding: 12px clamp(12px, 4vw, 32px);
+  opacity: 0;
+  transition: opacity 600ms ease-in-out;
+}
+.hwes-header-bar--visible {
+  opacity: 1;
+}
+.hwes-header-bar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.hwes-header-bar__logo {
+  height: 56px;
+  width: auto;
+  max-width: 80px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.hwes-header-bar__title-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.hwes-header-bar__title {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: clamp(0.85rem, 1.6vw, 1rem);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--player-text, #e8e6d8);
+  margin: 0;
+}
+.hwes-header-bar__credit {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.65);
+  text-decoration: none;
+  transition: color 200ms ease;
+}
+a.hwes-header-bar__credit:hover {
+  color: var(--player-primary, rgba(109, 211, 255, 1));
+}
+/* Hidden during cinematic moments — see body.hwes-cinematic
+   block below (single-source rule per FE-arch P1-5 fix). The
+   old sibling-selector pattern is gone. */
+@media (max-width: 600px) {
+  .hwes-header-bar {
+    padding: 8px 12px;
+  }
+  .hwes-header-bar__logo {
+    height: 36px;
+    max-width: 56px;
+  }
+}
+
+/* CHAPTER BAR — Phase 3.2 persistent chrome.
+   Pinned beneath the header bar. Shows numeral + name + year
+   range for the active item's collection (chapter). Empty when
+   no chapter context. Per skill 1.5.0 — cyan numeral, cream
+   info, glass background. */
+.hwes-chapter-bar {
+  position: fixed;
+  top: 76px; /* below header */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 69;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 20px;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease-in-out;
+}
+.hwes-chapter-bar--visible {
+  opacity: 1;
+}
+.hwes-chapter-bar__numeral {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 1.95rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--player-primary, rgba(109, 211, 255, 1));
+  text-shadow: 0 0 24px var(--player-primary, rgba(109, 211, 255, 0.5));
+  line-height: 1;
+}
+.hwes-chapter-bar__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+.hwes-chapter-bar__name {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--player-text, #e8e6d8);
+}
+.hwes-chapter-bar__years {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.65rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.55);
+}
+/* Chapter bar hidden during cinematic moments — see body.hwes-cinematic
+   block below (single-source rule). */
+@media (max-width: 600px) {
+  .hwes-chapter-bar {
+    top: 56px;
+    padding: 6px 12px;
+    gap: 10px;
+  }
+  .hwes-chapter-bar__numeral {
+    font-size: 1.4rem;
+  }
+  .hwes-chapter-bar__name {
+    font-size: 0.75rem;
+  }
+}
+
+/* COMING SOON renderer — Phase 3.7 (content_coming_soon_v1).
+   Renders cover + title + "Releases at <date>" instead of
+   attempting media playback. Dwell timer auto-advances. */
+.hwes-coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: clamp(24px, 5vw, 64px);
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+.hwes-coming-soon__cover {
+  width: clamp(200px, 40vw, 360px);
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow:
+    0 12px 60px rgba(0, 0, 0, 0.6),
+    0 0 80px rgba(109, 211, 255, 0.2);
+  filter: grayscale(0.4) brightness(0.85);
+}
+.hwes-coming-soon__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: center;
+}
+.hwes-coming-soon__banner {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--player-primary, rgba(109, 211, 255, 1));
+  padding: 6px 16px;
+  border: 1px solid rgba(109, 211, 255, 0.4);
+  border-radius: 999px;
+  background: rgba(109, 211, 255, 0.06);
+}
+.hwes-coming-soon__title {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--player-text, #e8e6d8);
+  margin: 0;
+}
+.hwes-coming-soon__release {
+  font-family: var(--player-font-body, 'Rajdhani', sans-serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  color: rgba(232, 230, 216, 0.7);
+  margin: 0;
+}
+
+/* DRAWER TOGGLES — Phase 3.3 + 3.4 chrome. Floating buttons that
+   open the playlist (right-side drawer) and lyrics (left-side
+   panel). Cyan glass aesthetic; pinned bottom corners. */
+.hwes-drawer-toggle {
+  position: fixed;
+  bottom: 16px;
+  z-index: 49; /* below drawers (z=50), above content */
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--player-text, #e8e6d8);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(109, 211, 255, 0.4);
+  border-radius: 999px;
+  padding: 10px 18px;
+  cursor: pointer;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+.hwes-drawer-toggle:hover {
+  background: rgba(109, 211, 255, 0.12);
+  border-color: var(--player-primary);
+  box-shadow: 0 0 24px rgba(109, 211, 255, 0.35);
+}
+.hwes-drawer-toggle--playlist {
+  right: 16px;
+}
+.hwes-drawer-toggle--lyrics {
+  left: 16px;
+}
+/* Drawer toggles hidden during cinematic moments — see
+   body.hwes-cinematic block below (single-source rule). */
+
+/* PLAYLIST DRAWER — Phase 3.3. Slide-out from right. */
+.hwes-playlist-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: clamp(280px, 32vw, 400px);
+  z-index: 50;
+  background: rgba(12, 20, 35, 0.92);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-left: 1px solid rgba(109, 211, 255, 0.12);
+  transform: translateX(100%);
+  transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hwes-playlist-drawer--open {
+  transform: translateX(0);
+}
+.hwes-playlist-drawer__inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.hwes-playlist-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.hwes-playlist-drawer__title {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--player-text, #e8e6d8);
+  margin: 0;
+}
+.hwes-playlist-drawer__close,
+.hwes-lyrics-panel__close {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: rgba(232, 230, 216, 0.7);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  transition: color 200ms ease, background 200ms ease;
+}
+.hwes-playlist-drawer__close:hover,
+.hwes-lyrics-panel__close:hover {
+  color: var(--player-primary);
+  background: rgba(109, 211, 255, 0.1);
+}
+.hwes-playlist-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 12px;
+}
+.hwes-playlist-drawer__chapter-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 8px 8px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(109, 211, 255, 0.08);
+}
+.hwes-playlist-drawer__chapter-header:first-child {
+  border-top: none;
+  margin-top: 0;
+}
+.hwes-playlist-drawer__chapter-name {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--player-primary);
+}
+.hwes-playlist-drawer__chapter-sub {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.5);
+}
+.hwes-playlist-drawer__section-divider {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.5);
+  margin: 24px 8px 8px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.hwes-playlist-drawer__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 10px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 200ms ease;
+}
+.hwes-playlist-drawer__row:hover:not(:disabled) {
+  background: rgba(109, 211, 255, 0.06);
+}
+.hwes-playlist-drawer__row--active {
+  background: rgba(109, 211, 255, 0.1);
+  border-left: 2px solid var(--player-primary);
+  padding-left: 6px;
+}
+.hwes-playlist-drawer__row:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.hwes-playlist-drawer__cover {
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.04);
+}
+.hwes-playlist-drawer__row:disabled .hwes-playlist-drawer__cover {
+  filter: grayscale(0.7);
+}
+.hwes-playlist-drawer__row-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.hwes-playlist-drawer__row-title {
+  font-family: var(--player-font-body, 'Rajdhani', sans-serif);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--player-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hwes-playlist-drawer__row-sub {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.5);
+}
+
+/* LYRICS SIDE PANEL — Phase 3.4. Slide-out from left. */
+.hwes-lyrics-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: clamp(280px, 36vw, 460px);
+  z-index: 50;
+  background: rgba(12, 20, 35, 0.92);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-right: 1px solid rgba(109, 211, 255, 0.12);
+  transform: translateX(-100%);
+  transition: transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.hwes-lyrics-panel--open {
+  transform: translateX(0);
+}
+.hwes-lyrics-panel__inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.hwes-lyrics-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.hwes-lyrics-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 24px 32px;
+}
+.hwes-lyrics-panel__item-title {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--player-text);
+  margin: 0 0 1.2rem 0;
+}
+.hwes-lyrics-panel__section-header {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--player-primary);
+  margin: 1.4rem 0 0.6rem 0;
+}
+.hwes-lyrics-panel__story {
+  font-family: var(--player-font-body, 'Rajdhani', sans-serif);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(232, 230, 216, 0.9);
+  margin: 0;
+  white-space: pre-wrap;
+}
+.hwes-lyrics-panel__lyrics {
+  font-family: var(--player-font-body, 'Rajdhani', sans-serif);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: rgba(232, 230, 216, 0.9);
+  white-space: pre-wrap;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 12px 16px;
+  border-radius: 6px;
+}
+.hwes-lyrics-panel__empty {
+  font-family: var(--player-font-body, 'Rajdhani', sans-serif);
+  font-style: italic;
+  color: rgba(232, 230, 216, 0.45);
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hwes-playlist-drawer,
+  .hwes-lyrics-panel {
+    transition: none;
+  }
+}
+
+/* SHOW-IDENT — Phase 0b framing renderer.
+   Persistent brand bug rendered when framing_directives.show_ident
+   === 'persistent' (default for broadcast_show) or 'opening_only'.
+   Small caps, subdued, corner-pinned; carries across scene changes
+   per the spec recipe text. */
+.hwes-show-ident {
+  position: fixed;
+  top: 1rem;
+  right: 1.25rem;
+  z-index: 70; /* above narration overlay (z=60), below bumper (z=200) */
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.45);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 800ms ease-in-out;
+}
+.hwes-show-ident--visible {
+  opacity: 1;
+}
+@media (max-width: 600px) {
+  .hwes-show-ident {
+    top: 0.5rem;
+    right: 0.6rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.25em;
+  }
+}
+
+/* NARRATION OVERLAY — Step 11. Transient text overlay shown
+   while the AI host speaks (TTS bridge per #33). Per-word
+   highlight via __word--active class fired by the bridge's
+   boundary events. Positioned in the upper third of the screen
+   so it doesn't cover the visualizer / cover / video. */
+.hwes-narration {
+  position: fixed;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(80vw, 920px);
+  z-index: 60; /* above content + chrome, below network bumper */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 380ms ease-in-out;
+  text-align: center;
+}
+.hwes-narration--visible {
+  opacity: 1;
+}
+.hwes-narration__text {
+  font-family: var(--player-font-display);
+  font-size: clamp(1.4rem, 3.2vw, 2.4rem);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: var(--player-text);
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.95),
+    0 6px 24px rgba(0, 0, 0, 0.8),
+    0 0 56px var(--player-primary);
+}
+.hwes-narration__word {
+  display: inline-block;
+  opacity: 0.55;
+  transition: opacity 120ms ease-out, color 120ms ease-out;
+}
+.hwes-narration__word--active {
+  opacity: 1;
+  color: var(--player-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hwes-narration {
+    transition: none;
+  }
+  .hwes-narration__word {
+    transition: none;
+  }
+}
+
+/* NETWORK STATION ID BUMPER — Step 10. Plays before any
+   experience. The HW wordmark + a synthesized digital-wave SFX
+   (network-bumper-sfx.js). Reinforces the broadcast-TV-program
+   framing: every experience is presented BY Harmonic Wave (the
+   network). */
+.hwes-network-bumper {
+  position: fixed;
+  inset: 0;
+  z-index: 1000; /* over everything: chrome, scenes, content */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Pure TV black — per user direction 2026-04-19. Like the black
+     a TV shows before a program starts (the Harmonic Wave "black"
+     is the primary background of the network ident). */
+  background: #000;
+  opacity: 0;
+  /* Smooth fade-out into the experience. Longer than the entry
+     ramp so the network-to-program transition reads as a graceful
+     reveal — not an abrupt cut. */
+  transition: opacity 1200ms cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+.hwes-network-bumper--in {
+  opacity: 1;
+}
+.hwes-network-bumper--leaving {
+  opacity: 0;
+}
+/* On leave, gently scale + fade the logo so the bumper recedes
+   instead of just dropping. Reads like the network ident dissolving
+   into the program. NOTE: per skill 1.5.4 (Phase 1.1 iOS hardening
+   2026-05-03), `filter` MUST stay static during transitions on iOS
+   Safari to avoid the snap. The leaving state animates transform +
+   opacity only; filter remains the base 5-stack drop-shadow set on
+   the logo's resting state. */
+.hwes-network-bumper--leaving .hwes-network-bumper__logo {
+  transition: transform 1200ms cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(1.08);
+}
+.hwes-network-bumper__logo {
+  position: relative;
+  z-index: 2;
+  /* Logo is intentionally small — the wave bars are wider than
+     the logo on both sides so they frame it. */
+  width: clamp(140px, 22vw, 260px);
+  height: auto;
+  user-select: none;
+  pointer-events: none;
+  opacity: 0;
+  /* Start small + invisible, grow into final size as the SFX
+     crescendos. The "network ident emerging" motion.
+     Per skill 1.5.4 — keyframes touch ONLY transform + opacity.
+     Filter is declared statically below (drop-shadow stack) and
+     stays constant for the entire animation. iOS Safari's filter-
+     snap bug surfaces when keyframes interpolate filter values:
+     the browser computes filter per-frame and skips transform/
+     opacity interpolation, causing the logo to snap. Halo sibling
+     below (.hwes-network-bumper__halo) animates the cyan glow
+     ramp on a separate element with its own opacity keyframes. */
+  transform: scale(0.5);
+  animation: hwes-bumper-logo 9000ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+  /* Massive 5-stack drop shadow from the POC — cyan glow plus
+     multiple black halos that create depth + vignette the logo
+     against the black background so it feels lit-from-within.
+     STATIC filter — never animated to avoid iOS Safari snap. */
+  filter:
+    drop-shadow(0 0 40px rgba(0, 210, 235, 0.35))
+    drop-shadow(0 0 40px rgba(0, 0, 0, 1))
+    drop-shadow(0 0 80px rgba(0, 0, 0, 1))
+    drop-shadow(0 0 140px rgba(0, 0, 0, 0.8))
+    drop-shadow(0 0 200px rgba(0, 0, 0, 0.6));
+  will-change: transform, opacity;
+}
+@keyframes hwes-bumper-logo {
+  /* Per skill 1.5.4: keyframes touch ONLY transform + opacity.
+     No filter values inside @keyframes blocks. Sync points match
+     network-bumper-sfx.js timeline:
+     0%   = invisible, scaled down to 0.5
+     50%  = nearly full size + opacity, just before bell sting
+     58%  = bell sting at SFX t=3.5s — peak scale 1.05
+     100% = sustain at full size */
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(0.98);
+  }
+  58% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* HALO SIBLING (Phase 1.1 iOS hardening) — separate element so
+   the glow ramp can animate without putting filter inside the
+   logo's keyframes. Sibling sits behind the logo (same z-stack)
+   and renders a cyan radial glow that pulses with the SFX. */
+.hwes-network-bumper__halo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30vmin;
+  height: 30vmin;
+  max-width: 320px;
+  max-height: 320px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(109, 211, 255, 0.55) 0%,
+    rgba(109, 211, 255, 0.2) 30%,
+    rgba(109, 211, 255, 0) 70%
+  );
+  opacity: 0;
+  z-index: 1; /* behind logo (z=2) */
+  pointer-events: none;
+  animation: hwes-bumper-halo 9000ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes hwes-bumper-halo {
+  /* Halo opacity-only animation — safe everywhere including iOS.
+     Mirrors the logo glow timing the old keyframes had baked into
+     the filter values. */
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.45;
+  }
+  58% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0.65;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hwes-network-bumper__halo {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+.hwes-network-bumper__pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40vmin;
+  height: 40vmin;
+  border-radius: 50%;
+  border: 2px solid rgba(109, 211, 255, 0.5);
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
+  /* Pulse swells outward in sync with the SFX crescendo. Three
+     runs spread across the 9s SFX so there's always a pulse in
+     flight as the wave crests. */
+  animation: hwes-bumper-pulse 3000ms ease-out 500ms 3 forwards;
+}
+/* 120-bar centered waveform behind the logo — direct port of the
+   POC's #logo-waveform pattern. Each bar is 2px wide with a
+   per-bar height set inline; CSS handles the staggered
+   intro+pulse sweep. */
+.hwes-network-bumper__waveform {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(-50% + 14px));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: min(72vw, 720px);
+  z-index: 1; /* behind logo (z=2), above background */
+  pointer-events: none;
+}
+.hwes-network-bumper__wf-bar {
+  width: 2px;
+  border-radius: 2px;
+  opacity: 0.1;
+  transform: scaleY(0.1);
+  animation:
+    hwes-bumper-wf-intro 1.5s ease-out forwards,
+    hwes-bumper-wf-pulse 2s ease-in-out 1.5s infinite;
+}
+@keyframes hwes-bumper-wf-intro {
+  0% {
+    transform: scaleY(0.1);
+    opacity: 0.1;
+  }
+  100% {
+    transform: scaleY(0.3);
+    opacity: 0.25;
+  }
+}
+@keyframes hwes-bumper-wf-pulse {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scaleY(0.8);
+    opacity: 0.85;
+  }
+}
+@media (max-width: 600px) {
+  .hwes-network-bumper__wf-bar {
+    width: 1px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hwes-network-bumper__wf-bar {
+    animation: none;
+    opacity: 0.4;
+    transform: scaleY(0.5);
+  }
+}
+@keyframes hwes-bumper-pulse {
+  0% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  80% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.6);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hwes-network-bumper__logo {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .hwes-network-bumper__pulse {
+    animation: none;
+    opacity: 0;
+  }
+}

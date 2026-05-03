@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "generated_at": "2026-04-19T13:43:13.897Z",
+  "generated_at": "2026-05-03T05:33:02.636Z",
   "primitives": {
     "prominence": {
       "type": "enum",
@@ -99,6 +99,32 @@
       "values": ["none", "auto"],
       "default": "none",
       "description": "Music bed under narration. \"auto\" lets the engine pick a low-volume track from the experience. Desktop multi-channel only — mobile pipeline ignores this directive."
+    }
+  },
+  "framing_primitives": {
+    "page_shell": {
+      "type": "enum",
+      "values": ["broadcast", "web_page", "podcast_feed", "film_screening", "gallery_wall"],
+      "default": "broadcast",
+      "description": "The whole-experience shell the renderer applies. \"broadcast\" matches the reference Universal Player's native presentation-mode flow (network bumper, item transitions, narration + music bed, end card). \"web_page\" is the simpler in-flow rendering with full chrome and no narrative shell. Other values are reserved for future framing recipes."
+    },
+    "show_ident": {
+      "type": "enum",
+      "values": ["none", "persistent", "opening_only"],
+      "default": "persistent",
+      "description": "Whether a brand bug / show ident persists across the experience. \"persistent\" holds the bug in a corner across every item. \"opening_only\" shows it during the opening then drops it. \"none\" never renders a bug."
+    },
+    "opening": {
+      "type": "enum",
+      "values": ["straight", "cold_open", "station_ident"],
+      "default": "cold_open",
+      "description": "What the experience opens with before the first item plays. \"straight\" goes directly to item 1. \"cold_open\" renders a hero card (cover + title + host voiceover) before item 1. \"station_ident\" plays a network-bumper animation first."
+    },
+    "closing": {
+      "type": "enum",
+      "values": ["abrupt", "sign_off", "credits_roll"],
+      "default": "sign_off",
+      "description": "What the experience closes with after the last item ends. \"abrupt\" just stops. \"sign_off\" plays a host outro (thanks-for-watching + coming-up teasers). \"credits_roll\" renders a reference-style end card with creator credit + share CTAs."
     }
   }
 }

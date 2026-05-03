@@ -1,0 +1,26 @@
+{
+  "_comment": "Phase 0b conformance fixture — framing recipe web_page. Alternate framing for experiences that don't suit a broadcast format (reference material, galleries, document-heavy). Resolves page_shell:'web_page', show_ident:'none', opening:'straight', closing:'abrupt'. Engine renders all items in-flow as scrollable cards with no bumper / cold-open / chyrons / sign-off. Tests resolveFraming() against web_page recipe definition + the alternate render path.",
+  "hwes_version": 1,
+  "hwes_extensions": [],
+  "id": 41,
+  "slug": "framing-web-page",
+  "name": "Framing — Web Page",
+  "description": "Validates HWES v1 framing system with web_page recipe (in-flow alternate to broadcast).",
+  "framing_recipes": ["web_page"],
+  "items": [
+    {
+      "item_id": 4101,
+      "content_id": 200,
+      "content_type_slug": "document",
+      "content_title": "Reference document one",
+      "content_metadata": { "body": "First reference paragraph for the web-page render." }
+    },
+    {
+      "item_id": 4102,
+      "content_id": 201,
+      "content_type_slug": "document",
+      "content_title": "Reference document two",
+      "content_metadata": { "body": "Second reference paragraph for the web-page render." }
+    }
+  ]
+}

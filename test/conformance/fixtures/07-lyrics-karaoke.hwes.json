@@ -1,20 +1,21 @@
 {
-  "_comment": "Display recipe: lyrics_karaoke. lyrics_display=scroll_synced, expand_button=true. Precondition: requires content_metadata.lrc_lyrics. This fixture supplies the LRC string so the precondition passes.",
+  "_comment": "Display recipe: text_overlay. lyrics_display=scroll_synced, expand_button=true. Precondition: requires content_metadata.lrc_lyrics AND lrc_data + content_type_slug in [song, podcast, narration, movie, lecture]. Provides both timed-text fields so the precondition passes under current AND-semantics. Filename retained as 07-lyrics-karaoke for git history continuity; the recipe slug it exercises is now text_overlay (lyrics_karaoke removed from spec 2026-05-02).",
   "hwes_version": 1,
   "hwes_extensions": ["display_recipes_v1"],
   "id": 7,
-  "slug": "lyrics-karaoke",
-  "name": "Lyrics Karaoke Conformance Fixture",
+  "slug": "text-overlay-lyrics",
+  "name": "Text Overlay (Lyrics) Conformance Fixture",
   "items": [
     {
       "item_id": 701,
       "content_id": 100,
       "content_type_slug": "song",
-      "content_title": "Lyrics Karaoke Test",
+      "content_title": "Text Overlay Test",
       "media_play_url": "/media/play/test.mp3",
-      "display_directives": ["lyrics_karaoke"],
+      "display_directives": ["text_overlay"],
       "content_metadata": {
-        "lrc_lyrics": "[00:00.00]Line one of the lyrics\n[00:02.00]Line two\n"
+        "lrc_lyrics": "[00:00.00]Line one of the lyrics\n[00:02.00]Line two\n",
+        "lrc_data": "[00:00.00]Line one of the lyrics\n[00:02.00]Line two\n"
       }
     }
   ]

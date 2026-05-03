@@ -59,6 +59,24 @@ const PAUSE_AFTER_NARRATION_DEFAULT_S = 0;
 /**
  * @typedef {object} NarrationPipeline
  * @property {(opts: SpeakItemOpts) => Promise<void>} speakForItem
+ * @property {(opts: { experience: any, actor?: any }) => Promise<void>} speakForExperience
+ *   Phase 2.4 — Tier 1 of the four-tier hierarchy.
+ * @property {(opts: { collection: any, actor?: any }) => Promise<void>} speakForCollection
+ *   Phase 2.4 — Tier 2.
+ * @property {(opts: { text: string, actor?: any }) => Promise<void>} speakBoundaryAnnounce
+ *   Phase 2.4 — Tier 4 (preconditioned on Tier 2 having fired).
+ * @property {(kind: 'experience' | 'collection' | 'content' | 'boundary', id?: string) => boolean} willPlayDJ
+ *   Phase 2.3 — gate predicate.
+ * @property {(kind: 'experience' | 'collection' | 'content' | 'boundary' | 'released-collection', id?: string) => void} markPlayed
+ *   Phase 2.5 — single-write path for once-per-session tracking.
+ * @property {{
+ *   playedExperienceOverview: boolean,
+ *   playedCollectionIntros: Set<string>,
+ *   playedContentIntros: Set<string>,
+ *   playedBoundaryAnnounce: boolean,
+ *   playedReleasedCollection: boolean,
+ * }} session
+ *   Read-only snapshot of session-level tracking for diagnostics + tests.
  * @property {() => void} skipCurrent
  * @property {() => void} teardown
  * @property {import('../renderers/narration/tts-bridge.js').TtsBridge} bridge
@@ -91,6 +109,86 @@ export function createNarrationPipeline(opts) {
 
   /** @type {((value?: any) => void) | null} */
   let activeSkipResolver = null;
+
+  // Phase 2.3 + 2.5 (skill 1.5.8) — once-per-session narration tracking.
+  // The four canonical structures + a unified `markPlayed(kind, id)`
+  // write path close the producer-gap trap (skill's worst-case bug:
+  // mark-as-played living in only one code path; multiple paths fire
+  // the intro). `willPlayDJ(kind, id)` is the gate; `markPlayed` is
+  // the single write. All speak* methods route through both.
+  //
+  // Tracking structures match skill 1.5.8 vocabulary:
+  //   playedExperienceOverview: boolean — fires once for the whole session
+  //   playedCollectionIntros: Set — collection_id values that fired
+  //   playedContentIntros: Set — content_id values that fired
+  //   playedBoundaryAnnounce: boolean — pre-release transition narration
+  //   playedReleasedCollection: boolean — precondition for boundary
+  //     announce (skill 1.5.8: announcement requires at least one
+  //     released-collection traversal so cold deep-links don't misfire).
+  /** @type {{
+   *   playedExperienceOverview: boolean,
+   *   playedCollectionIntros: Set<string>,
+   *   playedContentIntros: Set<string>,
+   *   playedBoundaryAnnounce: boolean,
+   *   playedReleasedCollection: boolean,
+   * }} */
+  const session = {
+    playedExperienceOverview: false,
+    playedCollectionIntros: new Set(),
+    playedContentIntros: new Set(),
+    playedBoundaryAnnounce: false,
+    playedReleasedCollection: false,
+  };
+
+  /**
+   * Single-write path for the producer-gap trap. ALL paths that fire
+   * a DJ phase must call markPlayed() AFTER speaking. Multiple paths
+   * may speak (item:started, Back-button-after-auto-advance, playlist
+   * jump, deep-link reload), but only the single write keeps state.
+   *
+   * @param {'experience' | 'collection' | 'content' | 'boundary' | 'released-collection'} kind
+   * @param {string | undefined} id
+   */
+  function markPlayed(kind, id) {
+    if (kind === 'experience') session.playedExperienceOverview = true;
+    else if (kind === 'collection') {
+      session.playedReleasedCollection = true;
+      if (id != null) session.playedCollectionIntros.add(String(id));
+    } else if (kind === 'content') {
+      if (id != null) session.playedContentIntros.add(String(id));
+    } else if (kind === 'boundary') session.playedBoundaryAnnounce = true;
+    else if (kind === 'released-collection') session.playedReleasedCollection = true;
+  }
+
+  /**
+   * Unified gate: should the engine speak DJ for (kind, id) right now?
+   * Returns false when the same (kind, id) already played this session.
+   *
+   * Boundary announcements have an additional precondition — they only
+   * fire AFTER at least one released-collection traversal so cold
+   * deep-links into a pre-release song don't misfire ("Up next are
+   * pre-release tracks" without context).
+   *
+   * @param {'experience' | 'collection' | 'content' | 'boundary'} kind
+   * @param {string | undefined} id
+   * @returns {boolean}
+   */
+  function willPlayDJ(kind, id) {
+    if (kind === 'experience') return !session.playedExperienceOverview;
+    if (kind === 'collection') {
+      if (id == null) return false;
+      return !session.playedCollectionIntros.has(String(id));
+    }
+    if (kind === 'content') {
+      if (id == null) return true; // no id → speak (anonymous)
+      return !session.playedContentIntros.has(String(id));
+    }
+    if (kind === 'boundary') {
+      if (session.playedBoundaryAnnounce) return false;
+      return session.playedReleasedCollection; // precondition
+    }
+    return true;
+  }
 
   // Subscribe to skip requests from the state machine (keyboard 'N',
   // chrome's future skip-narration button). Cancels the active TTS +
@@ -167,8 +265,176 @@ export function createNarrationPipeline(opts) {
     };
   }
 
+  /**
+   * Internal core speak path — mounts overlay, ducks bed, drives TTS,
+   * tears down. Both the per-item path AND the new four-tier methods
+   * (experience-overview, collection-intro, boundary-announce) route
+   * through this. Returns a promise that resolves on natural completion
+   * OR on skip-narration.
+   *
+   * Per FE-arch P1-1 fix (2026-05-03): each speakCore call captures a
+   * LOCAL resolver and only clears `activeSkipResolver` when the
+   * cleared value still matches its own (token equality check). When
+   * a second speakCore starts before the first's bridge.speak()
+   * promise resolves, the first's resolution path no longer clobbers
+   * the second's resolver. Skill 1.5.8 cancel-and-restart semantics
+   * preserved: each speakCore calls bridge.cancel() implicitly via
+   * speak() (which cancels prior in-flight) before scheduling itself.
+   *
+   * @param {{ text: string, audioUrl?: string, actor?: any,
+   *          pauseAfterSec?: number }} core
+   * @returns {Promise<void>}
+   */
+  async function speakCore(core) {
+    const text = core.text;
+    const audioUrl = core.audioUrl;
+    const voiceName = core.actor?.voice_name ?? core.actor?.name ?? undefined;
+    const overlay = mountOverlay(text);
+
+    audioPipeline.duckMusicBed();
+    const unsubBoundary = bridge.on('boundary', (event) => {
+      overlay.setHighlight(event.charStart, event.charEnd);
+    });
+
+    let wasSkipped = false;
+    /** @type {(skipFlag?: any) => void} */
+    let localResolver = () => {};
+    try {
+      await new Promise((resolve) => {
+        localResolver = (skipFlag) => {
+          if (skipFlag === true) wasSkipped = true;
+          resolve(undefined);
+        };
+        // If another speakCore is in flight, cancel it. Its in-flight
+        // bridge.speak() promise will reject/resolve and try to clear
+        // activeSkipResolver — the token-equality check below ensures
+        // it only clears if still own, so we don't lose our own resolver.
+        if (activeSkipResolver !== null) {
+          const prior = activeSkipResolver;
+          activeSkipResolver = null;
+          try {
+            prior(true); // resolve prior as skipped
+          } catch {
+            /* defensive */
+          }
+        }
+        activeSkipResolver = localResolver;
+        bridge
+          .speak({ text, audioUrl, voiceName, rate: 0.95 })
+          .then(() => {
+            // FE-arch P1-1 — only clear if we still own the slot. A
+            // later speakCore may have replaced our resolver; clearing
+            // unconditionally would clobber its.
+            if (activeSkipResolver === localResolver) activeSkipResolver = null;
+            resolve(undefined);
+          })
+          .catch((err) => {
+            if (activeSkipResolver === localResolver) activeSkipResolver = null;
+            // eslint-disable-next-line no-console
+            console.warn('[hwes/narration] tts error; advancing:', err);
+            resolve(undefined);
+          });
+      });
+    } finally {
+      unsubBoundary();
+      overlay.teardown();
+      const pauseSec = core.pauseAfterSec ?? 0;
+      if (!wasSkipped && pauseSec > 0) {
+        await new Promise((r) => setTimeout(r, pauseSec * 1000));
+      }
+    }
+  }
+
   return {
     bridge,
+    /**
+     * Phase 2.3 + 2.5 — expose tracking state read-only for diagnostics
+     * + tests. Helper functions are also exposed so callers (boot.js
+     * cold-open path) can mark experience-overview without going through
+     * a speakFor* method when narration is fired via a different path.
+     */
+    willPlayDJ,
+    markPlayed,
+    get session() {
+      return /** @type {const} */ ({
+        playedExperienceOverview: session.playedExperienceOverview,
+        playedCollectionIntros: new Set(session.playedCollectionIntros),
+        playedContentIntros: new Set(session.playedContentIntros),
+        playedBoundaryAnnounce: session.playedBoundaryAnnounce,
+        playedReleasedCollection: session.playedReleasedCollection,
+      });
+    },
+    /**
+     * Phase 2.4 — Tier 1: experience-overview narration.
+     * Fires ONCE per session. Voices `experience.intro_hint`. Used by
+     * the cold-open card; engine ignores re-calls after the first.
+     *
+     * @param {{ experience: any, actor?: any }} opts
+     * @returns {Promise<void>}
+     */
+    async speakForExperience({ experience, actor }) {
+      if (!willPlayDJ('experience', undefined)) return;
+      const text = experience?.intro_hint;
+      if (typeof text !== 'string' || text.trim().length === 0) {
+        // No text to speak; still mark as "played" so subsequent calls
+        // skip the empty narration attempt.
+        markPlayed('experience', undefined);
+        return;
+      }
+      try {
+        await speakCore({ text, actor });
+      } finally {
+        markPlayed('experience', undefined);
+      }
+    },
+    /**
+     * Phase 2.4 — Tier 2: collection-intro narration.
+     * Fires ONCE per collection per session. Voices the collection's
+     * intro_hint. Marks the collection as released-traversed so the
+     * boundary-announce precondition can later fire.
+     *
+     * @param {{ collection: any, actor?: any }} opts
+     * @returns {Promise<void>}
+     */
+    async speakForCollection({ collection, actor }) {
+      const collId = collection?.collection_id;
+      if (!willPlayDJ('collection', collId)) return;
+      const text =
+        collection?.collection_metadata?.intro_hint ??
+        collection?.intro_hint ??
+        collection?.collection_name;
+      if (typeof text !== 'string' || text.trim().length === 0) {
+        markPlayed('collection', collId);
+        return;
+      }
+      try {
+        await speakCore({ text, actor });
+      } finally {
+        markPlayed('collection', collId);
+      }
+    },
+    /**
+     * Phase 2.4 — Tier 4: boundary announcement.
+     * Fires ONCE per session at the transition between released and
+     * pre-release content. Preconditioned on at least one released-
+     * collection traversal. Reference player example:
+     *   "That was Chapter One. Up next are released songs from upcoming chapters."
+     *
+     * @param {{ text: string, actor?: any }} opts
+     * @returns {Promise<void>}
+     */
+    async speakBoundaryAnnounce({ text, actor }) {
+      if (!willPlayDJ('boundary', undefined)) return;
+      if (typeof text !== 'string' || text.trim().length === 0) {
+        markPlayed('boundary', undefined);
+        return;
+      }
+      try {
+        await speakCore({ text, actor });
+      } finally {
+        markPlayed('boundary', undefined);
+      }
+    },
     async speakForItem(speakOpts) {
       const { item, behavior, actor, phase } = speakOpts;
       // Phase gate: this implementation supports 'intro' (before_content),
@@ -176,75 +442,29 @@ export function createNarrationPipeline(opts) {
       // intro of the next item). 'during_content' is deferred.
       if (phase !== 'intro' && phase !== 'outro' && phase !== 'between') return;
 
+      // Phase 2.3 — once-per-content gate. Subsequent calls for the
+      // same content_id this session are no-ops (skip duplicate
+      // narration on Back-button reentry, playlist jumps, etc.).
+      const contentId = item?.content_id;
+      if (!willPlayDJ('content', contentId)) return;
+
       const text = resolveNarrationText({ item, phase, allowDefault: allowDefaultNarration });
-      if (!text) return;
+      if (!text) {
+        markPlayed('content', contentId);
+        return;
+      }
 
       const audioUrl = resolveNarrationAudioUrl({ item, phase });
-      const voiceName = actor?.voice_name ?? actor?.name ?? undefined;
-      const overlay = mountOverlay(text);
-
-      // Duck the music bed. Despite the "duck" name, this is a
-      // ONE-WAY ramp-to-zero per `synthesized-provider.js:duck()` —
-      // there's no automatic re-rampup after narration ends. By design:
-      // the broadcast pattern is "bed plays under the host's intro,
-      // then drops out so the listener moves into the program clean."
-      // If a future product decision wants the bed to swell back, add
-      // a `restoreMusicBed()` call here after the speak/finally.
-      // (Desktop only — mobile pipeline's duck is a no-op.)
-      audioPipeline.duckMusicBed();
-
-      // Wire the TTS bridge boundary events to the overlay highlight.
-      const unsubBoundary = bridge.on('boundary', (event) => {
-        overlay.setHighlight(event.charStart, event.charEnd);
-      });
-
-      // Track whether the speech ended via natural completion or via
-      // user skip. The skip flow (narration:skip event) bypasses the
-      // post-narration pause — user pressed N to advance NOW, making
-      // them wait `pause_after_narration_seconds` after defies intent.
-      // P1 from FE arch review of 3d675a6.
-      let wasSkipped = false;
-
-      // Speak. Skip flow (state machine 'narration:skip' event) cancels
-      // the bridge AND resolves this promise via activeSkipResolver.
+      const pauseSec = /** @type {number} */ (
+        /** @type {any} */ (behavior).pause_after_narration_seconds ??
+          PAUSE_AFTER_NARRATION_DEFAULT_S
+      );
       try {
-        await new Promise((resolve) => {
-          // Wrap the resolver so we can mark wasSkipped if the skip
-          // path was the trigger. Natural .then/.catch from the bridge
-          // bypass this wrapper and leave wasSkipped false.
-          activeSkipResolver = (skipFlag) => {
-            if (skipFlag === true) wasSkipped = true;
-            resolve(undefined);
-          };
-          bridge
-            .speak({ text, audioUrl, voiceName, rate: 0.95 })
-            .then(() => {
-              activeSkipResolver = null;
-              resolve(undefined);
-            })
-            .catch((err) => {
-              activeSkipResolver = null;
-              // On bridge errors, advance past instead of dead-stopping.
-              // eslint-disable-next-line no-console
-              console.warn('[hwes/narration] tts error; advancing:', err);
-              resolve(undefined);
-            });
-        });
+        await speakCore({ text, audioUrl, actor, pauseAfterSec: pauseSec });
       } finally {
-        unsubBoundary();
-        overlay.teardown();
-        // Honor pause_after_narration_seconds before resolving — but
-        // skip the pause if the user explicitly skipped (they want to
-        // advance NOW, not wait the post-narration beat).
-        if (!wasSkipped) {
-          const pauseSec = /** @type {number} */ (
-            /** @type {any} */ (behavior).pause_after_narration_seconds ??
-              PAUSE_AFTER_NARRATION_DEFAULT_S
-          );
-          if (pauseSec > 0) {
-            await new Promise((r) => setTimeout(r, pauseSec * 1000));
-          }
-        }
+        // Phase 2.3 — single mark-played write, regardless of natural
+        // end vs skip. Closes the producer-gap trap (skill 1.5.8).
+        markPlayed('content', contentId);
       }
     },
     skipCurrent() {

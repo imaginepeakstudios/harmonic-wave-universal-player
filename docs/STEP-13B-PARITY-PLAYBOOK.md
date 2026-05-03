@@ -78,7 +78,7 @@ The POC has hard-coded behavior. The new player gets equivalent behavior via rec
 |---|---|---|
 | Cover art + DJ intro before each song | `album_art_forward` (display) + `story_then_play` (delivery) | The POC's default flow |
 | Cinematic visualizer on song play | `cinematic_fullscreen` (display) | Triggers visualizer-canvas scene per layer-rules |
-| LRC lyrics scrolling overlay | `lyrics_karaoke` (display) OR `lyrics_along` (delivery) | Both produce `lyrics_display: 'scroll_synced'` |
+| LRC lyrics scrolling overlay | `text_overlay` (display) | Produces `lyrics_display: 'scroll_synced'`. Replaces the retired `lyrics_karaoke` + `lyrics_along` recipes (removed from spec 2026-05-02). |
 | Music bed under DJ narration | `narration_music_bed: 'auto'` (set via behavior_override on experience) | Maps to Step 9's synthesized music bed when no `music_bed_url` |
 | DJ between every track in playlist mode | `chapter_sequence` (delivery) + `guided_walkthrough` (delivery) | Or compose via item-level scripts |
 | Crossfade between tracks | `cross_fade_transitions` (display) | Triggers Step 9's crossfade pipeline |
@@ -96,7 +96,7 @@ The POC has hard-coded behavior. The new player gets equivalent behavior via rec
 - **Skip Intro button** — POC has it as a chrome button; HWES has `narration:skip` event + Step 10's keyboard 'N' but no chrome button. Player-side polish (Step 13c).
 - **Chapter bar** (chapter numeral + name + year range pinned to top) — HWES has no first-class "chapter" concept. Track as either an HWES extension (`chapter_bar_v1`) or a player-side rendering of `arc_role` / `experience_metadata.chapters[]`.
 - **Volume slider** — POC has a chrome slider tied to `audio.volume`. New player's chrome controls (Play/Skip only per `src/chrome/controls.js`). Decide per the broadcast-TV-feel framing: a TV doesn't have a volume slider for the program (system-level OS control owns it). Likely intentionally NOT in v1; document in SPEC.
-- **Lyrics side panel toggle** — POC has a "Lyrics" button that opens a side panel with the full lyrics + scroll-sync. HWES has the overlay variants (`lyrics_karaoke` etc) but no side-panel pattern. Could be a player-side polish item OR an HWES extension (`lyrics_panel_v1`).
+- **Lyrics side panel toggle** — POC has a "Lyrics" button that opens a side panel with the full lyrics + scroll-sync. HWES has the overlay variant (`text_overlay`) but no side-panel pattern. Could be a player-side polish item OR an HWES extension (`lyrics_panel_v1`).
 - **Playlist drawer toggle** — POC has a "Playlist" button that opens a slide-out drawer with all tracks + jump-to. HWES has `experience.items` but no in-player listing UI. Would be a player feature on top of existing data; track as a future step (between Steps 13 and 14).
 - **Header bar with artist logo + link** — POC pins artist branding at top. HWES has `actor.visual_directives` but no first-class artist-link pattern. Maps to player_theme_v1 extension or to the existing chrome shell's `<h1>` slot.
 

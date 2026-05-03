@@ -1,3 +1,5 @@
+import { formatIntroForTTS, filterDjTimings } from './format-intro.js';
+
 /**
  * TTS bridge — Step 11.
  *
@@ -115,6 +117,22 @@ export function createTtsBridge(opts = {}) {
   /** @type {(() => void) | null} */
   let silentResolve = null;
 
+  // Phase 1.4 (skill 1.5.2) — HTMLMediaElement pre-warm. iOS Safari
+  // requires that an <audio> element have .play() called from a user
+  // gesture AT LEAST ONCE in its lifetime to be playable later. The
+  // platform-audio path creates a NEW Audio element per speak() call
+  // — many of those calls happen well after the gesture frame closed
+  // (e.g., narration after the cold-open hold timer, between-track
+  // intros after auto-advance). Without pre-warming, iOS rejects the
+  // .play() with NotAllowedError.
+  //
+  // The fix: at bridge-create time (typically in the user-gesture
+  // chain because the bridge is created during boot), play+pause a
+  // silent 1ms WAV on a dedicated reusable element. Each subsequent
+  // speak() reuses THAT element by reassigning .src, so iOS sees the
+  // element as "user has approved this" from the original pre-warm.
+  const prewarmedAudio = createPrewarmedAudioElement();
+
   function emit(event, payload) {
     const set = handlers.get(event);
     if (!set) return;
@@ -142,7 +160,17 @@ export function createTtsBridge(opts = {}) {
     kind = 'platform-audio';
     if (!opts.audioUrl) throw new Error('[hwes/tts] platform-audio requires audioUrl');
 
-    activeAudio = document.createElement('audio');
+    // Phase 1.4 — reuse the pre-warmed element. Reassigning .src on a
+    // pre-warmed element preserves iOS's "user approved this element"
+    // permission from the original pre-warm gesture. Creating a fresh
+    // element per call would lose that and trigger NotAllowedError on
+    // iOS Safari for narration that fires post-gesture-frame.
+    activeAudio = prewarmedAudio ?? document.createElement('audio');
+    // Cancel any prior playback on the reused element. setAttribute
+    // before assigning new src so the .src= write replaces cleanly.
+    if (!activeAudio.paused) activeAudio.pause();
+    activeAudio.removeAttribute('src');
+    activeAudio.load();
     activeAudio.src = opts.audioUrl;
     activeAudio.preload = 'auto';
     if (opts.volume != null) activeAudio.volume = opts.volume;
@@ -389,16 +417,30 @@ export function createTtsBridge(opts = {}) {
     speak(speakOpts) {
       // Cancel any previous speech first. Idempotent.
       this.cancel();
+      // Phase 2.1 (skill 1.5.7) — normalize text for TTS at the call
+      // boundary. Display source (callers' overlay text) stays clean;
+      // only the spoken path gets the leading ". ", ellipses → comma,
+      // dashes → comma, sentence-per-paragraph treatment.
+      // Phase 2.2 (skill 1.5.7) — also strip punctuation-only entries
+      // from any provided wordTimings so render + sync layers index
+      // against the same filtered array.
+      const normalized = {
+        ...speakOpts,
+        text: formatIntroForTTS(speakOpts.text),
+        wordTimings: speakOpts.wordTimings
+          ? filterDjTimings(speakOpts.wordTimings)
+          : speakOpts.wordTimings,
+      };
       // Provider selection.
-      if (typeof speakOpts.audioUrl === 'string' && speakOpts.audioUrl.length > 0) {
-        return speakPlatformAudio(speakOpts);
+      if (typeof normalized.audioUrl === 'string' && normalized.audioUrl.length > 0) {
+        return speakPlatformAudio(normalized);
       }
       const speechAvailable =
         typeof globalThis !== 'undefined' && /** @type {any} */ (globalThis).speechSynthesis;
       if (speechAvailable) {
-        return speakBrowserTts(speakOpts);
+        return speakBrowserTts(normalized);
       }
-      return speakSilent(speakOpts);
+      return speakSilent(normalized);
     },
     pause() {
       if (kind === 'platform-audio') activeAudio?.pause();
@@ -421,7 +463,12 @@ export function createTtsBridge(opts = {}) {
         } catch {
           /* defensive */
         }
-        activeAudio = null;
+        // Phase 1.4 — when activeAudio is the pre-warmed element,
+        // DON'T null it out. Reusing the same element across calls
+        // is what preserves iOS's gesture-approval. Just detach src.
+        if (activeAudio !== prewarmedAudio) {
+          activeAudio = null;
+        }
       }
       if (activeUtterance) {
         try {
@@ -447,6 +494,57 @@ export function createTtsBridge(opts = {}) {
     teardown() {
       this.cancel();
       handlers.clear();
+      // Phase 1.4 — release the pre-warmed element on full teardown.
+      if (prewarmedAudio) {
+        try {
+          prewarmedAudio.pause();
+          prewarmedAudio.removeAttribute('src');
+          prewarmedAudio.remove();
+        } catch {
+          /* defensive */
+        }
+      }
     },
   };
+}
+
+/**
+ * Phase 1.4 — create + pre-warm an HTMLAudioElement on a silent WAV
+ * data URI inside the gesture frame. iOS Safari requires .play() to
+ * have been called from a user gesture for the element to be playable
+ * later; reusing this element across speak() calls preserves that
+ * permission. Caller MUST be inside a gesture for the pre-warm to
+ * stick (e.g., bridge created during boot, which originates from the
+ * page-load gesture chain).
+ *
+ * Returns the element OR null in non-DOM environments (tests).
+ *
+ * @returns {HTMLAudioElement | null}
+ */
+function createPrewarmedAudioElement() {
+  if (typeof document === 'undefined' || typeof Audio === 'undefined') return null;
+  // 44-byte WAV header + 2 bytes silent PCM (1 sample @ 8kHz mono 16-bit)
+  // = the minimal valid WAV. Encoded as base64 once at module load.
+  const SILENT_WAV =
+    'data:audio/wav;base64,' + 'UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQIAAAAAAA==';
+  try {
+    const el = new Audio(SILENT_WAV);
+    el.preload = 'auto';
+    el.crossOrigin = 'anonymous';
+    el.setAttribute('playsinline', '');
+    el.style.display = 'none';
+    if (document.body) document.body.appendChild(el);
+    // Fire-and-forget play+pause to satisfy iOS gesture approval.
+    // The promise resolves when playback starts; we immediately pause
+    // so no audio actually emits. Failures here are silent — TTS will
+    // create-per-call as the fallback path.
+    el.play()
+      .then(() => el.pause())
+      .catch(() => {
+        /* gesture rejection — fallback path will create-per-call */
+      });
+    return el;
+  } catch {
+    return null;
+  }
 }
