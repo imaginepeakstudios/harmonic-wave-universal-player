@@ -71,7 +71,7 @@ export function createBannerStaticRenderer(opts) {
     img.style.width = '100%';
     img.style.height = '100%';
     img.style.objectFit = 'cover';
-    img.style.filter = 'blur(40px) brightness(0.4)';
+    img.style.filter = 'blur(12px) brightness(0.65)';
     img.style.opacity = '0';
     img.style.transition = 'opacity 800ms ease-in-out';
     // Fade in once decoded — avoids the "flash of unblurred + bright"

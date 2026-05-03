@@ -38,6 +38,23 @@
 const FADE_OUT_MS = 600;
 
 /**
+ * Resolve visual_scene from any of the three production wire
+ * locations. Mirrors composition/layer-selector.js's helper of the
+ * same name; duplicated here so the start-gate stays self-contained
+ * (no cross-module dependency for one tiny helper).
+ *
+ * @param {any} experience
+ * @returns {{ banner1_url?: string, color_palette?: string } | undefined}
+ */
+function pickVisualScene(experience) {
+  return (
+    experience?.content_metadata?.visual_scene ??
+    experience?.visual_scene ??
+    experience?.collection_visual_scene
+  );
+}
+
+/**
  * @typedef {object} StartGate
  * @property {() => Promise<void>} waitForStart
  *   Resolves when the listener clicks the start button (or presses
@@ -50,14 +67,13 @@ const FADE_OUT_MS = 600;
 /**
  * @param {{
  *   mount: HTMLElement,
- *   experience: { name?: string, description?: string, intro_hint?: string,
- *                 cover_art_url?: string, profile_name?: string,
- *                 creator_name?: string }
+ *   experience: any,
+ *   actor?: { name?: string } | null,
  * }} opts
  * @returns {StartGate}
  */
 export function createStartGate(opts) {
-  const { mount, experience } = opts;
+  const { mount, experience, actor } = opts;
 
   const root = document.createElement('div');
   root.className = 'hwes-start-gate';
@@ -65,17 +81,61 @@ export function createStartGate(opts) {
   root.setAttribute('aria-label', 'Start the experience');
   root.setAttribute('aria-modal', 'true');
 
+  // Banner backdrop — full-bleed blurred experience banner image
+  // behind the card. Same cinematic feel as the production reference
+  // player's loading screen. Resolves visual_scene from the three
+  // wire locations + falls back to cover_art_url. When no imagery is
+  // authored at all, the radial-gradient base remains.
+  const visualScene = pickVisualScene(experience);
+  const backdropUrl =
+    visualScene?.banner1_url ?? experience?.og_image_url ?? experience?.cover_art_url ?? null;
+  if (backdropUrl) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'hwes-start-gate__backdrop';
+    backdrop.style.backgroundImage = `url(${JSON.stringify(backdropUrl)})`;
+    root.appendChild(backdrop);
+  }
+
+  // Vignette — soft radial darkening on top of the backdrop so card
+  // text always reads against a dimmed center regardless of how
+  // bright the banner is.
+  const vignette = document.createElement('div');
+  vignette.className = 'hwes-start-gate__vignette';
+  root.appendChild(vignette);
+
   const card = document.createElement('div');
   card.className = 'hwes-start-gate__card';
 
+  // Eyebrow — creator attribution above the experience-specific
+  // content. The experience is presented by the creator (their work);
+  // Harmonic Wave is the network underneath. Falls back to the
+  // platform name when no creator is attached (rare — production
+  // wires always have profile_name for attributable experiences).
+  // Resolution order: production wire's `profile_name` (joined from
+  // users.name) → cleaner-fixture `creator_name` alias → experience-
+  // level actor name (rawResponse.actor_name normalized into the actor
+  // view by the schema interpreter). The actor IS the creator-side
+  // attribution when no separate profile_name is wired.
+  const creatorName = experience?.profile_name || experience?.creator_name || actor?.name;
+  const eyebrow = document.createElement('div');
+  eyebrow.className = 'hwes-start-gate__eyebrow';
+  eyebrow.textContent = creatorName || 'Harmonic Wave';
+  card.appendChild(eyebrow);
+
   if (experience?.cover_art_url) {
+    const coverWrap = document.createElement('div');
+    coverWrap.className = 'hwes-start-gate__cover-wrap';
+    const coverHalo = document.createElement('div');
+    coverHalo.className = 'hwes-start-gate__cover-halo';
+    coverWrap.appendChild(coverHalo);
     const img = document.createElement('img');
     img.className = 'hwes-start-gate__cover';
     img.src = experience.cover_art_url;
     img.alt = '';
     img.crossOrigin = 'anonymous';
     img.draggable = false;
-    card.appendChild(img);
+    coverWrap.appendChild(img);
+    card.appendChild(coverWrap);
   }
 
   if (experience?.name) {
@@ -103,11 +163,11 @@ export function createStartGate(opts) {
   button.setAttribute('autofocus', '');
   card.appendChild(button);
 
-  const credit = document.createElement('div');
-  credit.className = 'hwes-start-gate__credit';
-  const creatorName = experience?.profile_name || experience?.creator_name;
-  credit.textContent = creatorName ? `by ${creatorName}` : 'presented by Harmonic Wave';
-  card.appendChild(credit);
+  // Subtle hint — keyboard alternative for accessibility + power users.
+  const hint = document.createElement('div');
+  hint.className = 'hwes-start-gate__hint';
+  hint.textContent = 'Press Enter to begin';
+  card.appendChild(hint);
 
   root.appendChild(card);
   mount.appendChild(root);

@@ -67,7 +67,7 @@ export function createBannerAnimatedRenderer(opts) {
     img.style.width = '100%';
     img.style.height = '100%';
     img.style.objectFit = 'cover';
-    img.style.filter = 'blur(40px) brightness(0.4)';
+    img.style.filter = 'blur(12px) brightness(0.65)';
     img.style.opacity = String(initialOpacity);
     img.style.transition = `opacity ${CROSSFADE_DURATION_MS}ms ease-in-out`;
     img.style.transform = 'scale(1)';

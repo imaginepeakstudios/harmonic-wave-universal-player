@@ -113,7 +113,16 @@ export function createAudioRenderer(opts) {
   // audio pipeline reads channel.element and trusts crossOrigin is set.
   audio.crossOrigin = 'anonymous';
   if (behavior.loop) audio.loop = true;
-  if (behavior.autoplay === 'muted') audio.muted = true;
+  // NOTE: behavior.autoplay === 'muted' is intentionally NOT honored on
+  // the audio renderer. That directive comes from display recipes like
+  // `cinematic_fullscreen` + `background_visual` whose intent is to
+  // silence companion VIDEO loops (per their recipe text: "loop the
+  // visual silently as a background while the audio plays"). Muting
+  // the primary audio defeats the purpose of an audio-primary
+  // experience — the listener clicked "Start the Experience" expecting
+  // to HEAR the music. Browser autoplay-policy is satisfied upstream
+  // by the Start Gate's gesture activation, so unmuted .play() on the
+  // first item works without the muted-autoplay fallback.
   // Native controls are hidden — chrome/controls.js renders the
   // play/pause UI. We expose the <audio> element via the channel for
   // Step 9's audio pipeline to wire FFT/gain nodes when they arrive.

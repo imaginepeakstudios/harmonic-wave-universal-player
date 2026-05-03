@@ -92,14 +92,21 @@ describe('renderers/content/audio', () => {
     expect(card.classList.contains('hwes-audio--fullscreen')).toBe(true);
   });
 
-  test('autoplay=muted sets the muted attribute', () => {
+  test('autoplay=muted does NOT mute the audio (primary-content rule)', () => {
+    // The 'muted' autoplay value comes from display recipes
+    // (cinematic_fullscreen, background_visual) whose intent is to
+    // silence companion VIDEO loops. Muting the primary audio of an
+    // audio-primary experience would defeat its purpose — the listener
+    // explicitly clicked Start to HEAR the song. The Start Gate's
+    // gesture activation upstream satisfies browser autoplay policy
+    // for unmuted .play(), so the muted-autoplay fallback is unneeded.
     createAudioRenderer({
       item: { content_title: 'X', media_play_url: 'https://example.com/x.mp3' },
       behavior: mergeBehavior(defaultBehavior(), { autoplay: 'muted' }),
       mount,
     });
     const audio = mount.querySelector('.hwes-audio__element');
-    expect(audio.muted).toBe(true);
+    expect(audio.muted).toBe(false);
   });
 
   test('loop=true sets the loop attribute', () => {

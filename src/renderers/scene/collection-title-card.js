@@ -56,7 +56,7 @@ const FADE_OUT_MS = 800;
  *   narrationPipeline: {
  *     speakForCollection?: (opts: { collection: any, actor?: any }) => Promise<void>,
  *   } | null,
- *   stateMachine?: { isAudioUnlocked: () => boolean } | null,
+ *   stateMachine?: { isAudioUnlocked: () => boolean, requestSkipNarration?: () => void } | null,
  * }} opts
  * @returns {CollectionTitleCard}
  */
@@ -68,12 +68,35 @@ export function createCollectionTitleCard(opts) {
   root.setAttribute('role', 'region');
   root.setAttribute('aria-label', 'Chapter introduction');
 
+  // Banner backdrop — chapter's visual_scene.banner1_url as a full-
+  // bleed image behind the card. Production wire serves a usable proxy
+  // URL on `visual_scene.banner1_url`; collection_cover_art_url is the
+  // older/cleaner-fixture alias. Without this, the chapter card shows
+  // only a flat gradient and the per-chapter visual identity is lost.
+  const bannerUrl =
+    collection?.visual_scene?.banner1_url ??
+    collection?.collection_visual_scene?.banner1_url ??
+    collection?.collection_cover_art_url ??
+    collection?.collection_metadata?.cover_art_url ??
+    null;
+  if (bannerUrl) {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'hwes-collection-card__backdrop';
+    backdrop.style.backgroundImage = `url(${JSON.stringify(bannerUrl)})`;
+    root.appendChild(backdrop);
+    const vignette = document.createElement('div');
+    vignette.className = 'hwes-collection-card__vignette';
+    root.appendChild(vignette);
+  }
+
   const card = document.createElement('div');
   card.className = 'hwes-collection-card__inner';
 
+  // Inline cover thumbnail — only render when we have a true cover-art
+  // URL (not a banner). Bannerless fixtures keep the original tile.
   const coverUrl =
     collection?.collection_cover_art_url ?? collection?.collection_metadata?.cover_art_url ?? null;
-  if (coverUrl) {
+  if (coverUrl && !bannerUrl) {
     const img = document.createElement('img');
     img.className = 'hwes-collection-card__cover';
     img.src = coverUrl;
@@ -106,15 +129,45 @@ export function createCollectionTitleCard(opts) {
   }
 
   root.appendChild(card);
+
+  // Skip button — short-circuits the hold + Tier 2 narration so the
+  // listener can advance to the first child item immediately. Cuts
+  // narration via the state machine's narration:skip event.
+  const skipBtn = document.createElement('button');
+  skipBtn.type = 'button';
+  skipBtn.className = 'hwes-collection-card__skip';
+  skipBtn.textContent = 'Skip Intro';
+  skipBtn.setAttribute('aria-label', 'Skip chapter intro and start playback');
+  root.appendChild(skipBtn);
+
   mount.appendChild(root);
 
   requestAnimationFrame(() => root.classList.add('hwes-collection-card--visible'));
 
   let teardownCalled = false;
+  /** @type {(() => void) | null} */
+  let resolveSkip = null;
+  /** @type {Promise<void>} */
+  const skipPromise = new Promise((resolve) => {
+    resolveSkip = () => resolve();
+  });
+
+  function onSkip() {
+    skipBtn.removeEventListener('click', onSkip);
+    skipBtn.disabled = true;
+    stateMachine?.requestSkipNarration?.();
+    resolveSkip?.();
+    resolveSkip = null;
+  }
+  skipBtn.addEventListener('click', onSkip);
 
   return {
     async play() {
-      await new Promise((r) => setTimeout(r, HOLD_BEFORE_NARRATION_MS));
+      await Promise.race([
+        new Promise((r) => setTimeout(r, HOLD_BEFORE_NARRATION_MS)),
+        skipPromise,
+      ]);
+      if (resolveSkip == null) return; // skipped during hold
       // Tier 2 narration. Once-per-collection gating + markPlayed
       // bookkeeping lives inside speakForCollection — the renderer just
       // calls it and lets the pipeline decide whether to actually voice.

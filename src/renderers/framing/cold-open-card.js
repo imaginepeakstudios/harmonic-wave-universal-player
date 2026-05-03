@@ -62,7 +62,7 @@ const CARD_OPACITY_FADE_IN_MS = 600;
  *     speakForExperience?: (opts: any) => Promise<void>,
  *     speakForItem?: (opts: any) => Promise<void>
  *   } | null,
- *   stateMachine?: { isAudioUnlocked: () => boolean } | null,
+ *   stateMachine?: { isAudioUnlocked: () => boolean, requestSkipNarration?: () => void } | null,
  * }} opts
  * @returns {ColdOpenCard}
  */
@@ -113,18 +113,51 @@ export function createColdOpenCard(opts) {
   card.appendChild(credit);
 
   root.appendChild(card);
+
+  // Skip button — short-circuits the hold + narration so the listener
+  // can advance to media play immediately. Cuts narration via the
+  // state machine's narration:skip event so any in-flight TTS stops
+  // alongside the visual dismissal.
+  const skipBtn = document.createElement('button');
+  skipBtn.type = 'button';
+  skipBtn.className = 'hwes-cold-open__skip';
+  skipBtn.textContent = 'Skip Intro';
+  skipBtn.setAttribute('aria-label', 'Skip cold open and start playback');
+  root.appendChild(skipBtn);
+
   mount.appendChild(root);
 
   // Trigger fade-in on next frame so the initial-state CSS rules take.
   requestAnimationFrame(() => root.classList.add('hwes-cold-open--visible'));
 
   let teardownCalled = false;
+  /** @type {(() => void) | null} */
+  let resolveSkip = null;
+  /** @type {Promise<void>} */
+  const skipPromise = new Promise((resolve) => {
+    resolveSkip = () => resolve();
+  });
+
+  function onSkip() {
+    skipBtn.removeEventListener('click', onSkip);
+    skipBtn.disabled = true;
+    // Cancel any in-flight TTS so audio stops in lockstep with the visual.
+    stateMachine?.requestSkipNarration?.();
+    resolveSkip?.();
+    resolveSkip = null;
+  }
+  skipBtn.addEventListener('click', onSkip);
 
   return {
     async play() {
       // Hold for ~3 seconds before voicing narration so the card has
-      // time to read as "a program about to air."
-      await new Promise((r) => setTimeout(r, HOLD_BEFORE_NARRATION_MS));
+      // time to read as "a program about to air." Race against the
+      // skip promise so a click during the hold short-circuits.
+      await Promise.race([
+        new Promise((r) => setTimeout(r, HOLD_BEFORE_NARRATION_MS)),
+        skipPromise,
+      ]);
+      if (resolveSkip == null) return; // skipped during hold
 
       // Voice the intro_hint via the narration pipeline. Phase 2.4 —
       // route through speakForExperience() (Tier 1 of the four-tier

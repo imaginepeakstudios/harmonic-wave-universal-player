@@ -354,6 +354,7 @@ let activeBumper = null;
       startGate = createStartGate({
         mount: app,
         experience: view.experience,
+        actor: view.actor,
       });
       waitForStart = startGate.waitForStart();
     }
@@ -1310,6 +1311,10 @@ let activeBumper = null;
           try {
             await narration.speakOutro({
               text: outroSeed,
+              audioUrl:
+                /** @type {any} */ (view.experience)?.tts_outro_audio_url ??
+                /** @type {any} */ (view.experience)?.tts_outro_url ??
+                undefined,
               actor: view.actor ?? undefined,
             });
           } catch (err) {
@@ -1351,6 +1356,10 @@ let activeBumper = null;
         try {
           await narration.speakStationIdent({
             text: seed,
+            audioUrl:
+              /** @type {any} */ (view.experience)?.tts_station_ident_audio_url ??
+              /** @type {any} */ (view.experience)?.tts_station_ident_url ??
+              undefined,
             actor: view.actor ?? undefined,
           });
         } catch (err) {

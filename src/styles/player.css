@@ -1013,6 +1013,39 @@ body {
   text-transform: uppercase;
   color: rgba(232, 230, 216, 0.5);
 }
+.hwes-cold-open__skip {
+  position: absolute;
+  bottom: clamp(1.2rem, 3vh, 2rem);
+  right: clamp(1.2rem, 3vw, 2rem);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(232, 230, 216, 0.35);
+  color: rgba(232, 230, 216, 0.9);
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 600ms ease-in-out 800ms, background 160ms, border-color 160ms;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.hwes-cold-open--visible .hwes-cold-open__skip {
+  opacity: 1;
+}
+.hwes-cold-open__skip:hover,
+.hwes-cold-open__skip:focus-visible {
+  background: rgba(0, 0, 0, 0.75);
+  border-color: var(--player-primary, rgba(109, 211, 255, 0.7));
+  outline: none;
+}
+.hwes-cold-open__skip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 @media (prefers-reduced-motion: reduce) {
   .hwes-cold-open {
     transition: none;
@@ -1048,7 +1081,34 @@ body {
 .hwes-collection-card--visible {
   opacity: 1;
 }
+.hwes-collection-card__backdrop {
+  position: absolute;
+  inset: -8%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(10px) brightness(0.55) saturate(1.05);
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 800ms ease-in-out;
+}
+.hwes-collection-card--visible .hwes-collection-card__backdrop {
+  opacity: 1;
+}
+.hwes-collection-card__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(2, 5, 9, 0.2) 0%,
+    rgba(2, 5, 9, 0.55) 60%,
+    rgba(2, 5, 9, 0.82) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
 .hwes-collection-card__inner {
+  position: relative;
+  z-index: 2;
   max-width: min(64vw, 720px);
   text-align: center;
   padding: 2rem;
@@ -1100,6 +1160,39 @@ body {
   max-width: 50ch;
   margin-left: auto;
   margin-right: auto;
+}
+.hwes-collection-card__skip {
+  position: absolute;
+  bottom: clamp(1.2rem, 3vh, 2rem);
+  right: clamp(1.2rem, 3vw, 2rem);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(232, 230, 216, 0.35);
+  color: rgba(232, 230, 216, 0.9);
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 500ms ease-in-out 600ms, background 160ms, border-color 160ms;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.hwes-collection-card--visible .hwes-collection-card__skip {
+  opacity: 1;
+}
+.hwes-collection-card__skip:hover,
+.hwes-collection-card__skip:focus-visible {
+  background: rgba(0, 0, 0, 0.75);
+  border-color: var(--player-primary, rgba(109, 211, 255, 0.7));
+  outline: none;
+}
+.hwes-collection-card__skip:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 @media (prefers-reduced-motion: reduce) {
   .hwes-collection-card {
@@ -1708,6 +1801,32 @@ a.hwes-header-bar__credit:hover {
   opacity: 1;
   color: var(--player-primary);
 }
+.hwes-narration__skip {
+  display: block;
+  margin: 1rem auto 0;
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(232, 230, 216, 0.35);
+  color: rgba(232, 230, 216, 0.85);
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms, color 160ms;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.hwes-narration__skip:hover,
+.hwes-narration__skip:focus-visible {
+  background: rgba(0, 0, 0, 0.75);
+  border-color: var(--player-primary, rgba(109, 211, 255, 0.7));
+  color: var(--player-text, #e8e6d8);
+  outline: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .hwes-narration {
     transition: none;
@@ -1717,10 +1836,14 @@ a.hwes-header-bar__credit:hover {
   }
 }
 
-/* START GATE — pre-Play overlay that captures the user gesture
-   browser autoplay policies require. Sits at z=1100 (above the
-   bumper z=1000, above everything) until the listener clicks
-   "Start the Experience." See src/intro/start-gate.js for lifecycle. */
+/* START GATE — cinematic pre-Play overlay that captures the user
+   gesture browser autoplay policies require. Sits at z=1100 (above
+   the bumper z=1000, above everything) until the listener clicks
+   "Start the Experience." Visual structure (back to front):
+     1. Banner backdrop (blurred, dimmed full-bleed)
+     2. Radial vignette (darkens center)
+     3. Card (eyebrow / cover with halo / title / by / premise / button / hint)
+   See src/intro/start-gate.js for lifecycle. */
 .hwes-start-gate {
   position: fixed;
   inset: 0;
@@ -1733,91 +1856,282 @@ a.hwes-header-bar__credit:hover {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   opacity: 0;
   transition: opacity 600ms ease-in-out;
 }
 .hwes-start-gate--visible {
   opacity: 1;
 }
+
+/* Banner backdrop — experience banner image, blurred + brightness-dimmed.
+   Same cinematic feel as the per-item static-banner scene. Slow drift
+   animation so the still feels alive. */
+.hwes-start-gate__backdrop {
+  position: absolute;
+  inset: -10%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(10px) brightness(0.7) saturate(1.1);
+  opacity: 0;
+  transform: scale(1.05);
+  transition:
+    opacity 1400ms ease-out,
+    transform 14000ms linear;
+  z-index: 0;
+}
+.hwes-start-gate--visible .hwes-start-gate__backdrop {
+  opacity: 1;
+  transform: scale(1.12); /* slow ken-burns drift over 14s */
+}
+
+/* Vignette — soft radial darkening that anchors the card text.
+   Tuned light so the banner image stays visible behind the card. */
+.hwes-start-gate__vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(2, 5, 9, 0.15) 0%,
+    rgba(2, 5, 9, 0.5) 60%,
+    rgba(2, 5, 9, 0.78) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
 .hwes-start-gate__card {
-  max-width: min(72vw, 720px);
+  position: relative;
+  z-index: 2;
+  max-width: min(78vw, 760px);
   text-align: center;
   padding: 2rem;
+  /* Stagger: each child fades up; defined per-child below */
+  --hwes-stagger: 80ms;
+}
+
+/* Eyebrow above cover — small uppercase brand anchor. */
+.hwes-start-gate__eyebrow {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--player-primary, rgba(109, 211, 255, 0.85));
+  margin-bottom: 1.4rem;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 700ms ease-out,
+    transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hwes-start-gate--visible .hwes-start-gate__eyebrow {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0ms;
+}
+
+/* Cover art with pulsing halo. */
+.hwes-start-gate__cover-wrap {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 1.6rem;
+  opacity: 0;
+  transform: translateY(12px) scale(0.96);
+  transition:
+    opacity 900ms ease-out,
+    transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hwes-start-gate--visible .hwes-start-gate__cover-wrap {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-delay: calc(var(--hwes-stagger) * 1);
+}
+.hwes-start-gate__cover-halo {
+  position: absolute;
+  inset: -32px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--player-primary, rgba(109, 211, 255, 0.45)) 0%,
+    transparent 60%
+  );
+  filter: blur(40px);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: hwes-start-gate-halo-pulse 4400ms ease-in-out infinite;
+  z-index: 0;
+}
+@keyframes hwes-start-gate-halo-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.78;
+    transform: scale(1.06);
+  }
 }
 .hwes-start-gate__cover {
-  width: clamp(180px, 28vw, 320px);
+  position: relative;
+  z-index: 1;
+  width: clamp(200px, 30vw, 340px);
   aspect-ratio: 1 / 1;
   object-fit: cover;
   border-radius: 8px;
-  margin-bottom: 1.6rem;
   box-shadow:
-    0 12px 60px rgba(0, 0, 0, 0.7),
-    0 0 80px rgba(109, 211, 255, 0.25);
+    0 16px 70px rgba(0, 0, 0, 0.75),
+    0 0 100px rgba(109, 211, 255, 0.18);
 }
+
 .hwes-start-gate__title {
   font-family: var(--player-font-display, 'Orbitron', sans-serif);
-  font-size: clamp(1.4rem, 3.6vw, 2.2rem);
+  font-size: clamp(1.5rem, 4.2vw, 2.8rem);
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
-  margin: 0 0 1rem 0;
+  margin: 0 0 0.5rem 0;
   color: var(--player-text, #e8e6d8);
   text-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.8),
-    0 0 30px var(--player-primary, rgba(109, 211, 255, 0.5));
+    0 3px 10px rgba(0, 0, 0, 0.85),
+    0 0 36px var(--player-primary, rgba(109, 211, 255, 0.55));
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 800ms ease-out,
+    transform 800ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-.hwes-start-gate__premise {
-  font-family: var(--player-font-body, 'Rajdhani', sans-serif);
-  font-size: clamp(0.95rem, 1.7vw, 1.1rem);
-  font-weight: 300;
-  line-height: 1.45;
-  color: rgba(232, 230, 216, 0.85);
-  margin: 0 auto 1.6rem auto;
-  max-width: 50ch;
+.hwes-start-gate--visible .hwes-start-gate__title {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: calc(var(--hwes-stagger) * 2);
 }
-.hwes-start-gate__button {
+
+.hwes-start-gate__by {
   font-family: var(--player-font-display, 'Orbitron', sans-serif);
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: 0.78rem;
+  font-weight: 500;
   letter-spacing: 0.34em;
   text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.6);
+  margin-bottom: 1.4rem;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 700ms ease-out,
+    transform 700ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hwes-start-gate--visible .hwes-start-gate__by {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: calc(var(--hwes-stagger) * 3);
+}
+
+.hwes-start-gate__premise {
+  font-family: var(--player-font-body, 'Rajdhani', sans-serif);
+  font-size: clamp(1rem, 1.85vw, 1.2rem);
+  font-weight: 300;
+  line-height: 1.5;
+  color: rgba(232, 230, 216, 0.88);
+  margin: 0 auto 2rem auto;
+  max-width: 56ch;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 800ms ease-out,
+    transform 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hwes-start-gate--visible .hwes-start-gate__premise {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: calc(var(--hwes-stagger) * 4);
+}
+
+.hwes-start-gate__button {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: clamp(0.7rem, 2.4vw, 0.82rem);
+  font-weight: 700;
+  letter-spacing: clamp(0.18em, 1.4vw, 0.36em);
+  text-transform: uppercase;
+  white-space: nowrap;
   color: var(--player-text, #e8e6d8);
-  background: transparent;
+  background: rgba(109, 211, 255, 0.04);
   border: 1px solid var(--player-primary, rgba(109, 211, 255, 0.7));
   border-radius: 40px;
-  padding: 14px 32px;
+  padding: clamp(12px, 3.2vw, 16px) clamp(20px, 5vw, 36px);
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(8px);
   transition:
+    opacity 800ms ease-out,
+    transform 800ms cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 240ms ease,
-    transform 240ms ease,
     background 240ms ease;
-  box-shadow: 0 0 24px rgba(109, 211, 255, 0.18);
+  box-shadow: 0 0 30px rgba(109, 211, 255, 0.22);
+  animation: hwes-start-gate-btn-glow 3200ms ease-in-out infinite;
+  animation-delay: 1200ms;
+}
+.hwes-start-gate--visible .hwes-start-gate__button {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: calc(var(--hwes-stagger) * 5);
+}
+@keyframes hwes-start-gate-btn-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 30px rgba(109, 211, 255, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 50px rgba(109, 211, 255, 0.42);
+  }
 }
 .hwes-start-gate__button:hover,
 .hwes-start-gate__button:focus-visible {
-  background: rgba(109, 211, 255, 0.06);
-  box-shadow: 0 0 40px rgba(109, 211, 255, 0.45);
+  background: rgba(109, 211, 255, 0.1);
+  box-shadow: 0 0 60px rgba(109, 211, 255, 0.55);
   transform: translateY(-1px);
   outline: none;
+  animation-play-state: paused;
 }
 .hwes-start-gate__button:active {
   transform: translateY(0);
-  box-shadow: 0 0 24px rgba(109, 211, 255, 0.3);
+  box-shadow: 0 0 32px rgba(109, 211, 255, 0.4);
 }
-.hwes-start-gate__credit {
-  margin-top: 1.2rem;
+
+.hwes-start-gate__hint {
+  margin-top: 1rem;
   font-family: var(--player-font-display, 'Orbitron', sans-serif);
-  font-size: 0.7rem;
-  letter-spacing: 0.3em;
+  font-size: 0.62rem;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  color: rgba(232, 230, 216, 0.45);
+  color: rgba(232, 230, 216, 0.35);
+  opacity: 0;
+  transition: opacity 800ms ease-out;
 }
+.hwes-start-gate--visible .hwes-start-gate__hint {
+  opacity: 1;
+  transition-delay: calc(var(--hwes-stagger) * 6);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .hwes-start-gate {
+  .hwes-start-gate,
+  .hwes-start-gate__backdrop,
+  .hwes-start-gate__eyebrow,
+  .hwes-start-gate__cover-wrap,
+  .hwes-start-gate__title,
+  .hwes-start-gate__by,
+  .hwes-start-gate__premise,
+  .hwes-start-gate__button,
+  .hwes-start-gate__hint {
     transition: none;
+    transform: none;
   }
+  .hwes-start-gate__cover-halo,
   .hwes-start-gate__button {
-    transition: none;
+    animation: none;
   }
 }
 

@@ -57,18 +57,34 @@ const OVERLAY_FADE_MS = 400;
 const PAUSE_AFTER_NARRATION_DEFAULT_S = 0;
 
 /**
+ * Return the first non-empty string in `candidates`, or undefined.
+ * Used by the four-tier speak* methods to pick a pre-rendered TTS
+ * audio URL across the field-name variants the platform may write
+ * (`tts_intro_url`, `tts_intro_audio_url`, nested under metadata, etc.).
+ *
+ * @param {Array<unknown>} candidates
+ * @returns {string | undefined}
+ */
+function firstNonEmpty(candidates) {
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.length > 0) return c;
+  }
+  return undefined;
+}
+
+/**
  * @typedef {object} NarrationPipeline
  * @property {(opts: SpeakItemOpts) => Promise<void>} speakForItem
  * @property {(opts: { experience: any, actor?: any }) => Promise<void>} speakForExperience
  *   Phase 2.4 — Tier 1 of the four-tier hierarchy.
  * @property {(opts: { collection: any, actor?: any }) => Promise<void>} speakForCollection
  *   Phase 2.4 — Tier 2.
- * @property {(opts: { text: string, actor?: any }) => Promise<void>} speakBoundaryAnnounce
+ * @property {(opts: { text: string, audioUrl?: string, actor?: any }) => Promise<void>} speakBoundaryAnnounce
  *   Phase 2.4 — Tier 4 (preconditioned on Tier 2 having fired).
- * @property {(opts: { text: string, actor?: any }) => Promise<void>} speakStationIdent
+ * @property {(opts: { text: string, audioUrl?: string, actor?: any }) => Promise<void>} speakStationIdent
  *   Station-ident bumper voiceover (broadcast_station_ident framing).
  *   Caller passes the line text (seed or fallback); pipeline voices it.
- * @property {(opts: { text: string, actor?: any }) => Promise<void>} speakOutro
+ * @property {(opts: { text: string, audioUrl?: string, actor?: any }) => Promise<void>} speakOutro
  *   Sign-off voiceover (closing: 'sign_off'). Fires on experience:ended
  *   alongside the completion card mount.
  * @property {(kind: 'experience' | 'collection' | 'content' | 'boundary', id?: string) => boolean} willPlayDJ
@@ -222,6 +238,20 @@ export function createNarrationPipeline(opts) {
     root.className = 'hwes-narration';
     root.setAttribute('role', 'status');
     root.setAttribute('aria-live', 'polite');
+
+    // Skip button — visible affordance for the keyboard 'N' shortcut.
+    // Discoverable for touch + mouse users who don't know the shortcut.
+    // Pointer-events restored on the button itself (the overlay root is
+    // pointer-events:none so it doesn't intercept content interactions).
+    const skipBtn = document.createElement('button');
+    skipBtn.type = 'button';
+    skipBtn.className = 'hwes-narration__skip';
+    skipBtn.textContent = 'Skip';
+    skipBtn.setAttribute('aria-label', 'Skip narration');
+    skipBtn.addEventListener('click', () => {
+      stateMachine.requestSkipNarration();
+    });
+    root.appendChild(skipBtn);
 
     const inner = document.createElement('div');
     inner.className = 'hwes-narration__text';
@@ -408,8 +438,17 @@ export function createNarrationPipeline(opts) {
         markPlayed('experience', undefined);
         return;
       }
+      // Pick up pre-rendered audio when the platform attaches it.
+      // Field-name matrix mirrors resolveNarrationAudioUrl below.
+      const audioUrl =
+        firstNonEmpty([
+          experience?.tts_intro_audio_url,
+          experience?.tts_intro_url,
+          experience?.content_metadata?.tts_intro_audio_url,
+          experience?.content_metadata?.tts_intro_url,
+        ]) || undefined;
       try {
-        await speakCore({ text, actor });
+        await speakCore({ text, audioUrl, actor });
       } finally {
         markPlayed('experience', undefined);
       }
@@ -434,8 +473,15 @@ export function createNarrationPipeline(opts) {
         markPlayed('collection', collId);
         return;
       }
+      const audioUrl =
+        firstNonEmpty([
+          collection?.tts_intro_audio_url,
+          collection?.tts_intro_url,
+          collection?.collection_metadata?.tts_intro_audio_url,
+          collection?.collection_metadata?.tts_intro_url,
+        ]) || undefined;
       try {
-        await speakCore({ text, actor });
+        await speakCore({ text, audioUrl, actor });
       } finally {
         markPlayed('collection', collId);
       }
@@ -447,17 +493,17 @@ export function createNarrationPipeline(opts) {
      * collection traversal. Reference player example:
      *   "That was Chapter One. Up next are released songs from upcoming chapters."
      *
-     * @param {{ text: string, actor?: any }} opts
+     * @param {{ text: string, audioUrl?: string, actor?: any }} opts
      * @returns {Promise<void>}
      */
-    async speakBoundaryAnnounce({ text, actor }) {
+    async speakBoundaryAnnounce({ text, audioUrl, actor }) {
       if (!willPlayDJ('boundary', undefined)) return;
       if (typeof text !== 'string' || text.trim().length === 0) {
         markPlayed('boundary', undefined);
         return;
       }
       try {
-        await speakCore({ text, actor });
+        await speakCore({ text, audioUrl, actor });
       } finally {
         markPlayed('boundary', undefined);
       }
@@ -476,12 +522,12 @@ export function createNarrationPipeline(opts) {
      * If station_ident is null, fall back to a generic ident composed
      * from `experience.name` ('This is [name].')."
      *
-     * @param {{ text: string, actor?: any }} opts
+     * @param {{ text: string, audioUrl?: string, actor?: any }} opts
      * @returns {Promise<void>}
      */
-    async speakStationIdent({ text, actor }) {
+    async speakStationIdent({ text, audioUrl, actor }) {
       if (typeof text !== 'string' || text.trim().length === 0) return;
-      await speakCore({ text, actor });
+      await speakCore({ text, audioUrl, actor });
     },
     /**
      * Sign-off voiceover — fires on `experience:ended` when
@@ -496,12 +542,12 @@ export function createNarrationPipeline(opts) {
      * the seed (or fallback) directly to speakCore — closer to verbatim
      * than the LLM path, but voiced in the actor's narrative voice.
      *
-     * @param {{ text: string, actor?: any }} opts
+     * @param {{ text: string, audioUrl?: string, actor?: any }} opts
      * @returns {Promise<void>}
      */
-    async speakOutro({ text, actor }) {
+    async speakOutro({ text, audioUrl, actor }) {
       if (typeof text !== 'string' || text.trim().length === 0) return;
-      await speakCore({ text, actor });
+      await speakCore({ text, audioUrl, actor });
     },
     async speakForItem(speakOpts) {
       const { item, behavior, actor, phase } = speakOpts;
