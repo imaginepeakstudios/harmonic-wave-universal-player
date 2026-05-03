@@ -76,6 +76,7 @@ import { createKeyboardInteractions } from './interactions/keyboard.js';
 import { createGestureInteractions } from './interactions/gestures.js';
 import { createSingleAudioGuard } from './interactions/single-audio-guard.js';
 import { createNetworkBumper } from './intro/network-bumper.js';
+import { createStartGate } from './intro/start-gate.js';
 import { createNarrationPipeline } from './composition/narration-pipeline.js';
 import { createColdOpenCard } from './renderers/framing/cold-open-card.js';
 import { createCollectionTitleCard } from './renderers/scene/collection-title-card.js';
@@ -312,34 +313,50 @@ let activeBumper = null;
     // boot. Active for the lifetime of the experience; torn down by
     // teardownActive below.
     const silentKeepalive = createSilentKeepalive();
+
+    // Gesture entry point — two patterns:
+    //
+    //   1. **Host-handled** (set `window.__HWES_AUTOSTART_VIA_HOST = true`
+    //      BEFORE this script runs): the embedding host (e.g. the
+    //      harmonic-wave-api-platform's landing page at /experience/:slug
+    //      or /preview/:id) has its own Play button + creator branding.
+    //      That button captures the gesture; the host then calls the
+    //      `window.__HWES_BEGIN()` function we expose below from inside
+    //      its click handler. Synchronous dispatch keeps the gesture
+    //      activation in scope for every downstream media .play() and
+    //      speechSynthesis.speak() call. The universal player shows NO
+    //      Start Gate of its own — the host owns that affordance.
+    //
+    //   2. **Self-gated** (default): no host-injected flag → universal
+    //      player shows its own Start Gate (cover + title + premise +
+    //      "Start the Experience" pill button). Click is the gesture
+    //      entry. Used by anonymous direct-loads, dev fixtures, embeds
+    //      without a host wrapper.
+    //
+    // Either way, downstream code awaits `waitForStart` — boot doesn't
+    // care which pattern fired.
+    const hostHandlesGesture = globalThis.__HWES_AUTOSTART_VIA_HOST === true;
     /** @type {Promise<void>} */
-    const bumperDone = (async () => {
-      if (!bumperEnabled) {
-        // Even when bumper is suppressed, still start the keepalive so
-        // any later Web Audio output (cold-open card narration's
-        // music-bed duck, item-level music bed) can audibly play on
-        // muted iPhones.
-        silentKeepalive.start().catch(() => {});
-        return;
-      }
-      bumperPipeline.ensureAudioContext?.();
-      // Start keepalive BEFORE the bumper so the audio session category
-      // is set BEFORE the SFX schedules its first oscillator. iOS picks
-      // the session category lazily on first audio output; sequencing
-      // here avoids the category lock from happening on the bumper SFX
-      // (which would lock to AmbientSound and kill the SFX silently).
-      silentKeepalive.start().catch(() => {});
-      activeBumper = createNetworkBumper({ mount: app, audioPipeline: bumperPipeline });
-      // FE-arch P1-5 — toggle `body.hwes-cinematic` so chrome (header,
-      // chapter bar, drawer toggles, show-ident) fades out during the
-      // bumper. CSS handles the visual; JS owns the state.
-      document.body?.classList?.add('hwes-cinematic');
-      try {
-        await activeBumper.play();
-      } finally {
-        document.body?.classList?.remove('hwes-cinematic');
-      }
-    })();
+    let waitForStart;
+    /** @type {ReturnType<typeof createStartGate> | null} */
+    let startGate = null;
+    if (hostHandlesGesture) {
+      // Expose the begin function. Host calls it from its click handler.
+      // Resolves the waitForStart promise inside that gesture window.
+      waitForStart = new Promise((resolve) => {
+        /** @type {any} */ (globalThis).__HWES_BEGIN = () => {
+          // One-shot — clear the global so a second click is a no-op.
+          /** @type {any} */ (globalThis).__HWES_BEGIN = () => {};
+          resolve(undefined);
+        };
+      });
+    } else {
+      startGate = createStartGate({
+        mount: app,
+        experience: view.experience,
+      });
+      waitForStart = startGate.waitForStart();
+    }
 
     injectTheme(view.experience?.player_theme);
 
@@ -380,6 +397,51 @@ let activeBumper = null;
     // Reuse the pipeline we already created for the bumper so the
     // AudioContext (if it got created) carries over to the experience.
     const audioPipeline = bumperPipeline;
+
+    // bumperDone IIFE — gates everything behind the start-gate click.
+    // Lives here (after stateMachine is declared) because its handler
+    // calls stateMachine.unlockAudio() inside the gesture window. The
+    // click flow: Start → unlock SM → start silent-keepalive → bumper
+    // visual + SFX → resolve. Boot awaits this promise downstream
+    // (see `await bumperDone`) before mounting chrome bars + items.
+    /** @type {Promise<void>} */
+    const bumperDone = (async () => {
+      // Block until the gesture entry point fires (own Start Gate
+      // click OR host-injected __HWES_BEGIN() call). Everything below
+      // this line runs INSIDE the user-gesture activation window,
+      // which is what allows media .play() and speechSynthesis to work.
+      await waitForStart;
+
+      // Unlock the state machine immediately so any item:started emits
+      // work. Synchronous + first thing post-gesture so subsequent
+      // async work doesn't drift outside the activation window.
+      stateMachine.unlockAudio();
+
+      // Start the silent-keepalive in the gesture window (iOS audio
+      // session category is set on first output, so this primes the
+      // session as Playback before any other media runs).
+      silentKeepalive.start().catch(() => {});
+
+      // Tear down our own Start Gate if we created one. Host-mode
+      // skips this — the host owns its own landing-page chrome and
+      // is responsible for revealing the player when the user clicks.
+      startGate?.teardown();
+
+      if (!bumperEnabled) {
+        return;
+      }
+      bumperPipeline.ensureAudioContext?.();
+      activeBumper = createNetworkBumper({ mount: app, audioPipeline: bumperPipeline });
+      // FE-arch P1-5 — toggle `body.hwes-cinematic` so chrome (header,
+      // chapter bar, drawer toggles, show-ident) fades out during the
+      // bumper. CSS handles the visual; JS owns the state.
+      document.body?.classList?.add('hwes-cinematic');
+      try {
+        await activeBumper.play();
+      } finally {
+        document.body?.classList?.remove('hwes-cinematic');
+      }
+    })();
 
     // Layer-set handle is just an inline-shape object: { wrap, renderer,
     // shell, aux, teardown, behavior }. Each item in the experience gets
@@ -616,8 +678,23 @@ let activeBumper = null;
         shell.root.style.zIndex = '1';
       }
 
-      const factory = RENDERERS[contentLayer?.renderer ?? 'unsupported'] ?? RENDERERS.unsupported;
-      const renderer = factory({ item, behavior, mount: contentMount });
+      // Content layer is optional — collection-references explicitly
+      // suppress it (the segment-title-card path owns their visual).
+      // When `contentLayer` is undefined, skip the renderer entirely
+      // rather than falling through to the 'unsupported' placeholder
+      // (which renders an "Untitled / Renderer for content type unknown
+      // lands in Step 6" dev card under the chrome shell — visible
+      // pre-Play during the bootstrap mount). The chrome shell still
+      // mounts above (provides the Play button); audio routing,
+      // analyser wiring, and renderer.done are all gated on `renderer`
+      // being non-null below.
+      const renderer = contentLayer
+        ? (RENDERERS[contentLayer.renderer] ?? RENDERERS.unsupported)({
+            item,
+            behavior,
+            mount: contentMount,
+          })
+        : null;
 
       // STEP 9 audio routing: if the renderer carries a media element
       // (audio/video kinds), route it through the audio pipeline so
@@ -705,7 +782,11 @@ let activeBumper = null;
       // moved, this done belongs to a stale item that's already been
       // torn down (renderer.teardown calls resolveDone) — discard.
       const counterAtMount = stateMachine.getAdvanceCounter();
-      renderer.done
+      // renderer is null when no content layer is in the plan (e.g.,
+      // collection-references). No `done` to wait on — auto-advance
+      // for these items is owned by the segment-title-card path that
+      // calls stateMachine.next() after its play/teardown cycle.
+      renderer?.done
         ?.then(() => {
           if (stateMachine.getAdvanceCounter() !== counterAtMount) return;
           if (activeIndex !== index) return;
@@ -756,7 +837,7 @@ let activeBumper = null;
           amplitudeProvider?.dispose();
           // Detach the audio pipeline routing for this item.
           if (mediaElement) audioPipeline.detachContent(mediaElement);
-          renderer.teardown();
+          renderer?.teardown();
           shell?.teardown();
           for (const a of aux) {
             try {
@@ -842,8 +923,28 @@ let activeBumper = null;
       // content. The item:started subscriber schedules renderer.start()
       // at ~40% of estimated narration duration so the song fades up
       // under the DJ's voice. Mobile path remains sequential.
+      // Auto-play once the experience is in motion. Two conditions:
+      //
+      //   1. Audio is unlocked — listener already opted into playback
+      //      (clicked Play, or desktop autoplay grant fired at boot).
+      //      Without this gate, mounting item 0 pre-gesture would
+      //      attempt audio.play() and get NotAllowedError on iOS.
+      //
+      //   2. Either behavior says so (autoplay !== 'off') OR we're
+      //      inside a broadcast-style framing. Spec primitive default
+      //      for autoplay is 'off' — the safe default for a single-item
+      //      embed where the listener decides when to start. But for
+      //      broadcast_show / broadcast_station_ident framings, the
+      //      framing recipe's "auto-advance" semantics imply each item
+      //      starts itself; the bumper / cold-open IS the gesture entry,
+      //      and listeners expect the show to roll without per-item
+      //      Play clicks. Treat `framing.page_shell === 'broadcast'`
+      //      as a force-autoplay signal.
+      const broadcastFlow = framing.page_shell === 'broadcast';
+      const wantsAutoplay = newSet.behavior.autoplay !== 'off' || broadcastFlow;
       if (
-        newSet.behavior.autoplay !== 'off' &&
+        wantsAutoplay &&
+        stateMachine.isAudioUnlocked() &&
         audioPipeline.supportsConcurrentSources &&
         !isNarrationInFlight()
       ) {
@@ -1323,6 +1424,19 @@ let activeBumper = null;
       lastMountedIndex = 0;
       mountItem(0);
     }
+
+    // No programmatic auto-unlock here. AudioContext.resume() can
+    // sometimes succeed without a gesture, but Chrome's media autoplay
+    // policy ALSO blocks any HTMLMediaElement.play() that isn't inside
+    // a user-gesture handler — so calling unlockAudio() pre-gesture
+    // makes the SM think it can roll the experience while every
+    // subsequent .play() silently fails with NotAllowedError. The
+    // chrome Play button click is the load-bearing gesture entry; in
+    // production the listener lands here from a /run/:token redirect
+    // whose preceding landing-page click counts as gesture activation,
+    // and mobile path remains explicit. Either way, doPlay() fires
+    // FROM the click handler synchronously, which keeps the activation
+    // window valid for the audio element's first .play().
 
     // Console banner: confirms the engine + composition + renderers
     // wired up cleanly. Useful for the README's "Open and you should

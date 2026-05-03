@@ -305,32 +305,52 @@ export function createNarrationPipeline(opts) {
     let wasSkipped = false;
     /** @type {(skipFlag?: any) => void} */
     let localResolver = () => {};
+    /** @type {ReturnType<typeof setTimeout> | null} */
+    let stallTimer = null;
     try {
       await new Promise((resolve) => {
         localResolver = (skipFlag) => {
           if (skipFlag === true) wasSkipped = true;
           resolve(undefined);
         };
-        // If another speakCore is in flight, cancel it. Its in-flight
-        // bridge.speak() promise will reject/resolve and try to clear
-        // activeSkipResolver — the token-equality check below ensures
-        // it only clears if still own, so we don't lose our own resolver.
         if (activeSkipResolver !== null) {
           const prior = activeSkipResolver;
           activeSkipResolver = null;
           try {
-            prior(true); // resolve prior as skipped
+            prior(true);
           } catch {
             /* defensive */
           }
         }
         activeSkipResolver = localResolver;
+        // Safety-valve timeout — Chrome's speechSynthesis sometimes
+        // stalls silently (voices-not-loaded race, paged-out tab, audio
+        // session contention). bridge.speak() never resolves, so the
+        // awaiting state machine (segment title cards, cold-open card,
+        // boundary announce, per-item intros) hangs the entire
+        // experience. Give TTS a bounded budget proportional to the
+        // text length (2 wps lower bound + 5s headroom), capped at 60s,
+        // then resolve as if the speech finished naturally so the
+        // experience advances. Per "do no harm" rule: this never fires
+        // for healthy TTS — the bridge resolves first.
+        const wordCount = text.split(/\s+/).filter(Boolean).length || 1;
+        const stallTimeoutMs = Math.min(60_000, (wordCount / 2) * 1000 + 5_000);
+        stallTimer = setTimeout(() => {
+          if (activeSkipResolver === localResolver) activeSkipResolver = null;
+          // eslint-disable-next-line no-console
+          console.warn(`[hwes/narration] tts stalled past ${stallTimeoutMs}ms budget; advancing`);
+          // Cancel any queued utterances on Chrome so we don't get a
+          // belated speech firing AFTER the next item has mounted.
+          try {
+            globalThis.speechSynthesis?.cancel();
+          } catch {
+            /* defensive */
+          }
+          resolve(undefined);
+        }, stallTimeoutMs);
         bridge
           .speak({ text, audioUrl, voiceName, rate: 0.95 })
           .then(() => {
-            // FE-arch P1-1 — only clear if we still own the slot. A
-            // later speakCore may have replaced our resolver; clearing
-            // unconditionally would clobber its.
             if (activeSkipResolver === localResolver) activeSkipResolver = null;
             resolve(undefined);
           })
@@ -342,6 +362,7 @@ export function createNarrationPipeline(opts) {
           });
       });
     } finally {
+      if (stallTimer != null) clearTimeout(stallTimer);
       unsubBoundary();
       overlay.teardown();
       const pauseSec = core.pauseAfterSec ?? 0;

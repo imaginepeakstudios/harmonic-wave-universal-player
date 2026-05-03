@@ -39,6 +39,31 @@
  */
 
 /**
+ * Resolve the visual_scene object for an item, looking at the three
+ * places it can live in the production wire shape:
+ *
+ *   1. `item.content_metadata.visual_scene` — legacy nesting (where
+ *      the engine first looked; preserved for compat).
+ *   2. `item.visual_scene` — top-level. Production wire emits this
+ *      for both content items AND collection-refs (the latter have
+ *      no `content_metadata` at all).
+ *   3. `item.collection_visual_scene` — collection-ref alternate
+ *      field name; mirrors `visual_scene` for chapter wrappers.
+ *
+ * Returns the first non-null match, or undefined. The shape is
+ * `{ banner1_url, banner2_url, color_palette, background, ... }` —
+ * caller reads only the fields it needs.
+ *
+ * @param {any} item
+ * @returns {{ banner1_url?: string, banner2_url?: string, color_palette?: string, background?: string } | undefined}
+ */
+function pickVisualScene(item) {
+  return (
+    item?.content_metadata?.visual_scene ?? item?.visual_scene ?? item?.collection_visual_scene
+  );
+}
+
+/**
  * Pick the renderer to use for the item's content layer based on its
  * content_type_slug. Unknown types fall through to a placeholder
  * (rendered as a "unsupported content" card by boot.js so the
@@ -135,10 +160,15 @@ export const LAYER_RULES = [
       // alt_cover_art_2_url) OR (banner1_url + banner2_url). Per skill
       // 1.5.0 / decision #4 — alt_cover variants are the first-party
       // chain; banner_* is legacy/fallback.
+      //
+      // Phase 5 sweep — visual_scene can live at three places per the
+      // production wire shape: item.content_metadata.visual_scene
+      // (legacy nesting), item.visual_scene (top-level on content +
+      // collection-refs), and item.collection_visual_scene (collection-
+      // ref alternate field). All three are checked so chapter wrappers
+      // and top-level-visual_scene items both render their banner.
       const i = /** @type {any} */ (item);
-      const vs = /** @type {{ banner1_url?: string, banner2_url?: string }} */ (
-        i?.content_metadata?.visual_scene
-      );
+      const vs = pickVisualScene(i);
       const altPair = !!(i?.alt_cover_art_1_url && i?.alt_cover_art_2_url);
       const bannerPair = !!(vs && vs.banner1_url && vs.banner2_url);
       return altPair || bannerPair;
@@ -149,9 +179,7 @@ export const LAYER_RULES = [
     renderer: 'banner-static',
     when: (item, _behavior) => {
       const i = /** @type {any} */ (item);
-      const vs = /** @type {{ banner1_url?: string, banner2_url?: string }} */ (
-        i?.content_metadata?.visual_scene
-      );
+      const vs = pickVisualScene(i);
       // Activate banner-static as the FALLBACK when banner-animated
       // doesn't activate — i.e., when we have ONLY ONE of either pair.
       // Phase 0c: check that banner-animated's predicate is false AND

@@ -1717,6 +1717,110 @@ a.hwes-header-bar__credit:hover {
   }
 }
 
+/* START GATE — pre-Play overlay that captures the user gesture
+   browser autoplay policies require. Sits at z=1100 (above the
+   bumper z=1000, above everything) until the listener clicks
+   "Start the Experience." See src/intro/start-gate.js for lifecycle. */
+.hwes-start-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(13, 21, 32, 0.96) 0%,
+    rgba(2, 5, 9, 1) 100%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 600ms ease-in-out;
+}
+.hwes-start-gate--visible {
+  opacity: 1;
+}
+.hwes-start-gate__card {
+  max-width: min(72vw, 720px);
+  text-align: center;
+  padding: 2rem;
+}
+.hwes-start-gate__cover {
+  width: clamp(180px, 28vw, 320px);
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 1.6rem;
+  box-shadow:
+    0 12px 60px rgba(0, 0, 0, 0.7),
+    0 0 80px rgba(109, 211, 255, 0.25);
+}
+.hwes-start-gate__title {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: clamp(1.4rem, 3.6vw, 2.2rem);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin: 0 0 1rem 0;
+  color: var(--player-text, #e8e6d8);
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.8),
+    0 0 30px var(--player-primary, rgba(109, 211, 255, 0.5));
+}
+.hwes-start-gate__premise {
+  font-family: var(--player-font-body, 'Rajdhani', sans-serif);
+  font-size: clamp(0.95rem, 1.7vw, 1.1rem);
+  font-weight: 300;
+  line-height: 1.45;
+  color: rgba(232, 230, 216, 0.85);
+  margin: 0 auto 1.6rem auto;
+  max-width: 50ch;
+}
+.hwes-start-gate__button {
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--player-text, #e8e6d8);
+  background: transparent;
+  border: 1px solid var(--player-primary, rgba(109, 211, 255, 0.7));
+  border-radius: 40px;
+  padding: 14px 32px;
+  cursor: pointer;
+  transition:
+    box-shadow 240ms ease,
+    transform 240ms ease,
+    background 240ms ease;
+  box-shadow: 0 0 24px rgba(109, 211, 255, 0.18);
+}
+.hwes-start-gate__button:hover,
+.hwes-start-gate__button:focus-visible {
+  background: rgba(109, 211, 255, 0.06);
+  box-shadow: 0 0 40px rgba(109, 211, 255, 0.45);
+  transform: translateY(-1px);
+  outline: none;
+}
+.hwes-start-gate__button:active {
+  transform: translateY(0);
+  box-shadow: 0 0 24px rgba(109, 211, 255, 0.3);
+}
+.hwes-start-gate__credit {
+  margin-top: 1.2rem;
+  font-family: var(--player-font-display, 'Orbitron', sans-serif);
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(232, 230, 216, 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hwes-start-gate {
+    transition: none;
+  }
+  .hwes-start-gate__button {
+    transition: none;
+  }
+}
+
 /* NETWORK STATION ID BUMPER — Step 10. Plays before any
    experience. The HW wordmark + a synthesized digital-wave SFX
    (network-bumper-sfx.js). Reinforces the broadcast-TV-program

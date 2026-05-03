@@ -73,37 +73,67 @@ export function createChromeBars(opts) {
     });
   }
 
-  const playlistDrawer = createPlaylistDrawer({
-    mount,
-    view,
-    onJumpTo: (index) => stateMachine.seek(index),
-  });
-  const playlistToggleBtn = document.createElement('button');
-  playlistToggleBtn.type = 'button';
-  playlistToggleBtn.className = 'hwes-drawer-toggle hwes-drawer-toggle--playlist';
-  playlistToggleBtn.setAttribute('aria-label', 'Open playlist');
-  playlistToggleBtn.setAttribute('data-hwes-drawer-toggle', 'playlist');
-  playlistToggleBtn.textContent = 'Playlist';
-  const onPlaylistToggle = () => playlistDrawer.toggle();
-  playlistToggleBtn.addEventListener('click', onPlaylistToggle);
-  mount.appendChild(playlistToggleBtn);
+  // Playlist drawer + toggle — universal across any multi-item
+  // experience (podcasts, lecture series, photo galleries, music
+  // albums). Suppressed for single-item experiences where the
+  // affordance has nothing to navigate to. Driven by traversal
+  // length so collection-refs that expand into multiple children
+  // count correctly.
+  const traversalLength = stateMachine.getTraversalLength?.() ?? view.items.length;
+  const showPlaylist = traversalLength > 1;
+  /** @type {ReturnType<typeof createPlaylistDrawer> | null} */
+  let playlistDrawer = null;
+  /** @type {HTMLButtonElement | null} */
+  let playlistToggleBtn = null;
+  /** @type {(() => void) | null} */
+  let onPlaylistToggle = null;
+  if (showPlaylist) {
+    playlistDrawer = createPlaylistDrawer({
+      mount,
+      view,
+      onJumpTo: (index) => stateMachine.seek(index),
+    });
+    playlistToggleBtn = document.createElement('button');
+    playlistToggleBtn.type = 'button';
+    playlistToggleBtn.className = 'hwes-drawer-toggle hwes-drawer-toggle--playlist';
+    playlistToggleBtn.setAttribute('aria-label', 'Open playlist');
+    playlistToggleBtn.setAttribute('data-hwes-drawer-toggle', 'playlist');
+    playlistToggleBtn.textContent = 'Playlist';
+    onPlaylistToggle = () => playlistDrawer?.toggle();
+    playlistToggleBtn.addEventListener('click', onPlaylistToggle);
+    mount.appendChild(playlistToggleBtn);
+  }
 
-  const lyricsPanel = createLyricsPanel({ mount });
-  const lyricsToggleBtn = document.createElement('button');
-  lyricsToggleBtn.type = 'button';
-  lyricsToggleBtn.className = 'hwes-drawer-toggle hwes-drawer-toggle--lyrics';
-  lyricsToggleBtn.setAttribute('aria-label', 'Open lyrics and story');
-  lyricsToggleBtn.setAttribute('data-hwes-drawer-toggle', 'lyrics');
-  lyricsToggleBtn.textContent = 'Lyrics';
-  const onLyricsToggle = () => lyricsPanel.toggle();
-  lyricsToggleBtn.addEventListener('click', onLyricsToggle);
-  mount.appendChild(lyricsToggleBtn);
+  // Story / Lyrics side panel — gated by whether ANY item in the
+  // experience has story or lyric content. Skips on experiences with
+  // pure media items (no metadata narrative to surface) so the chrome
+  // stays minimal. Detection scans both content-ref items and nested
+  // collection_content[] children.
+  const hasStoryOrLyrics = experienceHasStoryOrLyrics(view);
+  /** @type {ReturnType<typeof createLyricsPanel> | null} */
+  let lyricsPanel = null;
+  /** @type {HTMLButtonElement | null} */
+  let lyricsToggleBtn = null;
+  /** @type {(() => void) | null} */
+  let onLyricsToggle = null;
+  if (hasStoryOrLyrics) {
+    lyricsPanel = createLyricsPanel({ mount });
+    lyricsToggleBtn = document.createElement('button');
+    lyricsToggleBtn.type = 'button';
+    lyricsToggleBtn.className = 'hwes-drawer-toggle hwes-drawer-toggle--lyrics';
+    lyricsToggleBtn.setAttribute('aria-label', 'Open lyrics and story');
+    lyricsToggleBtn.setAttribute('data-hwes-drawer-toggle', 'lyrics');
+    lyricsToggleBtn.textContent = 'Lyrics';
+    onLyricsToggle = () => lyricsPanel?.toggle();
+    lyricsToggleBtn.addEventListener('click', onLyricsToggle);
+    mount.appendChild(lyricsToggleBtn);
+  }
 
   return {
     updateOnItemStart({ item, index, collection }) {
       chapterBar.update({ collection });
-      playlistDrawer.update({ activeIndex: index });
-      lyricsPanel.update({ item });
+      playlistDrawer?.update({ activeIndex: index });
+      lyricsPanel?.update({ item });
     },
     teardown() {
       unsubFirstItem?.();
@@ -112,10 +142,44 @@ export function createChromeBars(opts) {
       showIdent?.teardown();
       playlistDrawer?.teardown();
       lyricsPanel?.teardown();
-      playlistToggleBtn.removeEventListener('click', onPlaylistToggle);
-      lyricsToggleBtn.removeEventListener('click', onLyricsToggle);
-      playlistToggleBtn.remove();
-      lyricsToggleBtn.remove();
+      if (playlistToggleBtn && onPlaylistToggle) {
+        playlistToggleBtn.removeEventListener('click', onPlaylistToggle);
+        playlistToggleBtn.remove();
+      }
+      if (lyricsToggleBtn && onLyricsToggle) {
+        lyricsToggleBtn.removeEventListener('click', onLyricsToggle);
+        lyricsToggleBtn.remove();
+      }
     },
   };
+}
+
+/**
+ * Return true if any item in the experience (top-level or nested in a
+ * collection-ref's collection_content[]) carries story_text, lyrics, or
+ * lrc_lyrics in its content_metadata. Used by chrome-bars to decide
+ * whether the Lyrics/Story side panel toggle is worth surfacing —
+ * the player's chrome adapts to the experience's content shape rather
+ * than assuming music every time.
+ *
+ * @param {{ items?: any[] }} view
+ * @returns {boolean}
+ */
+function experienceHasStoryOrLyrics(view) {
+  const items = Array.isArray(view?.items) ? view.items : [];
+  for (const item of items) {
+    if (itemHasStoryOrLyrics(item)) return true;
+    const children = Array.isArray(item?.collection_content) ? item.collection_content : [];
+    for (const child of children) {
+      if (itemHasStoryOrLyrics(child)) return true;
+    }
+  }
+  return false;
+}
+
+function itemHasStoryOrLyrics(item) {
+  const md = item?.content_metadata;
+  if (!md || typeof md !== 'object') return false;
+  const has = (k) => typeof md[k] === 'string' && md[k].trim().length > 0;
+  return has('story_text') || has('full_story') || has('lyrics') || has('lrc_lyrics');
 }

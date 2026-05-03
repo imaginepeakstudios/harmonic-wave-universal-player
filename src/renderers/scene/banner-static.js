@@ -37,13 +37,20 @@
  */
 export function createBannerStaticRenderer(opts) {
   const { item, mount } = opts;
+  // visual_scene lives at three places per the production wire shape;
+  // see layer-selector.js pickVisualScene for the canonical resolution
+  // order. Banner-static activates for content items AND collection-
+  // ref wrappers, so we read from all three slots.
+  const i = /** @type {any} */ (item);
   const visualScene = /** @type {{ banner1_url?: string }} */ (
-    item?.content_metadata?.visual_scene ?? {}
+    i?.content_metadata?.visual_scene ?? i?.visual_scene ?? i?.collection_visual_scene ?? {}
   );
   const url =
     visualScene.banner1_url ??
+    i?.alt_cover_art_1_url ??
     item?.cover_art_url ??
     /** @type {{ content_cover_art_url?: string }} */ (item)?.content_cover_art_url ??
+    /** @type {{ collection_cover_art_url?: string }} */ (item)?.collection_cover_art_url ??
     item?.content_metadata?.cover_art_url ??
     null;
 
