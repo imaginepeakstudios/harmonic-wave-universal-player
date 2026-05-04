@@ -16,7 +16,7 @@
  *   - Mounted by boot.js when `framing.page_shell === 'broadcast'` AND
  *     experience has a name.
  *   - z-index 70 — sits above narration overlay (z=60) so the brand is
- *     visible during voiceovers, below the bumper (z=200) and cold-open
+ *     visible during voiceovers, below the bumper (z=1000) and cold-open
  *     card (z=90) so those cinematic moments aren't broken.
  *   - Hidden during the bumper / cold-open via CSS sibling visibility.
  *

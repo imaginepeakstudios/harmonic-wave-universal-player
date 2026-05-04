@@ -57,22 +57,6 @@ const OVERLAY_FADE_MS = 400;
 const PAUSE_AFTER_NARRATION_DEFAULT_S = 0;
 
 /**
- * Return the first non-empty string in `candidates`, or undefined.
- * Used by the four-tier speak* methods to pick a pre-rendered TTS
- * audio URL across the field-name variants the platform may write
- * (`tts_intro_url`, `tts_intro_audio_url`, nested under metadata, etc.).
- *
- * @param {Array<unknown>} candidates
- * @returns {string | undefined}
- */
-function firstNonEmpty(candidates) {
-  for (const c of candidates) {
-    if (typeof c === 'string' && c.length > 0) return c;
-  }
-  return undefined;
-}
-
-/**
  * @typedef {object} NarrationPipeline
  * @property {(opts: SpeakItemOpts) => Promise<void>} speakForItem
  * @property {(opts: { experience: any, actor?: any }) => Promise<void>} speakForExperience
@@ -117,16 +101,37 @@ function firstNonEmpty(candidates) {
  */
 
 /**
+ * TTS source priority (tier-agnostic; applied by every speak* method):
+ *   1. `generated_media[<key>].audio` — platform-prerendered at publish
+ *      time. Canonical happy path. The HWES wire surfaces every
+ *      pre-rendered URL here under keys like `intro_hint`,
+ *      `collection:<id>:intro_hint`, `content:<id>:intro_hint`.
+ *   2. Browser TTS (SpeechSynthesisUtterance) — last resort. Always
+ *      available, no API key, lower quality.
+ *
+ * FUTURE — agent-streamed TTS slots in BETWEEN (1) and (2): when an
+ * AI host is configured for the experience, the bridge will gain a
+ * third provider (`kind: 'agent-streamed'`) that opens a streaming
+ * source and feeds the same overlay / ducking / word-sync surface.
+ * Browser TTS stays last no matter what other providers exist.
+ *
  * @param {{
  *   audioPipeline: { duckMusicBed: () => void, killMusicBedInstantly: () => void, kind: 'desktop' | 'mobile' },
  *   stateMachine: import('../playback/state-machine.js').StateMachine,
  *   mount: HTMLElement,
  *   allowDefaultNarration?: boolean,
+ *   generatedMedia?: Record<string, { audio?: string }> | null,
  * }} opts
  * @returns {NarrationPipeline}
  */
 export function createNarrationPipeline(opts) {
-  const { audioPipeline, stateMachine, mount, allowDefaultNarration = false } = opts;
+  const {
+    audioPipeline,
+    stateMachine,
+    mount,
+    allowDefaultNarration = false,
+    generatedMedia = null,
+  } = opts;
   const bridge = createTtsBridge();
 
   /** @type {((value?: any) => void) | null} */
@@ -438,15 +443,10 @@ export function createNarrationPipeline(opts) {
         markPlayed('experience', undefined);
         return;
       }
-      // Pick up pre-rendered audio when the platform attaches it.
-      // Field-name matrix mirrors resolveNarrationAudioUrl below.
-      const audioUrl =
-        firstNonEmpty([
-          experience?.tts_intro_audio_url,
-          experience?.tts_intro_url,
-          experience?.content_metadata?.tts_intro_audio_url,
-          experience?.content_metadata?.tts_intro_url,
-        ]) || undefined;
+      // Tier-1 prerendered URL — see provider-priority comment on
+      // createNarrationPipeline. Missing key → bridge falls through
+      // to browser TTS.
+      const audioUrl = generatedMedia?.intro_hint?.audio || undefined;
       try {
         await speakCore({ text, audioUrl, actor });
       } finally {
@@ -473,13 +473,10 @@ export function createNarrationPipeline(opts) {
         markPlayed('collection', collId);
         return;
       }
+      // Tier-2 prerendered URL — keyed by collection_id. Missing key
+      // → bridge falls through to browser TTS.
       const audioUrl =
-        firstNonEmpty([
-          collection?.tts_intro_audio_url,
-          collection?.tts_intro_url,
-          collection?.collection_metadata?.tts_intro_audio_url,
-          collection?.collection_metadata?.tts_intro_url,
-        ]) || undefined;
+        (collId != null && generatedMedia?.[`collection:${collId}:intro_hint`]?.audio) || undefined;
       try {
         await speakCore({ text, audioUrl, actor });
       } finally {
@@ -568,7 +565,7 @@ export function createNarrationPipeline(opts) {
         return;
       }
 
-      const audioUrl = resolveNarrationAudioUrl({ item, phase });
+      const audioUrl = resolveNarrationAudioUrl({ item, phase, generatedMedia });
       const pauseSec = /** @type {number} */ (
         /** @type {any} */ (behavior).pause_after_narration_seconds ??
           PAUSE_AFTER_NARRATION_DEFAULT_S
@@ -643,27 +640,26 @@ function resolveNarrationText(opts) {
 }
 
 /**
- * @param {{ item: any, phase: 'intro' | 'outro' | 'between' }} opts
+ * Tier-3 prerendered URL — keyed by content_id. The platform writes
+ * pre-rendered per-item TTS into `generated_media` under
+ * `content:<id>:intro_hint` (and `…:outro_hint` for outro phase).
+ * Missing key → caller hands undefined to the bridge, which falls
+ * through to browser TTS. No legacy field lookups: the HWES wire
+ * surfaces prerendered audio exclusively via generated_media.
+ *
+ * @param {{ item: any, phase: 'intro' | 'outro' | 'between',
+ *           generatedMedia?: Record<string, { audio?: string }> | null }} opts
  * @returns {string | undefined}
  */
 function resolveNarrationAudioUrl(opts) {
-  const { item, phase } = opts;
+  const { item, phase, generatedMedia } = opts;
+  const contentId = item?.content_id;
+  if (contentId == null || !generatedMedia) return undefined;
   if (phase === 'intro' || phase === 'between') {
-    const candidates = [
-      item?.tts_intro_audio_url,
-      item?.content_metadata?.tts_intro_audio_url,
-      // Production may attach pre-rendered TTS as `tts_intro_url`.
-      item?.tts_intro_url,
-    ];
-    for (const c of candidates) {
-      if (typeof c === 'string' && c.length > 0) return c;
-    }
+    return generatedMedia[`content:${contentId}:intro_hint`]?.audio || undefined;
   }
   if (phase === 'outro') {
-    const candidates = [item?.tts_outro_audio_url, item?.content_metadata?.tts_outro_audio_url];
-    for (const c of candidates) {
-      if (typeof c === 'string' && c.length > 0) return c;
-    }
+    return generatedMedia[`content:${contentId}:outro_hint`]?.audio || undefined;
   }
   return undefined;
 }

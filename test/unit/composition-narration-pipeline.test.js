@@ -139,26 +139,48 @@ describe('composition/narration-pipeline — text resolution', () => {
 });
 
 describe('composition/narration-pipeline — audio URL resolution', () => {
-  test('intro: prefers tts_intro_audio_url', () => {
+  test('intro: returns generated_media[content:<id>:intro_hint].audio', () => {
     expect(
       resolveNarrationAudioUrl({
-        item: { tts_intro_audio_url: 'https://example.com/a.mp3' },
+        item: { content_id: 42 },
         phase: 'intro',
+        generatedMedia: { 'content:42:intro_hint': { audio: 'https://example.com/a.mp3' } },
       }),
     ).toBe('https://example.com/a.mp3');
   });
 
-  test('intro: falls back to content_metadata.tts_intro_audio_url', () => {
+  test('outro: returns generated_media[content:<id>:outro_hint].audio', () => {
     expect(
       resolveNarrationAudioUrl({
-        item: { content_metadata: { tts_intro_audio_url: 'https://example.com/b.mp3' } },
-        phase: 'intro',
+        item: { content_id: 42 },
+        phase: 'outro',
+        generatedMedia: { 'content:42:outro_hint': { audio: 'https://example.com/b.mp3' } },
       }),
     ).toBe('https://example.com/b.mp3');
   });
 
-  test('returns undefined when no URL', () => {
-    expect(resolveNarrationAudioUrl({ item: {}, phase: 'intro' })).toBe(undefined);
+  test('returns undefined when generatedMedia is missing', () => {
+    expect(resolveNarrationAudioUrl({ item: { content_id: 42 }, phase: 'intro' })).toBe(undefined);
+  });
+
+  test('returns undefined when key is absent (browser TTS fallback path)', () => {
+    expect(
+      resolveNarrationAudioUrl({
+        item: { content_id: 42 },
+        phase: 'intro',
+        generatedMedia: { 'content:99:intro_hint': { audio: 'https://example.com/x.mp3' } },
+      }),
+    ).toBe(undefined);
+  });
+
+  test('returns undefined when item has no content_id', () => {
+    expect(
+      resolveNarrationAudioUrl({
+        item: {},
+        phase: 'intro',
+        generatedMedia: { 'content:42:intro_hint': { audio: 'x' } },
+      }),
+    ).toBe(undefined);
   });
 });
 

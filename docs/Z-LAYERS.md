@@ -11,9 +11,9 @@ When adding a new layer, **pick the lowest z value that satisfies the
 ## Stack (top → bottom)
 
 ```
-1000  Loading screen / fatal error overlay      (one-shot, blocks everything)
+1100  Start Gate (.hwes-start-gate)              (one-shot pre-Play overlay; captures the user gesture browser autoplay policies require; sits above the bumper so it never collides with a cinematic moment)
 
- 200  Network Station ID Bumper                  (cinematic moment; opt-in via opening:'station_ident')
+1000  Network Station ID Bumper                  (cinematic moment; opt-in via opening:'station_ident')
 
   90  Cold-open card                             (cinematic moment; default for opening:'cold_open')
 
@@ -61,17 +61,17 @@ When adding a new layer, **pick the lowest z value that satisfies the
 
 2. **Transient overlays** (narration, lyrics) live in 5–60. Mounted per-item or per-narration; gone on teardown.
 
-3. **Cinematic moments** (bumper, cold-open, completion card) live in 80–200. They cover everything below to focus attention. The `body.hwes-cinematic` class fades 49–70 chrome during these moments — JS-toggled around `bumper.play()` and `coldOpenCard.play()` lifecycles.
+3. **Cinematic moments** (bumper, cold-open, completion card) live in 80–1000. They cover everything below to focus attention. The `body.hwes-cinematic` class fades 49–70 chrome during these moments — JS-toggled around `bumper.play()` and `coldOpenCard.play()` lifecycles.
 
-4. **Loading / fatal-error overlay** sits at 1000 — above EVERYTHING. Used only for boot failures (network error, malformed HWES JSON, hwes_version mismatch).
+4. **Gesture-entry gate** sits at 1100 — above the bumper. The Start Gate is the pre-Play overlay every browser autoplay policy requires; it dismisses on the first user gesture and never coexists with a cinematic moment. Boot-state messaging (`.boot-loading` / `.boot-error` / `.boot-empty`) is inline-flow content that replaces the app body — it has no z-index because no other layer is mounted yet.
 
-5. **Sublayers within a single component** stay 1–2 with the parent at a higher value. Example: bumper has `.hwes-network-bumper` at 200, logo at 2, halo + waveform at 1, background fill at 0.
+5. **Sublayers within a single component** stay 1–2 with the parent at a higher value. Example: bumper has `.hwes-network-bumper` at 1000, logo at 2, halo + waveform at 1, background fill at 0.
 
 ## Adding a new layer
 
 Reorder this doc + the corresponding CSS in lockstep. If you change a value, update this file in the same commit (the README-drift gate will not catch z-index changes; only humans will).
 
-If you find yourself wanting to add a layer at z=70, z=50, or z=200, ask: "should this share the slot with what's already there, or is the new component cinematically distinct?" If sharing makes sense, document the coexistence here. If distinct, find an unused gap (z=85, z=55) before reaching for z=300.
+If you find yourself wanting to add a layer at z=70, z=50, or z=1000, ask: "should this share the slot with what's already there, or is the new component cinematically distinct?" If sharing makes sense, document the coexistence here. If distinct, find an unused gap (z=85, z=55) before reaching for z=300.
 
 ## Audit commands
 
@@ -80,5 +80,5 @@ If you find yourself wanting to add a layer at z=70, z=50, or z=200, ask: "shoul
 grep -rnE "z-index: *[0-9]+" src/
 
 # Find any values not in this ladder
-grep -rnE "z-index: *[0-9]+" src/ | grep -vE "z-index: *(0|1|2|3|5|10|49|50|60|69|70|80|90|200|1000)"
+grep -rnE "z-index: *[0-9]+" src/ | grep -vE "z-index: *(0|1|2|3|5|10|49|50|60|69|70|80|90|1000|1100)"
 ```

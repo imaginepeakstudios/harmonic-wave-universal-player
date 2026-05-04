@@ -10,7 +10,7 @@
   ],
   "id": 16,
   "user_id": 1,
-  "profile_id": null,
+  "profile_id": 1,
   "name": "The Time Is Now",
   "slug": "the-time-is-now",
   "description": "This isn’t just an album. It’s a journey through real moments — where innocence gives way to awareness, where struggle leads to surrender, and where faith becomes something steady. Each chapter unfolds with intention. Each song carries meaning. This is “The Time Is Now,” experienced as it was lived.",
@@ -32,8 +32,8 @@
     "color_palette": "#3C3C3C"
   },
   "stream_count": 0,
-  "play_count": 9,
-  "last_played": "2026-05-03 13:49:57",
+  "play_count": 11,
+  "last_played": "2026-05-03 17:23:09",
   "actor_profile_id": 1,
   "seo_title": "The Time Is Now | Matthew Hartley",
   "seo_description": "Experience “The Time Is Now” by Matthew Hartley — an immersive, story-driven music journey on Harmonic Wave, built from real life, faith, and personal transformation.",
@@ -46,7 +46,7 @@
   "tts_intro": 0,
   "tts_fields": "[\"intro_hint\"]",
   "created_at": "2026-04-23 04:01:24",
-  "updated_at": "2026-05-03 16:03:24",
+  "updated_at": "2026-05-03 19:48:08",
   "share_token": "007ce7bdf1927aabfa7139baab5da0b5",
   "hide_hw_branding": 0,
   "framing_recipes": "[\"broadcast_show\"]",
@@ -54,9 +54,9 @@
   "station_ident": null,
   "station_logo_url": null,
   "enable_station_bumper": 1,
-  "profile_name": null,
-  "profile_slug": null,
-  "profile_recipe_library": null,
+  "profile_name": "Matthew Hartley",
+  "profile_slug": "matthew-hartley",
+  "profile_recipe_library": "[]",
   "actor_name": "Matthew Hartley",
   "actor_slug": "matthew-hartley",
   "actor_voice_id": "BNofWSgY4rQI6QkulBQT",
@@ -65,6 +65,29 @@
   "actor_actor_type": "real_person",
   "actor_visual_style": "Use a cinematic, grounded visual style based in real environments—industrial spaces, natural textures, and open settings. Favor natural or soft directional lighting with muted color palettes and subtle contrast. Avoid polished or staged aesthetics. The subject should feel authentic, reflective, and present, often positioned in quiet, introspective moments. Overall tone should feel minimal, honest, and emotionally grounded.",
   "actor_visual_directives": "[\"no_human_faces\",\"muted_colors\",\"natural_lighting\",\"cinematic_lighting\",\"industrial_setting\",\"minimal_composition\",\"negative_space\",\"no_text_overlays\",\"no_logos\",\"no_ui_elements\",\"realistic_textures\",\"grounded_tone\"]",
+  "generated_media": {
+    "collection:10:intro_hint": {
+      "audio": "https://harmonicwave.ai/media/generated/5"
+    },
+    "collection:11:intro_hint": {
+      "audio": "https://harmonicwave.ai/media/generated/6"
+    },
+    "collection:12:intro_hint": {
+      "audio": "https://harmonicwave.ai/media/generated/7"
+    },
+    "collection:7:intro_hint": {
+      "audio": "https://harmonicwave.ai/media/generated/2"
+    },
+    "collection:8:intro_hint": {
+      "audio": "https://harmonicwave.ai/media/generated/3"
+    },
+    "collection:9:intro_hint": {
+      "audio": "https://harmonicwave.ai/media/generated/4"
+    },
+    "intro_hint": {
+      "audio": "https://harmonicwave.ai/media/generated/1"
+    }
+  },
   "actor": {
     "name": "Matthew Hartley",
     "slug": "matthew-hartley",
@@ -108,7 +131,7 @@
     "og_image_url": "https://harmonicwave.ai/media/play/r2key/users%2F1%2Fexperiences%2Fthe-time-is-now%2Fimages%2F67fa3e86-af1c-49ed-9596-8bc5b882ffd9.jpg",
     "og_type": "website",
     "twitter_card": "summary_large_image",
-    "canonical_slug": "the-time-is-now",
+    "canonical_slug": "matthew-hartley/the-time-is-now",
     "noindex": false
   },
   "items": [

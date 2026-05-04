@@ -17,9 +17,8 @@
  * everything that follows.
  *
  * Visual:
- *   - Full-bleed overlay at z=1100 (above the loading screen, above
- *     the bumper z=200, above the cold-open card z=90 — this ALWAYS
- *     wins until dismissed)
+ *   - Full-bleed overlay at z=1100 (above the bumper z=1000, above the
+ *     cold-open card z=90 — this ALWAYS wins until dismissed)
  *   - Cover art (experience.cover_art_url) centered
  *   - Experience name + one-line premise (description or intro_hint)
  *   - "Start the Experience" pill button (Orbitron, cyan glow)

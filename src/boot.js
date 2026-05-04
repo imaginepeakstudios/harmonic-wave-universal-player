@@ -1013,6 +1013,7 @@ let activeBumper = null;
       stateMachine,
       mount: app,
       allowDefaultNarration: narrateAuto,
+      generatedMedia: /** @type {any} */ (view.experience)?.generated_media ?? null,
     });
 
     let lastMountedIndex = -1;
