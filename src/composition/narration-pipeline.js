@@ -57,6 +57,41 @@ const OVERLAY_FADE_MS = 400;
 const PAUSE_AFTER_NARRATION_DEFAULT_S = 0;
 
 /**
+ * Verbatim/direction discriminator per HWES v1.
+ *
+ * A field key is VERBATIM (speak word-for-word; platform pre-renders TTS
+ * and surfaces the URL via `generated_media[<key>].audio`) when it
+ * appears in the entity's `tts_fields` opt-in array. Otherwise it's
+ * DIRECTION (the text is a seed for an AI-host to compose around; the
+ * universal player — not an AI host — leaves DIRECTION slots silent).
+ *
+ * Spec text: "opt-in means verbatim AND audio pre-rendered; opt-out
+ * means direction AND no audio." The wire shape is a JSON-string array;
+ * the interpreter passes it through unparsed for forward-compat, so the
+ * helper accepts either the raw string or a native array.
+ *
+ * @param {string} fieldKey
+ * @param {unknown} ttsFieldsRaw  JSON-string array, native array, or null.
+ * @returns {boolean}
+ */
+function isVerbatimSlot(fieldKey, ttsFieldsRaw) {
+  if (ttsFieldsRaw == null) return false;
+  let arr;
+  if (Array.isArray(ttsFieldsRaw)) {
+    arr = ttsFieldsRaw;
+  } else if (typeof ttsFieldsRaw === 'string') {
+    try {
+      arr = JSON.parse(ttsFieldsRaw);
+    } catch {
+      return false;
+    }
+  } else {
+    return false;
+  }
+  return Array.isArray(arr) && arr.includes(fieldKey);
+}
+
+/**
  * @typedef {object} NarrationPipeline
  * @property {(opts: SpeakItemOpts) => Promise<void>} speakForItem
  * @property {(opts: { experience: any, actor?: any }) => Promise<void>} speakForExperience
@@ -101,19 +136,32 @@ const PAUSE_AFTER_NARRATION_DEFAULT_S = 0;
  */
 
 /**
- * TTS source priority (tier-agnostic; applied by every speak* method):
- *   1. `generated_media[<key>].audio` — platform-prerendered at publish
- *      time. Canonical happy path. The HWES wire surfaces every
- *      pre-rendered URL here under keys like `intro_hint`,
- *      `collection:<id>:intro_hint`, `content:<id>:intro_hint`.
- *   2. Browser TTS (SpeechSynthesisUtterance) — last resort. Always
- *      available, no API key, lower quality.
+ * Narration mode (per HWES v1 verbatim/direction split — see
+ * `isVerbatimSlot` helper above):
+ *   - VERBATIM (key in entity's `tts_fields`): platform pre-renders TTS;
+ *     speak the text word-for-word.
+ *   - DIRECTION (key NOT in `tts_fields`): text is a SEED for AI-host
+ *     composition. The universal player isn't an AI host — DIRECTION
+ *     slots stay silent here. Once-per-session tracking still marks
+ *     them played so the slot doesn't retry.
  *
- * FUTURE — agent-streamed TTS slots in BETWEEN (1) and (2): when an
- * AI host is configured for the experience, the bridge will gain a
- * third provider (`kind: 'agent-streamed'`) that opens a streaming
- * source and feeds the same overlay / ducking / word-sync surface.
- * Browser TTS stays last no matter what other providers exist.
+ * Within VERBATIM mode, the speak* methods pick a TTS source in this
+ * priority order:
+ *   1. `generated_media[<key>].audio` → platform-audio. Canonical
+ *      happy path. Keys: `intro_hint`, `collection:<id>:intro_hint`,
+ *      `content:<id>:intro_hint`, `outro_hint`, `station_ident`.
+ *   2. Browser TTS reading the verbatim text → degraded fallback when
+ *      the prerendered URL is missing (rare; opt-in implies
+ *      pre-rendered, but networks fail). Always last in the chain
+ *      regardless of other providers.
+ *
+ * FUTURE — agent-streamed TTS:
+ *   - For VERBATIM slots: slots in BETWEEN platform-audio and
+ *     browser-TTS when the prerendered URL is missing.
+ *   - For DIRECTION slots: fills the slot entirely (composes prose
+ *     in the actor's narrative_voice from the seed + structured
+ *     fields, streams the audio, feeds the same overlay/ducking
+ *     surface). Browser TTS stays last regardless.
  *
  * @param {{
  *   audioPipeline: { duckMusicBed: () => void, killMusicBedInstantly: () => void, kind: 'desktop' | 'mobile' },
@@ -436,6 +484,12 @@ export function createNarrationPipeline(opts) {
      */
     async speakForExperience({ experience, actor }) {
       if (!willPlayDJ('experience', undefined)) return;
+      // Verbatim/direction gate — see narration-mode comment on the
+      // factory. DIRECTION slots stay silent in the universal player.
+      if (!isVerbatimSlot('intro_hint', experience?.tts_fields)) {
+        markPlayed('experience', undefined);
+        return;
+      }
       const text = experience?.intro_hint;
       if (typeof text !== 'string' || text.trim().length === 0) {
         // No text to speak; still mark as "played" so subsequent calls
@@ -465,6 +519,14 @@ export function createNarrationPipeline(opts) {
     async speakForCollection({ collection, actor }) {
       const collId = collection?.collection_id;
       if (!willPlayDJ('collection', collId)) return;
+      // Verbatim/direction gate — see narration-mode comment on the
+      // factory. The interpreter normalizes top-level collection items
+      // to `collection_tts_fields`; nested junctions to `tts_fields`.
+      const ttsFields = collection?.tts_fields ?? collection?.collection_tts_fields;
+      if (!isVerbatimSlot('intro_hint', ttsFields)) {
+        markPlayed('collection', collId);
+        return;
+      }
       const text =
         collection?.collection_metadata?.intro_hint ??
         collection?.intro_hint ??
@@ -558,6 +620,16 @@ export function createNarrationPipeline(opts) {
       // narration on Back-button reentry, playlist jumps, etc.).
       const contentId = item?.content_id;
       if (!willPlayDJ('content', contentId)) return;
+
+      // Verbatim/direction gate — see narration-mode comment on the
+      // factory. Junction-row whitelist eligible keys per spec are
+      // `intro_hint` only; phase==='outro' at the item level has no
+      // v1 path (whitelist excludes outro_hint), so it always skips.
+      const eligibleKey = phase === 'outro' ? 'outro_hint' : 'intro_hint';
+      if (!isVerbatimSlot(eligibleKey, item?.tts_fields)) {
+        markPlayed('content', contentId);
+        return;
+      }
 
       const text = resolveNarrationText({ item, phase, allowDefault: allowDefaultNarration });
       if (!text) {
@@ -664,4 +736,4 @@ function resolveNarrationAudioUrl(opts) {
   return undefined;
 }
 
-export { resolveNarrationText, resolveNarrationAudioUrl };
+export { resolveNarrationText, resolveNarrationAudioUrl, isVerbatimSlot };

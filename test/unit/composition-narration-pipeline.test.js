@@ -3,6 +3,7 @@ import {
   createNarrationPipeline,
   resolveNarrationText,
   resolveNarrationAudioUrl,
+  isVerbatimSlot,
 } from '../../src/composition/narration-pipeline.js';
 import { createStateMachine } from '../../src/playback/state-machine.js';
 
@@ -237,7 +238,11 @@ describe('composition/narration-pipeline — speakForItem', () => {
       mount,
     });
     const speakP = pipeline.speakForItem({
-      item: { intro_hint: 'hello world', content_title: 'X' },
+      item: {
+        intro_hint: 'hello world',
+        content_title: 'X',
+        tts_fields: '["intro_hint"]',
+      },
       behavior: /** @type {any} */ ({}),
       phase: 'intro',
     });
@@ -265,7 +270,10 @@ describe('composition/narration-pipeline — speakForItem', () => {
       allowDefaultNarration: true,
     });
     await pipeline.speakForItem({
-      item: { content_title: 'Holding On' },
+      item: {
+        content_title: 'Holding On',
+        tts_fields: '["intro_hint"]',
+      },
       behavior: /** @type {any} */ ({}),
       phase: 'intro',
     });
@@ -285,7 +293,7 @@ describe('composition/narration-pipeline — speakForItem', () => {
       mount,
     });
     await pipeline.speakForItem({
-      item: { intro_hint: 'hello' },
+      item: { intro_hint: 'hello', tts_fields: '["intro_hint"]' },
       behavior: /** @type {any} */ ({}),
       phase: 'intro',
     });
@@ -305,7 +313,10 @@ describe('composition/narration-pipeline — speakForItem', () => {
       mount,
     });
     const speakP = pipeline.speakForItem({
-      item: { intro_hint: 'a long sentence here' },
+      item: {
+        intro_hint: 'a long sentence here',
+        tts_fields: '["intro_hint"]',
+      },
       behavior: /** @type {any} */ ({}),
       phase: 'intro',
     });
@@ -324,7 +335,7 @@ describe('composition/narration-pipeline — speakForItem', () => {
       mount,
     });
     await pipeline.speakForItem({
-      item: { intro_hint: 'hi' },
+      item: { intro_hint: 'hi', tts_fields: '["intro_hint"]' },
       behavior: /** @type {any} */ ({}),
       phase: 'intro',
     });
@@ -395,7 +406,10 @@ describe('composition/narration-pipeline — Phase 2 four-tier hierarchy + once-
 
   test('speakForExperience marks experience-overview as played', async () => {
     await pipeline.speakForExperience({
-      experience: { intro_hint: 'Welcome, listener.' },
+      experience: {
+        intro_hint: 'Welcome, listener.',
+        tts_fields: '["intro_hint"]',
+      },
     });
     expect(stub.utterances.length).toBe(1);
     expect(stub.utterances[0].text).toMatch(/Welcome, listener\./);
@@ -404,10 +418,16 @@ describe('composition/narration-pipeline — Phase 2 four-tier hierarchy + once-
 
   test('speakForExperience second call no-ops (once per session)', async () => {
     await pipeline.speakForExperience({
-      experience: { intro_hint: 'First call.' },
+      experience: {
+        intro_hint: 'First call.',
+        tts_fields: '["intro_hint"]',
+      },
     });
     await pipeline.speakForExperience({
-      experience: { intro_hint: 'Second call.' },
+      experience: {
+        intro_hint: 'Second call.',
+        tts_fields: '["intro_hint"]',
+      },
     });
     expect(stub.utterances.length).toBe(1); // only the first
   });
@@ -423,6 +443,7 @@ describe('composition/narration-pipeline — Phase 2 four-tier hierarchy + once-
       collection: {
         collection_id: 'chapter-1',
         collection_name: 'Chapter One',
+        tts_fields: '["intro_hint"]',
       },
     });
     expect(stub.utterances.length).toBe(1);
@@ -432,16 +453,28 @@ describe('composition/narration-pipeline — Phase 2 four-tier hierarchy + once-
 
   test('speakForCollection second call for same collection no-ops', async () => {
     await pipeline.speakForCollection({
-      collection: { collection_id: 'chapter-1', collection_name: 'Chapter One' },
+      collection: {
+        collection_id: 'chapter-1',
+        collection_name: 'Chapter One',
+        tts_fields: '["intro_hint"]',
+      },
     });
     await pipeline.speakForCollection({
-      collection: { collection_id: 'chapter-1', collection_name: 'Chapter One Repeat' },
+      collection: {
+        collection_id: 'chapter-1',
+        collection_name: 'Chapter One Repeat',
+        tts_fields: '["intro_hint"]',
+      },
     });
     expect(stub.utterances.length).toBe(1);
   });
 
   test('speakForItem marks content as played; second call no-ops', async () => {
-    const item = { content_id: 200, intro_hint: 'About this song.' };
+    const item = {
+      content_id: 200,
+      intro_hint: 'About this song.',
+      tts_fields: '["intro_hint"]',
+    };
     await pipeline.speakForItem({
       item,
       behavior: /** @type {any} */ ({}),
@@ -520,5 +553,154 @@ describe('composition/narration-pipeline — Phase 2 four-tier hierarchy + once-
     await pipeline.speakOutro({ text: '' });
     await pipeline.speakOutro({ text: '   ' });
     expect(stub.utterances.length).toBe(0);
+  });
+});
+
+describe('composition/narration-pipeline — isVerbatimSlot helper', () => {
+  test('JSON-string array with key returns true', () => {
+    expect(isVerbatimSlot('intro_hint', '["intro_hint","outro_hint"]')).toBe(true);
+  });
+  test('JSON-string array without key returns false', () => {
+    expect(isVerbatimSlot('intro_hint', '["outro_hint"]')).toBe(false);
+  });
+  test('empty JSON-string array returns false (DIRECTION mode)', () => {
+    expect(isVerbatimSlot('intro_hint', '[]')).toBe(false);
+  });
+  test('native array works the same as JSON-string', () => {
+    expect(isVerbatimSlot('intro_hint', ['intro_hint'])).toBe(true);
+    expect(isVerbatimSlot('outro_hint', ['intro_hint'])).toBe(false);
+  });
+  test('null / undefined / non-string returns false', () => {
+    expect(isVerbatimSlot('intro_hint', null)).toBe(false);
+    expect(isVerbatimSlot('intro_hint', undefined)).toBe(false);
+    expect(isVerbatimSlot('intro_hint', 42)).toBe(false);
+  });
+  test('malformed JSON returns false', () => {
+    expect(isVerbatimSlot('intro_hint', 'not-json')).toBe(false);
+    expect(isVerbatimSlot('intro_hint', '{"intro_hint":true}')).toBe(false);
+  });
+});
+
+describe('composition/narration-pipeline — verbatim/direction gating', () => {
+  /** @type {ReturnType<typeof installSpeechStub>} */
+  let stub;
+  /** @type {HTMLElement} */
+  let mount;
+  /** @type {ReturnType<typeof createStateMachine>} */
+  let sm;
+  /** @type {ReturnType<typeof createNarrationPipeline>} */
+  let pipeline;
+
+  beforeEach(() => {
+    stub = installSpeechStub();
+    mount = document.createElement('div');
+    document.body.appendChild(mount);
+    sm = createStateMachine();
+    pipeline = createNarrationPipeline({
+      audioPipeline: /** @type {any} */ ({
+        duckMusicBed: () => {},
+        killMusicBedInstantly: () => {},
+        kind: 'desktop',
+      }),
+      stateMachine: sm,
+      mount,
+    });
+  });
+
+  afterEach(() => {
+    pipeline?.teardown();
+    stub.restore();
+    mount.remove();
+  });
+
+  test('speakForExperience: DIRECTION mode (tts_fields=[]) skips narration', async () => {
+    await pipeline.speakForExperience({
+      experience: { intro_hint: 'Direction text — should not be spoken.', tts_fields: '[]' },
+    });
+    expect(stub.utterances.length).toBe(0);
+    // Still marked as played so once-per-session tracker closes the slot.
+    expect(pipeline.session.playedExperienceOverview).toBe(true);
+  });
+
+  test('speakForExperience: missing tts_fields entirely skips narration', async () => {
+    await pipeline.speakForExperience({
+      experience: { intro_hint: 'No tts_fields at all.' },
+    });
+    expect(stub.utterances.length).toBe(0);
+    expect(pipeline.session.playedExperienceOverview).toBe(true);
+  });
+
+  test('speakForCollection: DIRECTION mode skips, marks slot played', async () => {
+    await pipeline.speakForCollection({
+      collection: {
+        collection_id: 'chap-2',
+        collection_name: 'Chapter Two',
+        intro_hint: 'Direction text.',
+        tts_fields: '[]',
+      },
+    });
+    expect(stub.utterances.length).toBe(0);
+    expect(pipeline.session.playedCollectionIntros.has('chap-2')).toBe(true);
+  });
+
+  test('speakForCollection: collection_tts_fields alias is honored', async () => {
+    // Top-level collection-as-item carries `collection_tts_fields`.
+    await pipeline.speakForCollection({
+      collection: {
+        collection_id: 'chap-3',
+        collection_name: 'Chapter Three',
+        intro_hint: 'Verbatim line.',
+        collection_tts_fields: '["intro_hint"]',
+      },
+    });
+    expect(stub.utterances.length).toBe(1);
+  });
+
+  test('speakForItem: DIRECTION mode skips, marks content played', async () => {
+    await pipeline.speakForItem({
+      item: {
+        content_id: 300,
+        intro_hint: 'Junction-row direction text.',
+        tts_fields: '[]',
+      },
+      behavior: /** @type {any} */ ({}),
+      phase: 'intro',
+    });
+    expect(stub.utterances.length).toBe(0);
+    expect(pipeline.session.playedContentIntros.has('300')).toBe(true);
+  });
+
+  test('speakForItem outro phase always skips (junction whitelist excludes outro_hint)', async () => {
+    await pipeline.speakForItem({
+      item: {
+        content_id: 400,
+        outro_hint: 'Item outro.',
+        tts_fields: '["intro_hint"]', // even with intro_hint opted in, outro is not eligible
+      },
+      behavior: /** @type {any} */ ({}),
+      phase: 'outro',
+    });
+    expect(stub.utterances.length).toBe(0);
+  });
+
+  test('VERBATIM with no generated_media URL → degraded fallback to browser TTS', async () => {
+    // Per spec: opt-in implies pre-rendered, but if the URL is missing
+    // the bridge falls through to browser TTS reading the verbatim text.
+    pipeline.teardown();
+    pipeline = createNarrationPipeline({
+      audioPipeline: /** @type {any} */ ({
+        duckMusicBed: () => {},
+        killMusicBedInstantly: () => {},
+        kind: 'desktop',
+      }),
+      stateMachine: sm,
+      mount,
+      // generatedMedia omitted — no platform-audio URL available.
+    });
+    await pipeline.speakForExperience({
+      experience: { intro_hint: 'Verbatim cold open.', tts_fields: '["intro_hint"]' },
+    });
+    expect(stub.utterances.length).toBe(1);
+    expect(stub.utterances[0].text).toMatch(/Verbatim cold open\./);
   });
 });

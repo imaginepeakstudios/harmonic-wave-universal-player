@@ -1313,8 +1313,7 @@ let activeBumper = null;
             await narration.speakOutro({
               text: outroSeed,
               audioUrl:
-                /** @type {any} */ (view.experience)?.tts_outro_audio_url ??
-                /** @type {any} */ (view.experience)?.tts_outro_url ??
+                /** @type {any} */ (view.experience)?.generated_media?.outro_hint?.audio ??
                 undefined,
               actor: view.actor ?? undefined,
             });
@@ -1358,8 +1357,7 @@ let activeBumper = null;
           await narration.speakStationIdent({
             text: seed,
             audioUrl:
-              /** @type {any} */ (view.experience)?.tts_station_ident_audio_url ??
-              /** @type {any} */ (view.experience)?.tts_station_ident_url ??
+              /** @type {any} */ (view.experience)?.generated_media?.station_ident?.audio ??
               undefined,
             actor: view.actor ?? undefined,
           });

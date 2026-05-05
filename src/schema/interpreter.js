@@ -586,6 +586,15 @@ export function interpret(rawResponse, opts = {}) {
     (Array.isArray(rawResponse.delivery_instructions)
       ? rawResponse.delivery_instructions
       : undefined);
+  // Experience-level `display_recipes` was REMOVED from the wire in
+  // HWES v1.0 (the spec's no-cross-scope-cascade rule: display recipes
+  // live on content/collection/junction only). Production payloads
+  // never set `display_recipes` or `display_directives` at the
+  // experience root; this fallback exists for hand-rolled fixtures
+  // and legacy payloads. `getItemDisplayDirectives` runtime fallback
+  // to `experience.display_directives` is a player-side defensive
+  // net (incomplete items get experience-level styling rather than
+  // empty), distinct from the platform's pre-resolution cascade.
   const expDisplay = Array.isArray(rawResponse.display_directives)
     ? rawResponse.display_directives
     : parseJsonField(rawResponse.display_recipes, undefined);
